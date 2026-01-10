@@ -1,0 +1,70 @@
+name: bolan
+description: 'Open-source AI-powered terminal emulator'
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Terminal core
+  xterm: ^4.0.0
+  flutter_pty: ^0.4.0
+
+  # State
+  flutter_riverpod: ^2.6.0
+  riverpod_annotation: ^2.6.0
+  freezed_annotation: ^2.4.0
+
+  # Navigation
+  go_router: ^14.0.0
+
+  # Native window
+  macos_window_utils: ^1.6.0
+  flutter_acrylic: ^1.1.0
+
+  # Config & storage
+  toml: ^0.16.0
+  path_provider: ^2.1.0
+  flutter_secure_storage: ^9.2.0
+  shared_preferences: ^2.3.0
+
+  # Network / AI
+  dio: ^5.7.0
+
+  # Fonts
+  google_fonts: ^6.2.0
+
+  # Utilities
+  uuid: ^4.5.0
+  intl: ^0.20.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.0
+  freezed: ^2.5.0
+  riverpod_generator: ^2.6.0
+  mocktail: ^1.0.0
+  custom_lint: ^0.7.0
+  riverpod_lint: ^2.6.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/shell-integration/
+    - assets/fonts/JetBrainsMono/
+
+  fonts:
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono/JetBrainsMono-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/JetBrainsMono/JetBrainsMono-Italic.ttf
+          style: italic
