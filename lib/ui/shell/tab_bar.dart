@@ -12,7 +12,9 @@ import '../../providers/session_provider.dart';
 /// Uses [TitlebarSafeArea] to keep tabs clear of the traffic light buttons.
 /// Each tab shows the session title and a close button on hover.
 class BolonTabBar extends ConsumerWidget {
-  const BolonTabBar({super.key});
+  final VoidCallback? onSettings;
+
+  const BolonTabBar({super.key, this.onSettings});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,12 +45,26 @@ class BolonTabBar extends ConsumerWidget {
               },
             ),
           ),
-          // New tab button
+          // Action buttons
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: _AddTabButton(
-              theme: theme,
-              onTap: () => ref.read(sessionProvider.notifier).createSession(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (onSettings != null)
+                  _IconButton(
+                    icon: Icons.settings_outlined,
+                    theme: theme,
+                    onTap: onSettings!,
+                  ),
+                const SizedBox(width: 4),
+                _IconButton(
+                  icon: Icons.add,
+                  theme: theme,
+                  onTap: () =>
+                      ref.read(sessionProvider.notifier).createSession(),
+                ),
+              ],
             ),
           ),
         ],
@@ -150,11 +166,16 @@ class _TabState extends State<_Tab> {
   }
 }
 
-class _AddTabButton extends StatelessWidget {
+class _IconButton extends StatelessWidget {
+  final IconData icon;
   final BolonTheme theme;
   final VoidCallback onTap;
 
-  const _AddTabButton({required this.theme, required this.onTap});
+  const _IconButton({
+    required this.icon,
+    required this.theme,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +184,7 @@ class _AddTabButton extends StatelessWidget {
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: Icon(
-          Icons.add,
+          icon,
           size: 16,
           color: theme.dimForeground,
         ),

@@ -17,6 +17,9 @@ class BolonApp extends ConsumerWidget {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: bolonDefaultDark.background,
         fontFamily: 'JetBrainsMono',
+        textTheme: const TextTheme().apply(
+          decoration: TextDecoration.none,
+        ),
       ),
       home: const TerminalShell(),
     );

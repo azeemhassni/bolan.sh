@@ -14,7 +14,7 @@ import 'shell_integration.dart';
 ///
 /// Handles bidirectional data flow: terminal keyboard output goes to PTY input,
 /// PTY output goes to terminal screen. Tracks command blocks via OSC 133
-/// shell integration sequences.
+/// shell integration sequences, capturing command output text.
 class TerminalSession extends ChangeNotifier {
   final String id;
   final String title;
@@ -28,11 +28,15 @@ class TerminalSession extends ChangeNotifier {
   // Block model state
   final List<CommandBlock> _blocks = [];
   CommandBlock? _activeBlock;
-  String _pendingCommand = '';
   bool _commandRunning = false;
 
-  // Accumulated output lines for the active block
-  final List<String> _outputBuffer = [];
+  // Status bar state
+  String _cwd = '';
+  String _gitBranch = '';
+  bool _gitDirty = false;
+
+  // Buffer for capturing command output between C and D markers
+  final StringBuffer _outputCapture = StringBuffer();
 
   TerminalSession._({
     required this.id,
@@ -81,7 +85,7 @@ class TerminalSession extends ChangeNotifier {
   bool get isDisposed => _disposed;
   int get pid => _pty.pid;
 
-  /// Completed command blocks.
+  /// Completed command blocks with captured output.
   List<CommandBlock> get blocks => List.unmodifiable(_blocks);
 
   /// The currently running command block, or null.
@@ -89,6 +93,34 @@ class TerminalSession extends ChangeNotifier {
 
   /// Whether a command is currently executing.
   bool get isCommandRunning => _commandRunning;
+
+  /// Current working directory, updated via OSC 7 or shell integration.
+  String get cwd => _cwd;
+
+  /// Abbreviated CWD for display (replaces $HOME with ~).
+  String get abbreviatedCwd {
+    if (_cwd.isEmpty) return '';
+    final home = Platform.environment['HOME'] ?? '';
+    if (home.isNotEmpty && _cwd.startsWith(home)) {
+      return '~${_cwd.substring(home.length)}';
+    }
+    return _cwd;
+  }
+
+  /// Current git branch name, or empty if not in a repo.
+  String get gitBranch => _gitBranch;
+
+  /// Whether the git working tree has uncommitted changes.
+  bool get gitDirty => _gitDirty;
+
+  /// Shell name (e.g. "zsh", "bash").
+  String get shellName => title;
+
+  /// Terminal column count.
+  int get cols => terminal.viewWidth;
+
+  /// Terminal row count.
+  int get rows => terminal.viewHeight;
 
   /// Writes user input to the PTY.
   void writeInput(String data) {
@@ -113,9 +145,15 @@ class TerminalSession extends ChangeNotifier {
   }
 
   void _connect() {
-    // PTY output → Terminal screen
+    // PTY output → Terminal screen + output capture
     _outputSub = _pty.output.listen((data) {
-      terminal.write(utf8.decode(data, allowMalformed: true));
+      final decoded = utf8.decode(data, allowMalformed: true);
+      terminal.write(decoded);
+
+      // Capture output while a command is running
+      if (_commandRunning) {
+        _outputCapture.write(decoded);
+      }
     });
 
     // Terminal keyboard/mouse output → PTY input
@@ -128,11 +166,13 @@ class TerminalSession extends ChangeNotifier {
       _pty.resize(height, width);
     };
 
-    // OSC 133 shell integration events
+    // OSC sequences: shell integration (133) and CWD (7)
     terminal.onPrivateOSC = (String code, List<String> args) {
       if (code == '133') {
         final event = parseOsc133(args);
         if (event != null) _handleShellEvent(event);
+      } else if (code == '7' && args.isNotEmpty) {
+        _handleOsc7(args[0]);
       }
     };
   }
@@ -148,20 +188,17 @@ class TerminalSession extends ChangeNotifier {
         _commandRunning = false;
 
       case PromptEnd():
-        // User has typed a command, about to execute.
-        // Capture what's on the current terminal line as the command text.
-        _pendingCommand = _readCurrentLine();
+        break;
 
-      case CommandStart():
-        // Command execution begins.
-        if (_pendingCommand.isNotEmpty) {
+      case CommandStart(:final command):
+        if (command.isNotEmpty) {
+          _outputCapture.clear();
           _activeBlock = CommandBlock(
             id: _uuid.v4(),
-            command: _pendingCommand,
+            command: command,
             startedAt: DateTime.now(),
           );
           _commandRunning = true;
-          _outputBuffer.clear();
           notifyListeners();
         }
 
@@ -170,70 +207,146 @@ class TerminalSession extends ChangeNotifier {
     }
   }
 
+  /// Clears all completed blocks. Used when the user runs `clear`.
+  void clearBlocks() {
+    _blocks.clear();
+    notifyListeners();
+  }
+
   void _finalizeBlock({int? exitCode}) {
     if (_activeBlock == null) return;
 
+    // Handle `clear` — clear all blocks instead of adding a new one.
+    final cmd = _activeBlock!.command.trim();
+    if (cmd == 'clear' || cmd == 'reset') {
+      _blocks.clear();
+      _activeBlock = null;
+      _commandRunning = false;
+      _outputCapture.clear();
+      notifyListeners();
+      return;
+    }
+
+    // Clean up the captured output — strip ANSI escape sequences for
+    // the plain-text copy, trim trailing whitespace.
+    final rawOutput = _outputCapture.toString();
+    final cleanOutput = _stripAnsiEscapes(rawOutput).trim();
+
     _blocks.add(_activeBlock!.copyWith(
+      output: cleanOutput,
       exitCode: exitCode ?? -1,
       finishedAt: DateTime.now(),
       isRunning: false,
     ));
     _activeBlock = null;
     _commandRunning = false;
-    _pendingCommand = '';
+    _outputCapture.clear();
+
     notifyListeners();
   }
 
-  /// Reads the current line from the terminal buffer (the command the user typed).
-  String _readCurrentLine() {
-    final buffer = terminal.buffer;
-    if (buffer.lines.length == 0) return '';
+  /// Strips ANSI escape sequences from terminal output for clean text display.
+  static String _stripAnsiEscapes(String input) {
+    // Matches CSI sequences, OSC sequences, and simple escape sequences
+    return input.replaceAll(
+      RegExp(r'\x1B\[[0-9;]*[a-zA-Z]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)|\x1B[()][0-9A-Z]|\x1B[>=<]'),
+      '',
+    );
+  }
 
-    final cursorRow = buffer.cursorY + buffer.scrollBack;
-    if (cursorRow < 0 || cursorRow >= buffer.lines.length) return '';
+  /// Handles OSC 7 — current working directory notification.
+  /// Format: file://hostname/path
+  void _handleOsc7(String uri) {
+    try {
+      final parsed = Uri.parse(uri);
+      final newCwd = Uri.decodeComponent(parsed.path);
+      if (newCwd.isNotEmpty && newCwd != _cwd) {
+        _cwd = newCwd;
+        _updateGitStatus();
+        notifyListeners();
+      }
+    } on FormatException {
+      // Ignore malformed URIs
+    }
+  }
 
-    final line = buffer.lines[cursorRow];
-    return line.getText().trim();
+  /// Queries git status for the current working directory.
+  Future<void> _updateGitStatus() async {
+    if (_cwd.isEmpty) return;
+
+    try {
+      final branchResult = await Process.run(
+        'git',
+        ['rev-parse', '--abbrev-ref', 'HEAD'],
+        workingDirectory: _cwd,
+      );
+      if (branchResult.exitCode == 0) {
+        _gitBranch = (branchResult.stdout as String).trim();
+
+        final statusResult = await Process.run(
+          'git',
+          ['status', '--porcelain'],
+          workingDirectory: _cwd,
+        );
+        _gitDirty = (statusResult.stdout as String).trim().isNotEmpty;
+        notifyListeners();
+      } else {
+        _gitBranch = '';
+        _gitDirty = false;
+      }
+    } on ProcessException {
+      _gitBranch = '';
+      _gitDirty = false;
+    }
   }
 
   void _injectShellIntegration() {
-    // Source the shell integration script that emits OSC 133 markers.
-    // The scripts are bundled as assets and copied to a known location,
-    // but for now we emit the hooks inline for immediate functionality.
     final shellName = _defaultShell().split('/').last;
+    String? script;
 
     if (shellName == 'zsh') {
-      // Inline zsh integration — emits OSC 133 A/B/C/D markers.
-      const script = r'''
+      // Hide the shell's native prompt — Bolan renders its own prompt area.
+      // Set PS1 to empty so no prompt text appears in the terminal output.
+      script = r"""
+PS1=''
+RPS1=''
+PROMPT=''
 __bolan_prompt_start() { printf '\e]133;A\a'; }
 __bolan_prompt_end()   { printf '\e]133;B\a'; }
-__bolan_cmd_start()    { printf '\e]133;C\a'; }
+__bolan_cmd_start()    { printf '\e]133;C;%s\a' "$1"; }
 __bolan_cmd_end()      { printf "\e]133;D;$?\a"; }
+__bolan_osc7()         { printf '\e]7;file://%s%s\a' "$HOST" "$PWD"; }
 autoload -Uz add-zsh-hook
 add-zsh-hook precmd  __bolan_prompt_start
 add-zsh-hook precmd  __bolan_cmd_end
+add-zsh-hook precmd  __bolan_osc7
 add-zsh-hook preexec __bolan_prompt_end
 add-zsh-hook preexec __bolan_cmd_start
-''';
-      // Use a small delay so the shell has time to initialize first.
-      Future<void>.delayed(const Duration(milliseconds: 300), () {
-        if (!_disposed) writeInput(script);
-      });
+""";
     } else if (shellName == 'bash') {
-      const script = r'''
+      script = r"""
+PS1=''
 __bolan_prompt_start() { printf '\e]133;A\a'; }
 __bolan_prompt_end()   { printf '\e]133;B\a'; }
-__bolan_cmd_start()    { printf '\e]133;C\a'; }
+__bolan_cmd_start()    { printf '\e]133;C;%s\a' "$BASH_COMMAND"; }
 __bolan_cmd_end()      { printf "\e]133;D;$?\a"; }
+__bolan_osc7()         { printf '\e]7;file://%s%s\a' "$HOSTNAME" "$PWD"; }
 __bolan_preexec() { __bolan_prompt_end; __bolan_cmd_start; }
-__bolan_precmd() { __bolan_cmd_end; __bolan_prompt_start; }
+__bolan_precmd() { __bolan_cmd_end; __bolan_prompt_start; __bolan_osc7; }
 trap '__bolan_preexec' DEBUG
 PROMPT_COMMAND="__bolan_precmd;${PROMPT_COMMAND}"
-''';
-      Future<void>.delayed(const Duration(milliseconds: 300), () {
-        if (!_disposed) writeInput(script);
-      });
+""";
     }
+
+    if (script == null) return;
+
+    Future<void>.delayed(const Duration(milliseconds: 300), () async {
+      if (_disposed) return;
+      final tmpDir = Directory.systemTemp;
+      final scriptFile = File('${tmpDir.path}/bolan_shell_integration_$id.sh');
+      await scriptFile.writeAsString(script!);
+      writeInput('source ${scriptFile.path} && clear\n');
+    });
   }
 
   static String _defaultShell() {

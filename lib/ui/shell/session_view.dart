@@ -1,36 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
 
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/xterm_theme.dart';
-import '../blocks/block_list.dart';
+import '../../providers/config_provider.dart';
+import '../../providers/font_size_provider.dart';
+import '../blocks/command_block_widget.dart';
+import '../prompt/prompt_area.dart';
+import '../shared/font_size_toast.dart';
 
-/// Renders a single terminal session.
+/// Renders a terminal session with Warp-style flowing layout.
 ///
-/// Shows completed command blocks above the live terminal view.
-/// The terminal view handles the currently running command and prompt.
-class SessionView extends StatefulWidget {
+/// Completed commands are rendered as styled block widgets. During command
+/// execution, a live TerminalView shows output. The prompt area flows
+/// right after the last content.
+class SessionView extends ConsumerStatefulWidget {
   final TerminalSession session;
 
   const SessionView({super.key, required this.session});
 
   @override
-  State<SessionView> createState() => _SessionViewState();
+  ConsumerState<SessionView> createState() => _SessionViewState();
 }
 
-class _SessionViewState extends State<SessionView> {
-  final _controller = TerminalController();
-  late final FocusNode _focusNode;
+class _SessionViewState extends ConsumerState<SessionView> {
+  final _terminalController = TerminalController();
+  final _scrollController = ScrollController();
+  late final FocusNode _terminalFocusNode;
+  bool _showToast = false;
 
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode(debugLabel: 'terminal-${widget.session.id}');
+    _terminalFocusNode = FocusNode(debugLabel: 'terminal-${widget.session.id}');
     widget.session.addListener(_onSessionChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
-    });
   }
 
   @override
@@ -45,71 +51,125 @@ class _SessionViewState extends State<SessionView> {
   @override
   void dispose() {
     widget.session.removeListener(_onSessionChanged);
-    _controller.dispose();
-    _focusNode.dispose();
+    _terminalController.dispose();
+    _scrollController.dispose();
+    _terminalFocusNode.dispose();
     super.dispose();
   }
 
   void _onSessionChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
+    final fontSize = ref.watch(fontSizeProvider);
+    final configLoader = ref.watch(configLoaderProvider);
+    final lineHeight = configLoader?.config.editor.lineHeight ?? 1.2;
     final blocks = widget.session.blocks;
-    final activeBlock = widget.session.activeBlock;
+    final isRunning = widget.session.isCommandRunning;
 
-    return Column(
-      children: [
-        // Completed blocks — shown above the terminal
-        if (blocks.isNotEmpty || activeBlock != null)
-          Flexible(
-            flex: 0,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.4,
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.equal, meta: true):
+            _increaseFontSize,
+        const SingleActivator(LogicalKeyboardKey.minus, meta: true):
+            _decreaseFontSize,
+        const SingleActivator(LogicalKeyboardKey.digit0, meta: true):
+            _resetFontSize,
+      },
+      child: Stack(
+        children: [
+          ListView(
+            controller: _scrollController,
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.only(top: 8),
+            children: [
+              // Completed command blocks
+              for (final block in blocks)
+                CommandBlockWidget(
+                  block: block,
+                  fontSize: fontSize,
+                  lineHeight: lineHeight,
+                ),
+
+              // Live terminal output (only while a command is running)
+              if (isRunning)
+                SizedBox(
+                  height: _liveTerminalHeight(fontSize, lineHeight),
+                  child: TerminalView(
+                    widget.session.terminal,
+                    controller: _terminalController,
+                    theme: bolonToXtermTheme(theme),
+                    textStyle: TerminalStyle(
+                      fontSize: fontSize,
+                      height: lineHeight,
+                      fontFamily: 'JetBrainsMono',
+                      fontFamilyFallback: const [
+                        'Menlo',
+                        'Monaco',
+                        'Consolas',
+                        'Liberation Mono',
+                        'Courier New',
+                      ],
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    focusNode: _terminalFocusNode,
+                    cursorType: TerminalCursorType.block,
+                    backgroundOpacity: 0,
+                    readOnly: true,
+                  ),
+                ),
+
+              // Prompt area — flows right after content
+              PromptArea(
+                session: widget.session,
+                fontSize: fontSize,
               ),
-              child: BlockList(
-                blocks: blocks,
-                activeBlock: activeBlock,
+            ],
+          ),
+
+          // Font size toast
+          if (_showToast)
+            Center(
+              child: FontSizeToast(
+                fontSize: fontSize,
+                onDismissed: () {
+                  if (mounted) setState(() => _showToast = false);
+                },
               ),
             ),
-          ),
-
-        // Thin separator between blocks and terminal
-        if (blocks.isNotEmpty || activeBlock != null)
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: theme.blockBorder,
-          ),
-
-        // Live terminal — always visible for the running command and prompt
-        Expanded(
-          child: TerminalView(
-            widget.session.terminal,
-            controller: _controller,
-            theme: bolonToXtermTheme(theme),
-            textStyle: const TerminalStyle(
-              fontSize: 13,
-              fontFamily: 'JetBrainsMono',
-              fontFamilyFallback: [
-                'Menlo',
-                'Monaco',
-                'Consolas',
-                'Liberation Mono',
-                'Courier New',
-              ],
-            ),
-            padding: const EdgeInsets.all(8),
-            focusNode: _focusNode,
-            autofocus: true,
-            cursorType: TerminalCursorType.block,
-            backgroundOpacity: 0,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
+  }
+
+  /// Fixed height for the live terminal view — uses the full terminal height
+  /// to avoid layout jumps as output grows.
+  double _liveTerminalHeight(double fontSize, double lineHeight) {
+    final cellHeight = fontSize * lineHeight;
+    return widget.session.terminal.viewHeight * cellHeight + 16;
+  }
+
+  void _increaseFontSize() {
+    ref.read(fontSizeProvider.notifier).increase();
+    setState(() => _showToast = true);
+  }
+
+  void _decreaseFontSize() {
+    ref.read(fontSizeProvider.notifier).decrease();
+    setState(() => _showToast = true);
+  }
+
+  void _resetFontSize() {
+    ref.read(fontSizeProvider.notifier).reset();
+    setState(() => _showToast = true);
   }
 }

@@ -1,11 +1,12 @@
 /// Data model for a single command and its output in the block model.
 ///
 /// Each command typed at the prompt becomes a [CommandBlock] once executed.
-/// The block tracks the command text, output lines, timing, and exit code.
+/// The block captures the full output text, timing, and exit code.
+/// Output can be copied with a single click.
 class CommandBlock {
   final String id;
   final String command;
-  final List<String> outputLines;
+  final String output;
   final DateTime startedAt;
   final DateTime? finishedAt;
   final int? exitCode;
@@ -14,7 +15,7 @@ class CommandBlock {
   const CommandBlock({
     required this.id,
     required this.command,
-    this.outputLines = const [],
+    this.output = '',
     required this.startedAt,
     this.finishedAt,
     this.exitCode,
@@ -24,7 +25,7 @@ class CommandBlock {
   CommandBlock copyWith({
     String? id,
     String? command,
-    List<String>? outputLines,
+    String? output,
     DateTime? startedAt,
     DateTime? finishedAt,
     int? exitCode,
@@ -33,7 +34,7 @@ class CommandBlock {
     return CommandBlock(
       id: id ?? this.id,
       command: command ?? this.command,
-      outputLines: outputLines ?? this.outputLines,
+      output: output ?? this.output,
       startedAt: startedAt ?? this.startedAt,
       finishedAt: finishedAt ?? this.finishedAt,
       exitCode: exitCode ?? this.exitCode,
@@ -46,4 +47,7 @@ class CommandBlock {
 
   /// Whether the command exited successfully (code 0).
   bool get succeeded => exitCode == 0;
+
+  /// Whether this block has any output to display.
+  bool get hasOutput => output.isNotEmpty;
 }

@@ -4,11 +4,18 @@ import '../../core/terminal/command_block.dart';
 import '../../core/theme/bolan_theme.dart';
 
 /// Header row for a command block — shows the command text, exit code badge,
-/// and execution duration.
+/// execution duration, and optional copy indicator.
 class BlockHeader extends StatelessWidget {
   final CommandBlock block;
+  final bool showCopyHint;
+  final bool copied;
 
-  const BlockHeader({super.key, required this.block});
+  const BlockHeader({
+    super.key,
+    required this.block,
+    this.showCopyHint = false,
+    this.copied = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +32,7 @@ class BlockHeader extends StatelessWidget {
               color: theme.dimForeground,
               fontFamily: 'JetBrainsMono',
               fontSize: 13,
+              decoration: TextDecoration.none,
             ),
           ),
           // Command text
@@ -36,11 +44,32 @@ class BlockHeader extends StatelessWidget {
                 fontFamily: 'JetBrainsMono',
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
+                decoration: TextDecoration.none,
               ),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
             ),
           ),
+
+          // Copy indicator
+          if (copied)
+            Text(
+              'Copied',
+              style: TextStyle(
+                color: theme.exitSuccessFg,
+                fontSize: 11,
+                fontFamily: 'JetBrainsMono',
+              ),
+            )
+          else if (showCopyHint)
+            Icon(
+              Icons.content_copy,
+              size: 13,
+              color: theme.dimForeground,
+            ),
+
+          const SizedBox(width: 8),
+
           // Running indicator or exit code
           if (block.isRunning)
             SizedBox(
@@ -53,6 +82,7 @@ class BlockHeader extends StatelessWidget {
             )
           else if (block.exitCode != null)
             _ExitBadge(exitCode: block.exitCode!, theme: theme),
+
           // Duration
           if (block.duration != null) ...[
             const SizedBox(width: 8),

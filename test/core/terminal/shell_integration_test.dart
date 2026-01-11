@@ -13,9 +13,16 @@ void main() {
       expect(event, isA<PromptEnd>());
     });
 
-    test('parses CommandStart (C)', () {
+    test('parses CommandStart (C) with command text', () {
+      final event = parseOsc133(['C', 'ls -la']);
+      expect(event, isA<CommandStart>());
+      expect((event! as CommandStart).command, 'ls -la');
+    });
+
+    test('parses CommandStart (C) without command text', () {
       final event = parseOsc133(['C']);
       expect(event, isA<CommandStart>());
+      expect((event! as CommandStart).command, '');
     });
 
     test('parses CommandEnd (D) with exit code', () {

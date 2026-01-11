@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// A compact pill-shaped chip used in the status bar.
+/// A compact outlined chip used in the prompt area, styled like Warp's chips.
 ///
-/// Displays an optional icon and text with custom foreground/background colors.
+/// Displays an optional icon and text with a bordered outline style.
 class StatusChip extends StatelessWidget {
   final String text;
   final Color fg;
@@ -20,16 +20,17 @@ class StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: fg.withAlpha(60), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 11, color: fg),
+            Icon(icon, size: 12, color: fg),
             const SizedBox(width: 4),
           ],
           Text(
@@ -38,6 +39,8 @@ class StatusChip extends StatelessWidget {
               color: fg,
               fontSize: 12,
               fontFamily: 'JetBrainsMono',
+              fontWeight: FontWeight.w500,
+              decoration: TextDecoration.none,
             ),
           ),
         ],

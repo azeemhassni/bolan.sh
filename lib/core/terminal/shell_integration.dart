@@ -3,7 +3,7 @@
 /// The shell integration scripts emit these markers:
 ///   A — prompt start
 ///   B — prompt end (user has typed command, about to execute)
-///   C — command output start
+///   C;command — command output start (with command text)
 ///   D;exitCode — command finished
 sealed class ShellEvent {
   const ShellEvent();
@@ -19,9 +19,11 @@ class PromptEnd extends ShellEvent {
   const PromptEnd();
 }
 
-/// Command output has started.
+/// Command output has started. [command] contains the command text
+/// passed from the shell's preexec hook.
 class CommandStart extends ShellEvent {
-  const CommandStart();
+  final String command;
+  const CommandStart(this.command);
 }
 
 /// Command has finished executing.
@@ -40,7 +42,7 @@ ShellEvent? parseOsc133(List<String> args) {
   return switch (args[0]) {
     'A' => const PromptStart(),
     'B' => const PromptEnd(),
-    'C' => const CommandStart(),
+    'C' => CommandStart(args.length > 1 ? args[1] : ''),
     'D' => CommandEnd(_parseExitCode(args)),
     _ => null,
   };

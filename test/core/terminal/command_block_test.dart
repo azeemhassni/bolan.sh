@@ -49,19 +49,40 @@ void main() {
       expect(block.succeeded, isFalse);
     });
 
-    test('copyWith creates updated copy', () {
+    test('hasOutput is false for empty output', () {
+      final block = CommandBlock(
+        id: '1',
+        command: 'true',
+        startedAt: DateTime.now(),
+      );
+      expect(block.hasOutput, isFalse);
+    });
+
+    test('hasOutput is true for non-empty output', () {
+      final block = CommandBlock(
+        id: '1',
+        command: 'ls',
+        output: 'file1.txt\nfile2.txt',
+        startedAt: DateTime.now(),
+      );
+      expect(block.hasOutput, isTrue);
+    });
+
+    test('copyWith creates updated copy with output', () {
       final block = CommandBlock(
         id: '1',
         command: 'ls',
         startedAt: DateTime.now(),
       );
       final finished = block.copyWith(
+        output: 'file1.txt',
         exitCode: 0,
         finishedAt: DateTime.now(),
         isRunning: false,
       );
       expect(finished.id, block.id);
       expect(finished.command, block.command);
+      expect(finished.output, 'file1.txt');
       expect(finished.exitCode, 0);
       expect(finished.isRunning, isFalse);
     });
