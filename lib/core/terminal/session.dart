@@ -7,6 +7,7 @@ import 'package:flutter_pty/flutter_pty.dart';
 import 'package:uuid/uuid.dart';
 import 'package:xterm/xterm.dart';
 
+import '../completion/completion_engine.dart';
 import 'command_block.dart';
 import 'shell_integration.dart';
 
@@ -38,6 +39,9 @@ class TerminalSession extends ChangeNotifier {
 
   // Buffer for capturing command output between C and D markers
   final StringBuffer _outputCapture = StringBuffer();
+
+  // Completion engine — lazily initialized
+  CompletionEngine? _completionEngine;
 
   TerminalSession._({
     required this.id,
@@ -123,6 +127,12 @@ class TerminalSession extends ChangeNotifier {
   /// Terminal row count.
   int get rows => terminal.viewHeight;
 
+  /// Generates tab completions for the given input.
+  Future<CompletionResult> requestCompletion(String input, int cursorPos) {
+    _completionEngine ??= CompletionEngine(shell: _defaultShell());
+    return _completionEngine!.complete(input, cursorPos, _cwd);
+  }
+
   /// Writes user input to the PTY.
   void writeInput(String data) {
     if (_disposed) return;
@@ -142,6 +152,7 @@ class TerminalSession extends ChangeNotifier {
     _disposed = true;
     _outputSub?.cancel();
     _pty.kill();
+    _completionEngine?.dispose();
     super.dispose();
   }
 
