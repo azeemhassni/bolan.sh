@@ -24,10 +24,16 @@ class PromptInput extends StatefulWidget {
 
 class PromptInputState extends State<PromptInput> {
   final _controller = TextEditingController();
-  final _focusNode = FocusNode();
+  late final FocusNode _focusNode;
   final List<String> _history = [];
   int _historyIndex = -1;
   String _savedInput = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode(onKeyEvent: _handleKeyEvent);
+  }
 
   /// Requests focus on the input field.
   void requestFocus() => _focusNode.requestFocus();
@@ -47,81 +53,95 @@ class PromptInputState extends State<PromptInput> {
       color: Colors.transparent,
       child: Padding(
         padding: const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 10),
-        child: KeyboardListener(
-          focusNode: FocusNode(),
-          onKeyEvent: _handleKeyEvent,
-          child: TextField(
-            controller: _controller,
-            focusNode: _focusNode,
-            autofocus: true,
-            maxLines: null,
-            minLines: 1,
-            textInputAction: TextInputAction.newline,
-            style: TextStyle(
-              color: theme.foreground,
-              fontFamily: 'JetBrainsMono',
-              fontSize: widget.fontSize,
-              height: 1.4,
-              decoration: TextDecoration.none,
-            ),
-            cursorColor: theme.cursor,
-            cursorWidth: 2,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
-              isDense: true,
-            ),
-            // Submit is handled via KeyboardListener (Enter without Shift)
+        child: TextField(
+          controller: _controller,
+          focusNode: _focusNode,
+          autofocus: true,
+          maxLines: null,
+          minLines: 1,
+          style: TextStyle(
+            color: theme.foreground,
+            fontFamily: 'JetBrainsMono',
+            fontSize: widget.fontSize,
+            height: 1.4,
+            decoration: TextDecoration.none,
+          ),
+          cursorColor: theme.cursor,
+          cursorWidth: 2,
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.zero,
+            isDense: true,
           ),
         ),
       ),
     );
   }
 
-  void _handleKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) return;
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     final ctrl = HardwareKeyboard.instance.isControlPressed;
     final shift = HardwareKeyboard.instance.isShiftPressed;
 
     switch (event.logicalKey) {
-      // Enter submits, Shift+Enter inserts newline
       case LogicalKeyboardKey.enter when !shift:
         _onSubmit(_controller.text);
+        return KeyEventResult.handled;
+
+      case LogicalKeyboardKey.enter when shift:
+        // Insert newline at cursor position
+        final pos = _controller.selection.baseOffset;
+        final text = _controller.text;
+        _controller.text = '${text.substring(0, pos)}\n${text.substring(pos)}';
+        _controller.selection = TextSelection.collapsed(offset: pos + 1);
+        return KeyEventResult.handled;
 
       case LogicalKeyboardKey.arrowUp when !ctrl:
         _navigateHistory(back: true);
+        return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowDown when !ctrl:
         _navigateHistory(back: false);
+        return KeyEventResult.handled;
 
       case LogicalKeyboardKey.keyA when ctrl:
         _controller.selection = const TextSelection.collapsed(offset: 0);
+        return KeyEventResult.handled;
 
       case LogicalKeyboardKey.keyE when ctrl:
         _controller.selection = TextSelection.collapsed(
           offset: _controller.text.length,
         );
+        return KeyEventResult.handled;
 
       case LogicalKeyboardKey.keyU when ctrl:
         final pos = _controller.selection.baseOffset;
         _controller.text = _controller.text.substring(pos);
         _controller.selection = const TextSelection.collapsed(offset: 0);
+        return KeyEventResult.handled;
 
       case LogicalKeyboardKey.keyK when ctrl:
         final pos = _controller.selection.baseOffset;
         _controller.text = _controller.text.substring(0, pos);
         _controller.selection = TextSelection.collapsed(offset: pos);
+        return KeyEventResult.handled;
 
       case LogicalKeyboardKey.keyW when ctrl:
         _deleteWordBefore();
+        return KeyEventResult.handled;
 
       case LogicalKeyboardKey.keyC when ctrl:
         widget.session.writeInput('\x03');
         _controller.clear();
+        return KeyEventResult.handled;
 
       case LogicalKeyboardKey.keyL when ctrl:
         widget.session.clearBlocks();
         widget.session.writeInput('\x0c');
+        return KeyEventResult.handled;
+
+      default:
+        return KeyEventResult.ignored;
     }
   }
 

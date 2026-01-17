@@ -12,11 +12,13 @@ import 'prompt_input.dart';
 class PromptArea extends StatelessWidget {
   final TerminalSession session;
   final double fontSize;
+  final GlobalKey<PromptInputState>? promptInputKey;
 
   const PromptArea({
     super.key,
     required this.session,
     this.fontSize = 13.0,
+    this.promptInputKey,
   });
 
   @override
@@ -75,6 +77,7 @@ class PromptArea extends StatelessWidget {
 
           // Text input
           PromptInput(
+            key: promptInputKey,
             session: session,
             fontSize: fontSize,
           ),

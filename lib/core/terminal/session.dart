@@ -29,6 +29,7 @@ class TerminalSession extends ChangeNotifier {
   final List<CommandBlock> _blocks = [];
   CommandBlock? _activeBlock;
   bool _commandRunning = false;
+  bool _usedAltBuffer = false;
 
   // Status bar state
   String _cwd = '';
@@ -153,6 +154,10 @@ class TerminalSession extends ChangeNotifier {
       // Capture output while a command is running
       if (_commandRunning) {
         _outputCapture.write(decoded);
+        // Detect alternate screen buffer usage (TUI programs)
+        if (!_usedAltBuffer && terminal.isUsingAltBuffer) {
+          _usedAltBuffer = true;
+        }
       }
     });
 
@@ -193,6 +198,7 @@ class TerminalSession extends ChangeNotifier {
       case CommandStart(:final command):
         if (command.isNotEmpty) {
           _outputCapture.clear();
+          _usedAltBuffer = false;
           _activeBlock = CommandBlock(
             id: _uuid.v4(),
             command: command,
@@ -217,7 +223,6 @@ class TerminalSession extends ChangeNotifier {
     if (_activeBlock == null) return;
 
     final cmd = _activeBlock!.command.trim();
-    final baseCmd = cmd.split(' ').first.split('/').last;
 
     // Handle `clear` — clear all blocks instead of adding a new one.
     if (cmd == 'clear' || cmd == 'reset') {
@@ -229,14 +234,14 @@ class TerminalSession extends ChangeNotifier {
       return;
     }
 
-    // Skip output for interactive/TUI programs — their output is
-    // full of escape sequences and not useful as a block.
-    final isInteractive = _interactiveCommands.contains(baseCmd) ||
-        _interactiveFullCommands.any((c) => cmd.startsWith(c));
-    if (isInteractive) {
+    // Skip output for programs that used the alternate screen buffer
+    // (vim, nano, less, top, ssh, etc.) — their output is TUI rendering
+    // and not useful as a block.
+    if (_usedAltBuffer) {
       _activeBlock = null;
       _commandRunning = false;
       _outputCapture.clear();
+      _usedAltBuffer = false;
       notifyListeners();
       return;
     }
@@ -362,22 +367,6 @@ PROMPT_COMMAND="__bolan_precmd;${PROMPT_COMMAND}"
       writeInput('source ${scriptFile.path} && clear\n');
     });
   }
-
-  /// Commands that use a TUI / alternate screen buffer.
-  /// Their output is not useful as a block.
-  static const _interactiveCommands = {
-    'nano', 'vi', 'vim', 'nvim', 'emacs',
-    'less', 'more', 'man',
-    'top', 'htop', 'btop',
-    'claude', 'ssh', 'tmux', 'screen',
-  };
-
-  /// Multi-word commands that are interactive.
-  static const _interactiveFullCommands = {
-    'git commit',
-    'git rebase',
-    'git mergetool',
-  };
 
   static String _defaultShell() {
     if (Platform.isMacOS || Platform.isLinux) {

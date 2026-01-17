@@ -21,7 +21,14 @@ class BolonApp extends ConsumerWidget {
           decoration: TextDecoration.none,
         ),
       ),
-      home: const TerminalShell(),
+      home: DefaultTextStyle(
+        style: TextStyle(
+          fontFamily: 'JetBrainsMono',
+          decoration: TextDecoration.none,
+          color: bolonDefaultDark.foreground,
+        ),
+        child: const TerminalShell(),
+      ),
     );
   }
 }

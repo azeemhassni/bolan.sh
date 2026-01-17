@@ -10,6 +10,7 @@ import '../../providers/config_provider.dart';
 import '../../providers/font_size_provider.dart';
 import '../blocks/command_block_widget.dart';
 import '../prompt/prompt_area.dart';
+import '../prompt/prompt_input.dart';
 import '../shared/font_size_toast.dart';
 
 /// Renders a terminal session with Warp-style flowing layout.
@@ -30,13 +31,16 @@ class _SessionViewState extends ConsumerState<SessionView> {
   final _terminalController = TerminalController();
   final _scrollController = ScrollController();
   late final FocusNode _terminalFocusNode;
+  final _promptKey = GlobalKey<PromptInputState>();
   bool _showToast = false;
+  bool _wasRunning = false;
 
   @override
   void initState() {
     super.initState();
     _terminalFocusNode = FocusNode(debugLabel: 'terminal-${widget.session.id}');
     widget.session.addListener(_onSessionChanged);
+    HardwareKeyboard.instance.addHandler(_globalKeyHandler);
   }
 
   @override
@@ -50,6 +54,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_globalKeyHandler);
     widget.session.removeListener(_onSessionChanged);
     _terminalController.dispose();
     _scrollController.dispose();
@@ -59,11 +64,29 @@ class _SessionViewState extends ConsumerState<SessionView> {
 
   void _onSessionChanged() {
     if (!mounted) return;
+    final isRunning = widget.session.isCommandRunning;
+
     setState(() {});
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
+      if (!mounted) return;
+
+      // Command just started → focus the terminal
+      if (isRunning && !_wasRunning) {
+        _terminalFocusNode.requestFocus();
+      }
+
+      // Command just finished → focus the prompt input
+      if (!isRunning && _wasRunning) {
+        _promptKey.currentState?.requestFocus();
+      }
+
+      // Auto-scroll blocks list
+      if (!isRunning && _scrollController.hasClients) {
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       }
+
+      _wasRunning = isRunning;
     });
   }
 
@@ -87,56 +110,55 @@ class _SessionViewState extends ConsumerState<SessionView> {
       },
       child: Stack(
         children: [
-          ListView(
-            controller: _scrollController,
-            physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.only(top: 8),
-            children: [
-              // Completed command blocks
-              for (final block in blocks)
-                CommandBlockWidget(
-                  block: block,
-                  fontSize: fontSize,
-                  lineHeight: lineHeight,
-                ),
-
-              // Live terminal (only while a command is running)
-              // Interactive — not read-only, so vim/nano/etc. work
-              if (isRunning)
-                SizedBox(
-                  height: _liveTerminalHeight(fontSize, lineHeight),
-                  child: TerminalView(
-                    widget.session.terminal,
-                    controller: _terminalController,
-                    theme: bolonToXtermTheme(theme),
-                    textStyle: TerminalStyle(
-                      fontSize: fontSize,
-                      height: lineHeight,
-                      fontFamily: 'JetBrainsMono',
-                      fontFamilyFallback: const [
-                        'Menlo',
-                        'Monaco',
-                        'Consolas',
-                        'Liberation Mono',
-                        'Courier New',
-                      ],
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    focusNode: _terminalFocusNode,
-                    autofocus: true,
-                    cursorType: TerminalCursorType.block,
-                    backgroundOpacity: 0,
+          // Two modes:
+          // Running: full-screen terminal view (so programs get correct dimensions)
+          // Idle: block list + prompt area
+          if (isRunning)
+            TerminalView(
+              widget.session.terminal,
+              controller: _terminalController,
+              theme: bolonToXtermTheme(theme),
+              textStyle: TerminalStyle(
+                fontSize: fontSize,
+                height: lineHeight,
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: const [
+                  'Menlo',
+                  'Monaco',
+                  'Consolas',
+                  'Liberation Mono',
+                  'Courier New',
+                ],
+              ),
+              padding: const EdgeInsets.all(8),
+              focusNode: _terminalFocusNode,
+              autofocus: true,
+              cursorType: TerminalCursorType.block,
+              backgroundOpacity: 0,
+            )
+          else
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => _promptKey.currentState?.requestFocus(),
+              child: ListView(
+              controller: _scrollController,
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.only(top: 8),
+              children: [
+                for (final block in blocks)
+                  CommandBlockWidget(
+                    block: block,
+                    fontSize: fontSize,
+                    lineHeight: lineHeight,
                   ),
-                ),
-
-              // Prompt area — only shown when no command is running
-              if (!isRunning)
                 PromptArea(
                   session: widget.session,
                   fontSize: fontSize,
+                  promptInputKey: _promptKey,
                 ),
-            ],
-          ),
+              ],
+            ),
+            ),
 
           // Font size toast
           if (_showToast)
@@ -153,11 +175,23 @@ class _SessionViewState extends ConsumerState<SessionView> {
     );
   }
 
-  /// Fixed height for the live terminal view — uses the full terminal height
-  /// to avoid layout jumps as output grows.
-  double _liveTerminalHeight(double fontSize, double lineHeight) {
-    final cellHeight = fontSize * lineHeight;
-    return widget.session.terminal.viewHeight * cellHeight + 16;
+  bool _globalKeyHandler(KeyEvent event) {
+    if (widget.session.isCommandRunning) return false;
+    if (event is! KeyDownEvent) return false;
+
+    // If the prompt already has focus, let it handle the event
+    final promptState = _promptKey.currentState;
+    if (promptState == null) return false;
+
+    final isPrintable = event.character != null &&
+        event.character!.isNotEmpty &&
+        !HardwareKeyboard.instance.isControlPressed &&
+        !HardwareKeyboard.instance.isMetaPressed;
+
+    if (isPrintable) {
+      promptState.requestFocus();
+    }
+    return false; // Don't consume — let the event propagate
   }
 
   void _increaseFontSize() {
