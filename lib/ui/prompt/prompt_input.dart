@@ -54,7 +54,9 @@ class PromptInputState extends State<PromptInput> {
             controller: _controller,
             focusNode: _focusNode,
             autofocus: true,
-            maxLines: 1,
+            maxLines: null,
+            minLines: 1,
+            textInputAction: TextInputAction.newline,
             style: TextStyle(
               color: theme.foreground,
               fontFamily: 'JetBrainsMono',
@@ -69,7 +71,7 @@ class PromptInputState extends State<PromptInput> {
               contentPadding: EdgeInsets.zero,
               isDense: true,
             ),
-            onSubmitted: _onSubmit,
+            // Submit is handled via KeyboardListener (Enter without Shift)
           ),
         ),
       ),
@@ -80,8 +82,13 @@ class PromptInputState extends State<PromptInput> {
     if (event is! KeyDownEvent) return;
 
     final ctrl = HardwareKeyboard.instance.isControlPressed;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
 
     switch (event.logicalKey) {
+      // Enter submits, Shift+Enter inserts newline
+      case LogicalKeyboardKey.enter when !shift:
+        _onSubmit(_controller.text);
+
       case LogicalKeyboardKey.arrowUp when !ctrl:
         _navigateHistory(back: true);
       case LogicalKeyboardKey.arrowDown when !ctrl:

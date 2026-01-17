@@ -100,7 +100,8 @@ class _SessionViewState extends ConsumerState<SessionView> {
                   lineHeight: lineHeight,
                 ),
 
-              // Live terminal output (only while a command is running)
+              // Live terminal (only while a command is running)
+              // Interactive — not read-only, so vim/nano/etc. work
               if (isRunning)
                 SizedBox(
                   height: _liveTerminalHeight(fontSize, lineHeight),
@@ -122,17 +123,18 @@ class _SessionViewState extends ConsumerState<SessionView> {
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     focusNode: _terminalFocusNode,
+                    autofocus: true,
                     cursorType: TerminalCursorType.block,
                     backgroundOpacity: 0,
-                    readOnly: true,
                   ),
                 ),
 
-              // Prompt area — flows right after content
-              PromptArea(
-                session: widget.session,
-                fontSize: fontSize,
-              ),
+              // Prompt area — only shown when no command is running
+              if (!isRunning)
+                PromptArea(
+                  session: widget.session,
+                  fontSize: fontSize,
+                ),
             ],
           ),
 

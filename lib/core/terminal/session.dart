@@ -216,10 +216,24 @@ class TerminalSession extends ChangeNotifier {
   void _finalizeBlock({int? exitCode}) {
     if (_activeBlock == null) return;
 
-    // Handle `clear` — clear all blocks instead of adding a new one.
     final cmd = _activeBlock!.command.trim();
+    final baseCmd = cmd.split(' ').first.split('/').last;
+
+    // Handle `clear` — clear all blocks instead of adding a new one.
     if (cmd == 'clear' || cmd == 'reset') {
       _blocks.clear();
+      _activeBlock = null;
+      _commandRunning = false;
+      _outputCapture.clear();
+      notifyListeners();
+      return;
+    }
+
+    // Skip output for interactive/TUI programs — their output is
+    // full of escape sequences and not useful as a block.
+    final isInteractive = _interactiveCommands.contains(baseCmd) ||
+        _interactiveFullCommands.any((c) => cmd.startsWith(c));
+    if (isInteractive) {
       _activeBlock = null;
       _commandRunning = false;
       _outputCapture.clear();
@@ -348,6 +362,22 @@ PROMPT_COMMAND="__bolan_precmd;${PROMPT_COMMAND}"
       writeInput('source ${scriptFile.path} && clear\n');
     });
   }
+
+  /// Commands that use a TUI / alternate screen buffer.
+  /// Their output is not useful as a block.
+  static const _interactiveCommands = {
+    'nano', 'vi', 'vim', 'nvim', 'emacs',
+    'less', 'more', 'man',
+    'top', 'htop', 'btop',
+    'claude', 'ssh', 'tmux', 'screen',
+  };
+
+  /// Multi-word commands that are interactive.
+  static const _interactiveFullCommands = {
+    'git commit',
+    'git rebase',
+    'git mergetool',
+  };
 
   static String _defaultShell() {
     if (Platform.isMacOS || Platform.isLinux) {
