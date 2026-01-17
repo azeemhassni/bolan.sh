@@ -58,7 +58,7 @@ class StatusBar extends StatelessWidget {
             '${session.cols}\u00D7${session.rows}',
             style: TextStyle(
               color: theme.dimForeground,
-              fontFamily: 'JetBrainsMono',
+              fontFamily: 'Operator Mono',
               fontSize: 11,
               decoration: TextDecoration.none,
             ),

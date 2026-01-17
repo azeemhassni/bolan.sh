@@ -65,7 +65,7 @@ class CompletionPopup extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: isSelected ? theme.foreground : theme.blockHeaderFg,
-                  fontFamily: 'JetBrainsMono',
+                  fontFamily: 'Operator Mono',
                   fontSize: fontSize,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   decoration: TextDecoration.none,

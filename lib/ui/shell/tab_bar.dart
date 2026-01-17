@@ -143,7 +143,7 @@ class _TabState extends State<_Tab> {
                   style: TextStyle(
                     color: fg,
                     fontSize: 12,
-                    fontFamily: 'JetBrainsMono',
+                    fontFamily: 'Operator Mono',
                   ),
                 ),
               ),

@@ -69,7 +69,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                       block.command,
                       style: TextStyle(
                         color: theme.foreground,
-                        fontFamily: 'JetBrainsMono',
+                        fontFamily: 'Operator Mono',
                         fontSize: widget.fontSize,
                         fontWeight: FontWeight.w600,
                         decoration: TextDecoration.none,
@@ -83,7 +83,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                       style: TextStyle(
                         color: theme.exitSuccessFg,
                         fontSize: 11,
-                        fontFamily: 'JetBrainsMono',
+                        fontFamily: 'Operator Mono',
                         decoration: TextDecoration.none,
                       ),
                     )
@@ -99,7 +99,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                       _formatDuration(block.duration!),
                       style: TextStyle(
                         color: theme.dimForeground,
-                        fontFamily: 'JetBrainsMono',
+                        fontFamily: 'Operator Mono',
                         fontSize: widget.fontSize - 2,
                         decoration: TextDecoration.none,
                       ),
@@ -123,7 +123,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                       },
                       style: TextStyle(
                         color: theme.foreground,
-                        fontFamily: 'JetBrainsMono',
+                        fontFamily: 'Operator Mono',
                         fontSize: widget.fontSize,
                         height: widget.lineHeight,
                         decoration: TextDecoration.none,

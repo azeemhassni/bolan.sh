@@ -38,7 +38,7 @@ class EditorConfig {
   final bool blockMode;
 
   const EditorConfig({
-    this.fontFamily = 'JetBrainsMono',
+    this.fontFamily = 'Operator Mono',
     this.fontSize = 13.0,
     this.lineHeight = 1.0,
     this.cursorStyle = 'block',

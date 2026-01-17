@@ -30,7 +30,7 @@ class BlockHeader extends StatelessWidget {
             '\$ ',
             style: TextStyle(
               color: theme.dimForeground,
-              fontFamily: 'JetBrainsMono',
+              fontFamily: 'Operator Mono',
               fontSize: 13,
               decoration: TextDecoration.none,
             ),
@@ -41,7 +41,7 @@ class BlockHeader extends StatelessWidget {
               block.command,
               style: TextStyle(
                 color: theme.blockHeaderFg,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'Operator Mono',
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 decoration: TextDecoration.none,
@@ -58,7 +58,7 @@ class BlockHeader extends StatelessWidget {
               style: TextStyle(
                 color: theme.exitSuccessFg,
                 fontSize: 11,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'Operator Mono',
               ),
             )
           else if (showCopyHint)
@@ -90,7 +90,7 @@ class BlockHeader extends StatelessWidget {
               _formatDuration(block.duration!),
               style: TextStyle(
                 color: theme.dimForeground,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'Operator Mono',
                 fontSize: 11,
               ),
             ),
@@ -133,7 +133,7 @@ class _ExitBadge extends StatelessWidget {
         isSuccess ? '0' : '$exitCode',
         style: TextStyle(
           color: color,
-          fontFamily: 'JetBrainsMono',
+          fontFamily: 'Operator Mono',
           fontSize: 10,
           fontWeight: FontWeight.w600,
         ),

@@ -37,7 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Settings',
           style: TextStyle(
             color: theme.foreground,
-            fontFamily: 'JetBrainsMono',
+            fontFamily: 'Operator Mono',
             fontSize: 14,
           ),
         ),
@@ -158,7 +158,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Config file: ~/.config/bolan/config.toml',
             style: TextStyle(
               color: theme.dimForeground,
-              fontFamily: 'JetBrainsMono',
+              fontFamily: 'Operator Mono',
               fontSize: 11,
             ),
           ),
@@ -248,7 +248,7 @@ class _SectionHeader extends StatelessWidget {
       title,
       style: TextStyle(
         color: theme.foreground,
-        fontFamily: 'JetBrainsMono',
+        fontFamily: 'Operator Mono',
         fontSize: 14,
         fontWeight: FontWeight.w700,
       ),
@@ -283,7 +283,7 @@ class _TextOption extends StatelessWidget {
               label,
               style: TextStyle(
                 color: theme.blockHeaderFg,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'Operator Mono',
                 fontSize: 12,
               ),
             ),
@@ -296,7 +296,7 @@ class _TextOption extends StatelessWidget {
                 controller: TextEditingController(text: value),
                 style: TextStyle(
                   color: theme.foreground,
-                  fontFamily: 'JetBrainsMono',
+                  fontFamily: 'Operator Mono',
                   fontSize: 12,
                 ),
                 decoration: InputDecoration(
@@ -364,7 +364,7 @@ class _SliderOption extends StatelessWidget {
               label,
               style: TextStyle(
                 color: theme.blockHeaderFg,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'Operator Mono',
                 fontSize: 12,
               ),
             ),
@@ -395,7 +395,7 @@ class _SliderOption extends StatelessWidget {
               textAlign: TextAlign.right,
               style: TextStyle(
                 color: theme.foreground,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'Operator Mono',
                 fontSize: 12,
               ),
             ),
@@ -431,7 +431,7 @@ class _ToggleOption extends StatelessWidget {
               label,
               style: TextStyle(
                 color: theme.blockHeaderFg,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'Operator Mono',
                 fontSize: 12,
               ),
             ),
@@ -475,7 +475,7 @@ class _DropdownOption extends StatelessWidget {
               label,
               style: TextStyle(
                 color: theme.blockHeaderFg,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'Operator Mono',
                 fontSize: 12,
               ),
             ),
@@ -490,7 +490,7 @@ class _DropdownOption extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               style: TextStyle(
                 color: theme.foreground,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'Operator Mono',
                 fontSize: 12,
               ),
               items: options

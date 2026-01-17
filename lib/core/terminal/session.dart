@@ -21,7 +21,7 @@ class TerminalSession extends ChangeNotifier {
   final String title;
   final Terminal terminal;
   final Pty _pty;
-  StreamSubscription<List<int>>? _outputSub;
+  StreamSubscription<String>? _outputSub;
   bool _disposed = false;
 
   static const _uuid = Uuid();
@@ -157,10 +157,18 @@ class TerminalSession extends ChangeNotifier {
   }
 
   void _connect() {
-    // PTY output → Terminal screen + output capture
-    _outputSub = _pty.output.listen((data) {
-      final decoded = utf8.decode(data, allowMalformed: true);
-      terminal.write(decoded);
+    // PTY output → Terminal screen + output capture.
+    // Use a streaming UTF-8 decoder so multi-byte characters split
+    // across chunks are handled correctly (no replacement characters).
+    _outputSub = _pty.output
+        .cast<List<int>>()
+        .transform(utf8.decoder)
+        .listen((decoded) {
+      // Strip private CSI sequences that xterm.dart can't handle and
+      // misinterprets. \e[>4m (XTMODKEYS) gets parsed as \e[4m (underline).
+      // \e[<u (kitty keyboard restore) also causes issues.
+      final cleaned = _stripUnsupportedCsi(decoded);
+      terminal.write(cleaned);
 
       // Capture output while a command is running
       if (_commandRunning) {
@@ -273,6 +281,19 @@ class TerminalSession extends ChangeNotifier {
     _outputCapture.clear();
 
     notifyListeners();
+  }
+
+  /// Strips private CSI sequences that xterm.dart misinterprets.
+  ///
+  /// `\e[>4m` (XTMODKEYS) gets parsed as `\e[4m` (SGR underline).
+  /// `\e[<u` and `\e[>Xq` are kitty keyboard / XTMODKEYS sequences.
+  /// These are all private CSI with `>` or `<` prefixes.
+  static final _unsupportedCsiRe = RegExp(
+    r'\x1B\[[<>][0-9;]*[a-zA-Z]',
+  );
+
+  static String _stripUnsupportedCsi(String input) {
+    return input.replaceAll(_unsupportedCsiRe, '');
   }
 
   /// Strips ANSI escape sequences from terminal output for clean text display.

@@ -16,14 +16,14 @@ class BolonApp extends ConsumerWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: bolonDefaultDark.background,
-        fontFamily: 'JetBrainsMono',
+        fontFamily: 'Operator Mono',
         textTheme: const TextTheme().apply(
           decoration: TextDecoration.none,
         ),
       ),
       home: DefaultTextStyle(
         style: TextStyle(
-          fontFamily: 'JetBrainsMono',
+          fontFamily: 'Operator Mono',
           decoration: TextDecoration.none,
           color: bolonDefaultDark.foreground,
         ),

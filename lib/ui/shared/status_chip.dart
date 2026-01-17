@@ -38,7 +38,7 @@ class StatusChip extends StatelessWidget {
             style: TextStyle(
               color: fg,
               fontSize: 12,
-              fontFamily: 'JetBrainsMono',
+              fontFamily: 'Operator Mono',
               fontWeight: FontWeight.w500,
               decoration: TextDecoration.none,
             ),

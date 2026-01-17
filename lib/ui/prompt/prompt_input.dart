@@ -94,14 +94,14 @@ class PromptInputState extends State<PromptInput> {
                     ghostText: ghost,
                     style: TextStyle(
                       color: theme.dimForeground,
-                      fontFamily: 'JetBrainsMono',
+                      fontFamily: 'Operator Mono',
                       fontSize: widget.fontSize,
                       height: 1.4,
                       decoration: TextDecoration.none,
                     ),
                     realStyle: TextStyle(
                       color: Colors.transparent,
-                      fontFamily: 'JetBrainsMono',
+                      fontFamily: 'Operator Mono',
                       fontSize: widget.fontSize,
                       height: 1.4,
                       decoration: TextDecoration.none,
@@ -119,7 +119,7 @@ class PromptInputState extends State<PromptInput> {
               minLines: 1,
               style: TextStyle(
                 color: theme.foreground,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'Operator Mono',
                 fontSize: widget.fontSize,
                 height: 1.4,
                 decoration: TextDecoration.none,
