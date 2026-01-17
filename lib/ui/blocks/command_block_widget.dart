@@ -108,18 +108,26 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                 ],
               ),
 
-              // Output body
+              // Output body — pre-formatted, preserves whitespace alignment
               if (block.hasOutput)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    block.output,
-                    style: TextStyle(
-                      color: theme.foreground,
-                      fontFamily: 'JetBrainsMono',
-                      fontSize: widget.fontSize,
-                      height: widget.lineHeight,
-                      decoration: TextDecoration.none,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SelectableText(
+                      block.output,
+                      contextMenuBuilder: (context, editableTextState) {
+                        return AdaptiveTextSelectionToolbar.editableText(
+                          editableTextState: editableTextState,
+                        );
+                      },
+                      style: TextStyle(
+                        color: theme.foreground,
+                        fontFamily: 'JetBrainsMono',
+                        fontSize: widget.fontSize,
+                        height: widget.lineHeight,
+                        decoration: TextDecoration.none,
+                      ),
                     ),
                   ),
                 ),

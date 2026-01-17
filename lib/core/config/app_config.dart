@@ -40,7 +40,7 @@ class EditorConfig {
   const EditorConfig({
     this.fontFamily = 'JetBrainsMono',
     this.fontSize = 13.0,
-    this.lineHeight = 1.2,
+    this.lineHeight = 1.0,
     this.cursorStyle = 'block',
     this.cursorBlink = true,
     this.scrollbackLines = 10000,

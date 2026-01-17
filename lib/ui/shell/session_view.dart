@@ -71,9 +71,12 @@ class _SessionViewState extends ConsumerState<SessionView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
-      // Command just started → focus the terminal
+      // Command just started → focus the terminal + nudge PTY size
       if (isRunning && !_wasRunning) {
         _terminalFocusNode.requestFocus();
+        // Re-send current dimensions so the new program gets correct size
+        final t = widget.session.terminal;
+        widget.session.resize(t.viewHeight, t.viewWidth);
       }
 
       // Command just finished → focus the prompt input
@@ -95,7 +98,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
     final theme = BolonTheme.of(context);
     final fontSize = ref.watch(fontSizeProvider);
     final configLoader = ref.watch(configLoaderProvider);
-    final lineHeight = configLoader?.config.editor.lineHeight ?? 1.2;
+    final lineHeight = configLoader?.config.editor.lineHeight ?? 1.0;
     final blocks = widget.session.blocks;
     final isRunning = widget.session.isCommandRunning;
 
@@ -110,17 +113,17 @@ class _SessionViewState extends ConsumerState<SessionView> {
       },
       child: Stack(
         children: [
-          // Two modes:
-          // Running: full-screen terminal view (so programs get correct dimensions)
-          // Idle: block list + prompt area
-          if (isRunning)
-            TerminalView(
+          // Terminal view — always mounted to keep PTY dimensions current.
+          // Visible when a command is running, hidden behind blocks when idle.
+          Offstage(
+            offstage: !isRunning,
+            child: TerminalView(
               widget.session.terminal,
               controller: _terminalController,
               theme: bolonToXtermTheme(theme),
               textStyle: TerminalStyle(
                 fontSize: fontSize,
-                height: lineHeight,
+                height: 1.2, // xterm default — TUI programs expect this
                 fontFamily: 'JetBrainsMono',
                 fontFamilyFallback: const [
                   'Menlo',
@@ -132,11 +135,14 @@ class _SessionViewState extends ConsumerState<SessionView> {
               ),
               padding: const EdgeInsets.all(8),
               focusNode: _terminalFocusNode,
-              autofocus: true,
+              autofocus: isRunning,
               cursorType: TerminalCursorType.block,
               backgroundOpacity: 0,
-            )
-          else
+            ),
+          ),
+
+          // Block list + prompt — shown when idle
+          if (!isRunning)
             GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTap: () => _promptKey.currentState?.requestFocus(),

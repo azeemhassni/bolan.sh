@@ -257,10 +257,10 @@ class TerminalSession extends ChangeNotifier {
       return;
     }
 
-    // Clean up the captured output — strip ANSI escape sequences for
-    // the plain-text copy, trim trailing whitespace.
+    // Clean up the captured output — strip ANSI escape sequences,
+    // expand tabs to spaces, trim trailing whitespace.
     final rawOutput = _outputCapture.toString();
-    final cleanOutput = _stripAnsiEscapes(rawOutput).trim();
+    final cleanOutput = _expandTabs(_stripAnsiEscapes(rawOutput)).trim();
 
     _blocks.add(_activeBlock!.copyWith(
       output: cleanOutput,
@@ -277,11 +277,32 @@ class TerminalSession extends ChangeNotifier {
 
   /// Strips ANSI escape sequences from terminal output for clean text display.
   static String _stripAnsiEscapes(String input) {
-    // Matches CSI sequences, OSC sequences, and simple escape sequences
     return input.replaceAll(
       RegExp(r'\x1B\[[0-9;]*[a-zA-Z]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)|\x1B[()][0-9A-Z]|\x1B[>=<]'),
       '',
     );
+  }
+
+  /// Expands tab characters to spaces using 8-character tab stops.
+  static String _expandTabs(String input) {
+    final sb = StringBuffer();
+    var col = 0;
+    for (final char in input.codeUnits) {
+      if (char == 0x09) {
+        // Tab — expand to next 8-character stop
+        final spaces = 8 - (col % 8);
+        sb.write(' ' * spaces);
+        col += spaces;
+      } else if (char == 0x0A) {
+        // Newline — reset column
+        sb.writeCharCode(char);
+        col = 0;
+      } else {
+        sb.writeCharCode(char);
+        col++;
+      }
+    }
+    return sb.toString();
   }
 
   /// Handles OSC 7 — current working directory notification.

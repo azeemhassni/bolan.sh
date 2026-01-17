@@ -4,13 +4,12 @@ import 'package:flutter/services.dart';
 import '../../core/completion/completion_engine.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
-import 'completion_popup.dart';
 
-/// Seamless prompt input with TextField editing semantics.
+/// Prompt input with inline ghost-text completions.
 ///
-/// Supports Shift+arrow selection, double-click word select,
-/// delete selected text, command history, shell shortcuts,
-/// and Tab completion with a popup.
+/// - Tab or Right Arrow accepts the ghost completion.
+/// - When multiple completions exist, Tab cycles through them.
+/// - Ghost text shows as dimmed text after the cursor.
 class PromptInput extends StatefulWidget {
   final TerminalSession session;
   final double fontSize;
@@ -33,12 +32,19 @@ class PromptInputState extends State<PromptInput> {
   String _savedInput = '';
 
   // Completion state
-  List<String> _completionItems = [];
+  List<String> _completions = [];
   int _completionIndex = 0;
-  CompletionResult? _activeCompletion;
+  CompletionResult? _activeResult;
   bool _completionLoading = false;
 
-  bool get _showCompletion => _completionItems.isNotEmpty;
+  /// The ghost text to show after the cursor.
+  String get _ghostText {
+    if (_completions.isEmpty || _activeResult == null) return '';
+    final current = _completions[_completionIndex];
+    final prefix = _activeResult!.prefix;
+    if (current.length <= prefix.length) return '';
+    return current.substring(prefix.length);
+  }
 
   @override
   void initState() {
@@ -47,7 +53,6 @@ class PromptInputState extends State<PromptInput> {
     _controller.addListener(_onTextChanged);
   }
 
-  /// Requests focus on the input field.
   void requestFocus() => _focusNode.requestFocus();
 
   @override
@@ -59,11 +64,11 @@ class PromptInputState extends State<PromptInput> {
   }
 
   void _onTextChanged() {
-    // Dismiss completion popup when the user types
-    if (_showCompletion) {
+    if (_completions.isNotEmpty) {
       setState(() {
-        _completionItems = [];
-        _activeCompletion = null;
+        _completions = [];
+        _activeResult = null;
+        _completionIndex = 0;
       });
     }
   }
@@ -71,31 +76,42 @@ class PromptInputState extends State<PromptInput> {
   @override
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
+    final ghost = _ghostText;
 
     return Material(
       color: Colors.transparent,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Completion popup — shown above the input
-          if (_showCompletion)
-            Padding(
-              padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
-              child: CompletionPopup(
-                items: _completionItems,
-                selectedIndex: _completionIndex,
-                prefix: _activeCompletion?.prefix ?? '',
-                fontSize: widget.fontSize,
-                onSelect: _acceptCompletion,
+      child: Padding(
+        padding:
+            const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 10),
+        child: Stack(
+          children: [
+            // Ghost text overlay — positioned after the real text
+            if (ghost.isNotEmpty)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: _GhostTextOverlay(
+                    controller: _controller,
+                    ghostText: ghost,
+                    style: TextStyle(
+                      color: theme.dimForeground,
+                      fontFamily: 'JetBrainsMono',
+                      fontSize: widget.fontSize,
+                      height: 1.4,
+                      decoration: TextDecoration.none,
+                    ),
+                    realStyle: TextStyle(
+                      color: Colors.transparent,
+                      fontFamily: 'JetBrainsMono',
+                      fontSize: widget.fontSize,
+                      height: 1.4,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ),
               ),
-            ),
 
-          // Input field
-          Padding(
-            padding:
-                const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 10),
-            child: TextField(
+            // Real input
+            TextField(
               controller: _controller,
               focusNode: _focusNode,
               autofocus: true,
@@ -116,8 +132,8 @@ class PromptInputState extends State<PromptInput> {
                 isDense: true,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -128,45 +144,37 @@ class PromptInputState extends State<PromptInput> {
     final ctrl = HardwareKeyboard.instance.isControlPressed;
     final shift = HardwareKeyboard.instance.isShiftPressed;
 
-    // When completion popup is open, handle navigation
-    if (_showCompletion) {
-      switch (event.logicalKey) {
-        case LogicalKeyboardKey.tab:
-        case LogicalKeyboardKey.arrowDown:
-          setState(() {
-            _completionIndex =
-                (_completionIndex + 1) % _completionItems.length;
-          });
-          return KeyEventResult.handled;
-
-        case LogicalKeyboardKey.arrowUp:
-          setState(() {
-            _completionIndex =
-                (_completionIndex - 1 + _completionItems.length) %
-                    _completionItems.length;
-          });
-          return KeyEventResult.handled;
-
-        case LogicalKeyboardKey.enter:
-          _acceptCompletion(_completionIndex);
-          return KeyEventResult.handled;
-
-        case LogicalKeyboardKey.escape:
-          setState(() {
-            _completionItems = [];
-            _activeCompletion = null;
-          });
-          return KeyEventResult.handled;
-
-        default:
-          break;
-      }
-    }
-
     switch (event.logicalKey) {
+      // Tab — request completions or cycle through them
       case LogicalKeyboardKey.tab:
-        _requestCompletion();
+        if (_completions.isEmpty) {
+          _requestCompletion();
+        } else {
+          // Cycle to next completion
+          setState(() {
+            _completionIndex =
+                (_completionIndex + 1) % _completions.length;
+          });
+        }
         return KeyEventResult.handled;
+
+      // Right arrow at end of text — accept ghost completion
+      case LogicalKeyboardKey.arrowRight
+          when _ghostText.isNotEmpty &&
+              _controller.selection.baseOffset == _controller.text.length:
+        _acceptCurrentCompletion();
+        return KeyEventResult.handled;
+
+      // Escape — dismiss completions
+      case LogicalKeyboardKey.escape:
+        if (_completions.isNotEmpty) {
+          setState(() {
+            _completions = [];
+            _activeResult = null;
+          });
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
 
       case LogicalKeyboardKey.enter when !shift:
         _onSubmit(_controller.text);
@@ -201,18 +209,18 @@ class PromptInputState extends State<PromptInput> {
 
       case LogicalKeyboardKey.keyU when ctrl:
         final pos = _controller.selection.baseOffset;
-        _controller.removeListener(_onTextChanged);
-        _controller.text = _controller.text.substring(pos);
-        _controller.selection = const TextSelection.collapsed(offset: 0);
-        _controller.addListener(_onTextChanged);
+        _withoutListener(() {
+          _controller.text = _controller.text.substring(pos);
+          _controller.selection = const TextSelection.collapsed(offset: 0);
+        });
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.keyK when ctrl:
         final pos = _controller.selection.baseOffset;
-        _controller.removeListener(_onTextChanged);
-        _controller.text = _controller.text.substring(0, pos);
-        _controller.selection = TextSelection.collapsed(offset: pos);
-        _controller.addListener(_onTextChanged);
+        _withoutListener(() {
+          _controller.text = _controller.text.substring(0, pos);
+          _controller.selection = TextSelection.collapsed(offset: pos);
+        });
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.keyW when ctrl:
@@ -247,18 +255,14 @@ class PromptInputState extends State<PromptInput> {
       if (!mounted) return;
 
       if (result.isSingle) {
-        // Single match — inline complete immediately
+        // Single match — accept immediately
         _applyCompletion(result.items.first, result);
       } else if (result.items.isNotEmpty) {
-        // Multiple matches — insert longest common prefix and show popup
-        final lcp = longestCommonPrefix(result.items);
-        if (lcp.length > result.prefix.length) {
-          _applyCompletion(lcp, result);
-        }
+        // Multiple matches — show ghost text for first item
         setState(() {
-          _completionItems = result.items;
+          _completions = result.items;
           _completionIndex = 0;
-          _activeCompletion = result;
+          _activeResult = result;
         });
       }
     } finally {
@@ -266,12 +270,12 @@ class PromptInputState extends State<PromptInput> {
     }
   }
 
-  void _acceptCompletion(int index) {
-    if (_activeCompletion == null || index >= _completionItems.length) return;
-    _applyCompletion(_completionItems[index], _activeCompletion!);
+  void _acceptCurrentCompletion() {
+    if (_activeResult == null || _completions.isEmpty) return;
+    _applyCompletion(_completions[_completionIndex], _activeResult!);
     setState(() {
-      _completionItems = [];
-      _activeCompletion = null;
+      _completions = [];
+      _activeResult = null;
     });
   }
 
@@ -283,10 +287,14 @@ class PromptInputState extends State<PromptInput> {
     final newText = '$before$completion$suffix$after';
     final newPos = result.replaceStart + completion.length + suffix.length;
 
-    _controller.removeListener(_onTextChanged);
-    _controller.text = newText;
-    _controller.selection = TextSelection.collapsed(offset: newPos);
-    _controller.addListener(_onTextChanged);
+    _withoutListener(() {
+      _controller.text = newText;
+      _controller.selection = TextSelection.collapsed(offset: newPos);
+    });
+    setState(() {
+      _completions = [];
+      _activeResult = null;
+    });
   }
 
   void _onSubmit(String text) {
@@ -346,9 +354,48 @@ class PromptInputState extends State<PromptInput> {
       i--;
     }
 
+    _withoutListener(() {
+      _controller.text = text.substring(0, i) + text.substring(pos);
+      _controller.selection = TextSelection.collapsed(offset: i);
+    });
+  }
+
+  /// Modifies the controller without triggering _onTextChanged.
+  void _withoutListener(VoidCallback fn) {
     _controller.removeListener(_onTextChanged);
-    _controller.text = text.substring(0, i) + text.substring(pos);
-    _controller.selection = TextSelection.collapsed(offset: i);
+    fn();
     _controller.addListener(_onTextChanged);
+  }
+}
+
+/// Renders ghost/shadow text after the real text content.
+///
+/// Uses a transparent copy of the real text followed by the dimmed ghost text
+/// so the ghost aligns exactly after the cursor position.
+class _GhostTextOverlay extends StatelessWidget {
+  final TextEditingController controller;
+  final String ghostText;
+  final TextStyle style;
+  final TextStyle realStyle;
+
+  const _GhostTextOverlay({
+    required this.controller,
+    required this.ghostText,
+    required this.style,
+    required this.realStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RichText(
+      text: TextSpan(
+        children: [
+          // Invisible copy of real text to push ghost to the right position
+          TextSpan(text: controller.text, style: realStyle),
+          // Ghost text in dim color
+          TextSpan(text: ghostText, style: style),
+        ],
+      ),
+    );
   }
 }

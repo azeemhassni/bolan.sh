@@ -18,18 +18,16 @@ class CompletionResult {
   bool get isSingle => items.length == 1;
 }
 
-/// Generates shell completions by invoking bash/zsh in a subprocess.
+/// Generates shell completions using Dart's own filesystem APIs for
+/// file/directory completion, and the shell for command completion.
 ///
-/// Uses `compgen` for bash and a zpty-based approach for zsh to get
-/// the same completions the user's shell would provide, including
-/// custom completions for git, docker, kubectl, etc.
+/// This avoids fragile shell subprocess scripts for path completion
+/// and gives reliable cross-shell results.
 class CompletionEngine {
   final String _shell;
 
   CompletionEngine({String? shell})
       : _shell = shell ?? Platform.environment['SHELL'] ?? '/bin/bash';
-
-  String get _shellName => _shell.split('/').last;
 
   /// Generates completions for [input] at [cursorPos] in [cwd].
   Future<CompletionResult> complete(
@@ -37,19 +35,25 @@ class CompletionEngine {
     int cursorPos,
     String cwd,
   ) async {
-    if (input.isEmpty) return _empty(input, cursorPos);
+    if (input.isEmpty) return _empty(cursorPos);
 
-    // Extract the word being completed
     final textUpToCursor = input.substring(0, cursorPos);
     final words = textUpToCursor.split(RegExp(r'\s+'));
     final currentWord = words.isNotEmpty ? words.last : '';
     final replaceStart = cursorPos - currentWord.length;
-    final isFirstWord = words.length <= 1;
+    final isFirstWord = words.length <= 1 ||
+        (words.length == 2 && textUpToCursor.endsWith(currentWord));
 
     try {
-      final items = _shellName == 'zsh'
-          ? await _zshComplete(textUpToCursor, currentWord, isFirstWord, cwd)
-          : await _bashComplete(currentWord, isFirstWord, cwd);
+      List<String> items;
+
+      if (isFirstWord && !currentWord.contains('/')) {
+        // Command completion
+        items = await _completeCommand(currentWord);
+      } else {
+        // File/path completion
+        items = await _completePath(currentWord, cwd);
+      }
 
       return CompletionResult(
         items: items,
@@ -58,78 +62,121 @@ class CompletionEngine {
         replaceEnd: cursorPos,
       );
     } on Exception {
-      return _empty(input, cursorPos);
+      return _empty(cursorPos);
     }
   }
 
-  Future<List<String>> _bashComplete(
-    String word,
-    bool isCommand,
-    String cwd,
-  ) async {
-    // compgen -c for commands, -o default for files/directories
-    final flag = isCommand ? '-c' : '-o default';
-    final result = await Process.run(
-      'bash',
-      ['-i', '-c', 'compgen $flag -- ${_shellEscape(word)}'],
-      workingDirectory: cwd,
-      environment: Platform.environment,
-    ).timeout(const Duration(seconds: 2));
+  /// Completes file and directory paths using Dart IO.
+  Future<List<String>> _completePath(String partial, String cwd) async {
+    // Expand ~ to home directory
+    var expanded = partial;
+    final home = Platform.environment['HOME'] ?? '';
+    if (expanded.startsWith('~')) {
+      expanded = expanded.replaceFirst('~', home);
+    }
 
-    if (result.exitCode != 0) return [];
-    return _parseLines(result.stdout as String);
+    // Resolve relative to cwd
+    String dirPath;
+    String namePrefix;
+
+    if (expanded.contains('/')) {
+      final lastSlash = expanded.lastIndexOf('/');
+      dirPath = expanded.substring(0, lastSlash + 1);
+      namePrefix = expanded.substring(lastSlash + 1);
+    } else {
+      dirPath = cwd;
+      namePrefix = expanded;
+    }
+
+    // Resolve relative paths
+    if (!dirPath.startsWith('/')) {
+      dirPath = '$cwd/$dirPath';
+    }
+
+    final dir = Directory(dirPath);
+    if (!await dir.exists()) return [];
+
+    final items = <String>[];
+    try {
+      await for (final entity in dir.list()) {
+        final name = entity.path.split('/').last;
+        if (name.startsWith('.') && !namePrefix.startsWith('.')) continue;
+        if (!name.toLowerCase().startsWith(namePrefix.toLowerCase())) continue;
+
+        // Build the completion string matching the user's input style
+        String completion;
+        if (partial.contains('/')) {
+          final prefix = partial.substring(0, partial.lastIndexOf('/') + 1);
+          completion = '$prefix$name';
+        } else {
+          completion = name;
+        }
+
+        if (entity is Directory) {
+          completion = '$completion/';
+        }
+
+        items.add(completion);
+      }
+    } on FileSystemException {
+      return [];
+    }
+
+    items.sort();
+    return items;
   }
 
-  Future<List<String>> _zshComplete(
-    String fullInput,
-    String word,
-    bool isCommand,
-    String cwd,
-  ) async {
-    // Use a zsh subprocess with a capture script.
-    // For first-word (command) completion, list executables in PATH.
-    // For subsequent words, use file completion + the shell's own completions.
-    final script = '''
-autoload -Uz compinit 2>/dev/null && compinit -C 2>/dev/null
-# Capture completions
-local -a completions
-if [[ $isCommand == true ]]; then
-  completions=(\${(k)commands} \${(k)aliases} \${(k)builtins} \${(k)functions})
-  completions=(\${(M)completions:#${_shellEscape(word)}*})
-else
-  # File/directory completion
-  completions=(\$(compgen -o default -- ${_shellEscape(word)} 2>/dev/null))
-  if [[ \${#completions[@]} -eq 0 ]]; then
-    completions=(\$(print -l ${_shellEscape(word)}*(N) 2>/dev/null))
-  fi
-fi
-printf '%s\\n' "\${completions[@]}" | sort -u
-''';
+  /// Completes command names from PATH.
+  Future<List<String>> _completeCommand(String partial) async {
+    if (partial.isEmpty) return [];
 
-    final result = await Process.run(
-      'zsh',
-      ['-c', script],
-      workingDirectory: cwd,
-      environment: Platform.environment,
-    ).timeout(const Duration(seconds: 2));
+    final items = <String>{};
+    final pathDirs = Platform.environment['PATH']?.split(':') ?? [];
 
-    if (result.exitCode != 0) return [];
-    return _parseLines(result.stdout as String);
+    for (final dirPath in pathDirs) {
+      final dir = Directory(dirPath);
+      if (!await dir.exists()) continue;
+      try {
+        await for (final entity in dir.list()) {
+          if (entity is! File) continue;
+          final name = entity.path.split('/').last;
+          if (name.startsWith(partial)) {
+            items.add(name);
+          }
+        }
+      } on FileSystemException {
+        continue;
+      }
+    }
+
+    // Also add shell builtins/aliases via the shell
+    try {
+      final shellName = _shell.split('/').last;
+      final script = shellName == 'zsh'
+          ? "print -l \${(k)commands} \${(k)aliases} \${(k)builtins} 2>/dev/null | grep '^$partial' | sort -u"
+          : "compgen -abc -- '$partial' 2>/dev/null | sort -u";
+
+      final result = await Process.run(
+        _shell,
+        ['-c', script],
+        environment: Platform.environment,
+      ).timeout(const Duration(seconds: 2));
+
+      if (result.exitCode == 0) {
+        for (final line in (result.stdout as String).split('\n')) {
+          final trimmed = line.trim();
+          if (trimmed.isNotEmpty) items.add(trimmed);
+        }
+      }
+    } on Exception {
+      // Ignore — we already have PATH completions
+    }
+
+    final sorted = items.toList()..sort();
+    return sorted;
   }
 
-  List<String> _parseLines(String output) {
-    return output
-        .split('\n')
-        .map((l) => l.trim())
-        .where((l) => l.isNotEmpty)
-        .toList();
-  }
-
-  String _shellEscape(String s) {
-    return "'${s.replaceAll("'", "'\\''")}'";
-  }
-
-  CompletionResult _empty(String input, int cursorPos) {
+  CompletionResult _empty(int cursorPos) {
     return CompletionResult(
       items: [],
       prefix: '',
