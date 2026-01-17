@@ -1,0 +1,100 @@
+KNOWN ISSUES & WORKAROUNDS — Bolan Terminal
+============================================
+
+Last updated: 2026-04-02
+
+
+1. xterm.dart misinterprets private CSI sequences as SGR
+------------------------------------------------------------------------
+Problem:  Programs like Claude Code send \e[>4m (XTMODKEYS — key modifier
+          options) and \e[<u (kitty keyboard protocol). xterm.dart v4.0.0
+          does not recognize the > or < prefix in CSI sequences. It strips
+          the prefix and processes the remainder as a regular CSI, so
+          \e[>4m becomes \e[4m (SGR underline), turning on underline for
+          ALL subsequent text globally.
+
+Fix:      We strip all private CSI sequences matching \e[<...X and \e[>...X
+          before passing data to terminal.write(). See _stripUnsupportedCsi
+          in lib/core/terminal/session.dart.
+
+Impact:   Any terminal feature that uses CSI > or CSI < prefixes will not
+          work (XTMODKEYS, kitty keyboard protocol, some mouse modes).
+          This is acceptable because xterm.dart doesn't implement these
+          features anyway — stripping prevents misinterpretation.
+
+Root:     xterm.dart parser (escape/parser.dart) does not handle the > and
+          < intermediate bytes correctly in CSI sequences. A proper fix
+          would be in the xterm.dart package itself.
+
+
+2. xterm.dart renders underlines as thick Flutter TextDecoration
+------------------------------------------------------------------------
+Problem:  When SGR 4 (underline) IS intentionally used by programs,
+          xterm.dart renders it using Flutter's TextDecoration.underline
+          which is thicker and more prominent than what native terminals
+          like iTerm2 or Warp render.
+
+Status:   No fix. This is a rendering limitation of the xterm.dart package.
+          Would require forking xterm.dart or building a custom renderer
+          to control underline thickness/style.
+
+
+3. xterm.dart colon sub-parameter support
+------------------------------------------------------------------------
+Problem:  Modern terminals support colon-separated sub-parameters in SGR
+          sequences, e.g. \e[4:3m for curly underline. The xterm.dart
+          parser (v4.0.0) does NOT split on colons — only semicolons.
+          However, in practice this doesn't cause visible issues because
+          the colon falls through the parser's character classification
+          and the parameters still get processed (tested and confirmed).
+
+Status:   Works accidentally. Not a problem in practice but the parser
+          doesn't officially support it. Don't attempt to "fix" colons
+          by converting them to semicolons — this was tried and made
+          rendering WORSE (it changed parameter semantics).
+
+
+4. UTF-8 multi-byte character splitting across PTY chunks
+------------------------------------------------------------------------
+Problem:  PTY output arrives in arbitrary byte chunks. Multi-byte UTF-8
+          characters (like box-drawing ─, 3 bytes) can be split across
+          two chunks. Decoding each chunk independently with
+          utf8.decode(data, allowMalformed: true) replaces the split
+          bytes with U+FFFD replacement characters (�).
+
+Fix:      Use a streaming UTF-8 decoder: _pty.output.transform(utf8.decoder)
+          which buffers incomplete sequences across chunks. See _connect()
+          in lib/core/terminal/session.dart.
+
+
+5. macOS App Sandbox blocks PTY process spawning
+------------------------------------------------------------------------
+Problem:  Flutter's default macOS entitlements enable App Sandbox, which
+          prevents spawning shell processes via flutter_pty.
+
+Fix:      Set com.apple.security.app-sandbox to false in both
+          macos/Runner/DebugProfile.entitlements and
+          macos/Runner/Release.entitlements.
+
+
+6. flutter_acrylic + macos_window_utils double initialization
+------------------------------------------------------------------------
+Problem:  Both flutter_acrylic's Window.initialize() and
+          WindowManipulator.initialize() complete the same underlying
+          Future. Calling both causes "Future already completed" error.
+
+Fix:      Only call Window.initialize() — it calls
+          WindowManipulator.initialize() internally.
+          See lib/main.dart.
+
+
+7. Terminal dimensions stale when switching between block view and terminal view
+------------------------------------------------------------------------
+Problem:  When the TerminalView is not mounted (idle/block mode), the PTY
+          keeps stale dimensions from last mount. When a command starts and
+          the TerminalView mounts, programs may query dimensions before the
+          view has laid out and resized the PTY.
+
+Fix:      After transitioning to running mode, wait one frame for the
+          TerminalView to layout, then re-send dimensions via
+          session.resize(). See _onSessionChanged in session_view.dart.
