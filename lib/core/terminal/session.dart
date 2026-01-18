@@ -35,6 +35,8 @@ class TerminalSession extends ChangeNotifier {
   CommandBlock? _activeBlock;
   bool _commandRunning = false;
   bool _usedAltBuffer = false;
+  int _cursorUpCount = 0; // tracks TUI-style cursor movement
+  String _oscTitle = ''; // title set by program via OSC 0
 
   // Status bar state
   String _cwd = '';
@@ -131,25 +133,38 @@ class TerminalSession extends ChangeNotifier {
   /// Shell name (e.g. "zsh", "bash").
   String get shellName => title;
 
-  /// Dynamic tab title — shows current or last command name.
+  /// Dynamic tab title — prefers OSC 0 title from program, then
+  /// current/last command name, then CWD basename.
   String get tabTitle {
+    // Program-set title takes priority (e.g. Claude Code sets its own)
+    if (_oscTitle.isNotEmpty && _commandRunning) {
+      return _oscTitle;
+    }
     if (_commandRunning && _activeBlock != null) {
       return _extractProgramName(_activeBlock!.command);
     }
     if (_blocks.isNotEmpty) {
       return _extractProgramName(_blocks.last.command);
     }
+    if (_cwd.isNotEmpty) {
+      final basename = _cwd.split('/').last;
+      if (basename.isNotEmpty) return basename;
+    }
     return title;
   }
 
   /// Full command text for tooltip.
   String get fullTabTitle {
+    if (_oscTitle.isNotEmpty && _commandRunning) {
+      return _oscTitle;
+    }
     if (_commandRunning && _activeBlock != null) {
       return _activeBlock!.command.trim();
     }
     if (_blocks.isNotEmpty) {
       return _blocks.last.command.trim();
     }
+    if (_cwd.isNotEmpty) return abbreviatedCwd;
     return title;
   }
 
@@ -232,6 +247,9 @@ class TerminalSession extends ChangeNotifier {
         if (!_usedAltBuffer && terminal.isUsingAltBuffer) {
           _usedAltBuffer = true;
         }
+        // Count cursor-up sequences — programs that rewrite previous
+        // lines (spinners, progress bars, TUI) produce garbage when captured.
+        _cursorUpCount += _countCursorUps(decoded);
       }
     });
 
@@ -243,6 +261,12 @@ class TerminalSession extends ChangeNotifier {
     // Terminal resize → PTY resize
     terminal.onResize = (width, height, pixelWidth, pixelHeight) {
       _pty.resize(height, width);
+    };
+
+    // OSC 0 — program-set window/tab title
+    terminal.onTitleChange = (newTitle) {
+      _oscTitle = newTitle;
+      notifyListeners();
     };
 
     // OSC sequences: shell integration (133) and CWD (7)
@@ -273,6 +297,7 @@ class TerminalSession extends ChangeNotifier {
         if (command.isNotEmpty) {
           _outputCapture.clear();
           _usedAltBuffer = false;
+          _cursorUpCount = 0;
           _activeBlock = CommandBlock(
             id: _uuid.v4(),
             command: command,
@@ -308,14 +333,16 @@ class TerminalSession extends ChangeNotifier {
       return;
     }
 
-    // Skip output for programs that used the alternate screen buffer
-    // (vim, nano, less, top, ssh, etc.) — their output is TUI rendering
-    // and not useful as a block.
-    if (_usedAltBuffer) {
+    // Skip output for TUI programs:
+    // 1. Used the alternate screen buffer (vim, nano, less, top, etc.)
+    // 2. Heavy cursor-up usage (Claude Code, spinners, progress bars)
+    //    — these rewrite previous lines, producing garbage when captured.
+    if (_usedAltBuffer || _cursorUpCount > 5) {
       _activeBlock = null;
       _commandRunning = false;
       _outputCapture.clear();
       _usedAltBuffer = false;
+      _cursorUpCount = 0;
       notifyListeners();
       return;
     }
@@ -349,6 +376,14 @@ class TerminalSession extends ChangeNotifier {
 
   static String _stripUnsupportedCsi(String input) {
     return input.replaceAll(_unsupportedCsiRe, '');
+  }
+
+  /// Counts cursor-up sequences (\e[A, \e[1A, \e[2A, etc.) in output.
+  /// Programs that move the cursor up are doing in-place TUI rendering.
+  static final _cursorUpRe = RegExp(r'\x1B\[\d*A');
+
+  static int _countCursorUps(String input) {
+    return _cursorUpRe.allMatches(input).length;
   }
 
   /// Strips ANSI escape sequences from terminal output for clean text display.

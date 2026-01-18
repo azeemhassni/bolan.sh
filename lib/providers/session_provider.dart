@@ -1,76 +1,209 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
+import '../core/pane/pane_manager.dart';
+import '../core/pane/pane_node.dart';
+import '../core/terminal/command_history.dart';
 import '../core/terminal/session.dart';
-import '../core/terminal/session_manager.dart';
 
-/// Notifier that manages the terminal session lifecycle and active session state.
-///
-/// Listens to each session's ChangeNotifier so the tab bar updates when
-/// commands start/finish (changing tab titles and status icons).
+const _uuid = Uuid();
+
+/// State for a single tab — a tree of panes with a focused pane.
+class TabState {
+  final PaneNode rootPane;
+  final String focusedPaneId;
+
+  const TabState({required this.rootPane, required this.focusedPaneId});
+
+  LeafPane? get focusedLeaf =>
+      PaneManager.findLeaf(rootPane, focusedPaneId);
+
+  TerminalSession? get focusedSession => focusedLeaf?.session;
+}
+
+/// Top-level state: list of tabs + active tab index.
+class SessionState {
+  final List<TabState> tabs;
+  final int activeTabIndex;
+
+  const SessionState({required this.tabs, required this.activeTabIndex});
+
+  TabState? get activeTab {
+    if (activeTabIndex < 0 || activeTabIndex >= tabs.length) return null;
+    return tabs[activeTabIndex];
+  }
+
+  /// The focused session in the active tab (for tab bar title, etc.)
+  TerminalSession? get activeSession => activeTab?.focusedSession;
+
+  /// All sessions across all tabs (for backward compat).
+  List<TerminalSession> get allSessions {
+    return tabs
+        .expand((tab) => PaneManager.allLeaves(tab.rootPane))
+        .map((leaf) => leaf.session)
+        .toList();
+  }
+}
+
+/// Notifier managing tabs, panes, and sessions.
 class SessionNotifier extends Notifier<SessionState> {
-  late final SessionManager _manager;
+  final CommandHistory history = CommandHistory();
 
   @override
   SessionState build() {
-    _manager = SessionManager();
-    _manager.history.load();
-    final session = _manager.createSession();
-    _attachListener(session);
-    ref.onDispose(_manager.disposeAll);
-    return _stateFromManager();
+    history.load();
+    final tab = _createTab();
+    ref.onDispose(() {
+      for (final t in state.tabs) {
+        PaneManager.disposeAll(t.rootPane);
+      }
+    });
+    return SessionState(tabs: [tab], activeTabIndex: 0);
   }
 
-  /// Creates a new tab / session.
-  void createSession({String? workingDirectory}) {
-    final session =
-        _manager.createSession(workingDirectory: workingDirectory);
-    _attachListener(session);
-    state = _stateFromManager();
+  // --- Tab operations ---
+
+  void createTab({String? workingDirectory}) {
+    final tab = _createTab(workingDirectory: workingDirectory);
+    _attachTabListeners(tab);
+    final tabs = [...state.tabs, tab];
+    state = SessionState(tabs: tabs, activeTabIndex: tabs.length - 1);
   }
 
-  /// Switches focus to the session at [index].
-  void switchTo(int index) {
-    _manager.switchTo(index);
-    state = _stateFromManager();
+  void switchTab(int index) {
+    if (index < 0 || index >= state.tabs.length) return;
+    state = SessionState(tabs: state.tabs, activeTabIndex: index);
   }
 
-  /// Closes the session at [index]. If it was the last session, creates a new one.
-  void closeSession(int index) {
-    final wasLast = _manager.closeSession(index);
-    if (wasLast) {
-      final session = _manager.createSession();
-      _attachListener(session);
+  void closeTab(int index) {
+    if (index < 0 || index >= state.tabs.length) return;
+    PaneManager.disposeAll(state.tabs[index].rootPane);
+    final tabs = [...state.tabs]..removeAt(index);
+
+    if (tabs.isEmpty) {
+      final tab = _createTab();
+      _attachTabListeners(tab);
+      state = SessionState(tabs: [tab], activeTabIndex: 0);
+      return;
     }
-    state = _stateFromManager();
+
+    var activeIndex = state.activeTabIndex;
+    if (activeIndex >= tabs.length) activeIndex = tabs.length - 1;
+    if (activeIndex > index) activeIndex--;
+    state = SessionState(tabs: tabs, activeTabIndex: activeIndex);
   }
 
-  void _attachListener(TerminalSession session) {
+  // --- Pane operations ---
+
+  void splitPane(Axis axis) {
+    final tab = state.activeTab;
+    if (tab == null) return;
+
+    final (newRoot, newLeaf) =
+        PaneManager.split(tab.rootPane, tab.focusedPaneId, axis, history);
+    _attachSessionListener(newLeaf.session);
+
+    _updateActiveTab(TabState(
+      rootPane: newRoot,
+      focusedPaneId: newLeaf.id,
+    ));
+  }
+
+  void closePane() {
+    final tab = state.activeTab;
+    if (tab == null) return;
+
+    final newRoot = PaneManager.close(tab.rootPane, tab.focusedPaneId);
+    if (newRoot == null) {
+      // Last pane — close the tab
+      closeTab(state.activeTabIndex);
+      return;
+    }
+
+    // Focus the first remaining leaf
+    final newFocus = PaneManager.allLeaves(newRoot).first.id;
+    _updateActiveTab(TabState(rootPane: newRoot, focusedPaneId: newFocus));
+  }
+
+  void setFocusedPane(String paneId) {
+    final tab = state.activeTab;
+    if (tab == null || tab.focusedPaneId == paneId) return;
+    _updateActiveTab(TabState(
+      rootPane: tab.rootPane,
+      focusedPaneId: paneId,
+    ));
+  }
+
+  void navigatePane(AxisDirection direction) {
+    final tab = state.activeTab;
+    if (tab == null) return;
+
+    final targetId = PaneManager.findAdjacentPane(
+      tab.rootPane,
+      tab.focusedPaneId,
+      direction,
+    );
+    if (targetId != null) setFocusedPane(targetId);
+  }
+
+  void updateSplitRatio(String splitPaneId, double ratio) {
+    final tab = state.activeTab;
+    if (tab == null) return;
+    _updateRatio(tab.rootPane, splitPaneId, ratio);
+    // Trigger rebuild
+    state = SessionState(
+      tabs: state.tabs,
+      activeTabIndex: state.activeTabIndex,
+    );
+  }
+
+  // --- Internal helpers ---
+
+  TabState _createTab({String? workingDirectory}) {
+    final session = TerminalSession.start(
+      id: _uuid.v4(),
+      history: history,
+      workingDirectory: workingDirectory,
+    );
+    final leaf = LeafPane(id: _uuid.v4(), session: session);
+    _attachSessionListener(session);
+    return TabState(rootPane: leaf, focusedPaneId: leaf.id);
+  }
+
+  void _attachTabListeners(TabState tab) {
+    for (final leaf in PaneManager.allLeaves(tab.rootPane)) {
+      _attachSessionListener(leaf.session);
+    }
+  }
+
+  void _attachSessionListener(TerminalSession session) {
     session.addListener(_onSessionChanged);
   }
 
   void _onSessionChanged() {
-    state = _stateFromManager();
+    // Trigger rebuild to update tab titles, status icons, etc.
+    state = SessionState(
+      tabs: state.tabs,
+      activeTabIndex: state.activeTabIndex,
+    );
   }
 
-  SessionState _stateFromManager() => SessionState(
-        sessions: _manager.sessions,
-        activeIndex: _manager.activeIndex,
-      );
-}
+  void _updateActiveTab(TabState newTab) {
+    final tabs = [...state.tabs];
+    tabs[state.activeTabIndex] = newTab;
+    state = SessionState(tabs: tabs, activeTabIndex: state.activeTabIndex);
+  }
 
-/// Immutable snapshot of session manager state for the UI.
-class SessionState {
-  final List<TerminalSession> sessions;
-  final int activeIndex;
-
-  const SessionState({
-    required this.sessions,
-    required this.activeIndex,
-  });
-
-  TerminalSession? get activeSession {
-    if (activeIndex < 0 || activeIndex >= sessions.length) return null;
-    return sessions[activeIndex];
+  void _updateRatio(PaneNode node, String splitId, double ratio) {
+    if (node is SplitPane) {
+      if (node.id == splitId) {
+        node.ratio = ratio;
+        return;
+      }
+      _updateRatio(node.first, splitId, ratio);
+      _updateRatio(node.second, splitId, ratio);
+    }
   }
 }
 

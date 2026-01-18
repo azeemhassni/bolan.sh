@@ -2,16 +2,16 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:macos_window_utils/widgets/titlebar_safe_area.dart';
+import 'package:macos_window_utils/macos_window_utils.dart';
 
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/session_provider.dart';
 
-/// Tab bar rendered in the macOS title bar area.
+/// Compact tab bar rendered in the macOS title bar area.
 ///
-/// Shows tabs with dynamic titles (current/last command), status icons
-/// (running dot, error icon), gradient-fade truncation, and tooltips.
+/// Matches Warp's tab style: compact height, tight spacing, gradient-fade
+/// only on overflow, status icons, hover close button.
 class BolonTabBar extends ConsumerWidget {
   final VoidCallback? onSettings;
 
@@ -22,69 +22,71 @@ class BolonTabBar extends ConsumerWidget {
     final theme = BolonTheme.of(context);
     final sessionState = ref.watch(sessionProvider);
 
-    final content = SizedBox(
-      height: 38,
+    return GestureDetector(
+      onDoubleTap: () {
+        if (Platform.isMacOS) {
+          WindowManipulator.zoomWindow();
+        }
+      },
+      child: Container(
+      height: 36,
+      color: theme.tabBarBackground,
       child: Row(
         children: [
-          // Tabs — scrollable
+          // Tabs
           Expanded(
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: sessionState.sessions.length,
-              padding: const EdgeInsets.only(left: 8, top: 6, bottom: 6),
+              itemCount: sessionState.tabs.length,
+              padding: EdgeInsets.only(
+                left: Platform.isMacOS ? 78 : 8,
+                top: 4,
+                bottom: 4,
+              ),
               itemBuilder: (context, index) {
-                final session = sessionState.sessions[index];
-                final isActive = index == sessionState.activeIndex;
+                final tab = sessionState.tabs[index];
+                final session = tab.focusedSession;
+                final isActive = index == sessionState.activeTabIndex;
                 return _Tab(
-                  title: session.tabTitle,
-                  fullTitle: session.fullTabTitle,
-                  status: session.tabStatus,
+                  title: session?.tabTitle ?? 'zsh',
+                  fullTitle: session?.fullTabTitle ?? 'zsh',
+                  status: session?.tabStatus ?? TabStatus.idle,
                   isActive: isActive,
                   theme: theme,
                   onTap: () =>
-                      ref.read(sessionProvider.notifier).switchTo(index),
+                      ref.read(sessionProvider.notifier).switchTab(index),
                   onClose: () =>
-                      ref.read(sessionProvider.notifier).closeSession(index),
+                      ref.read(sessionProvider.notifier).closeTab(index),
                 );
               },
             ),
           ),
-          // Action buttons
+          // + button
           Padding(
-            padding: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.only(right: 6),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (onSettings != null)
+                _IconButton(
+                  icon: Icons.add,
+                  theme: theme,
+                  onTap: () =>
+                      ref.read(sessionProvider.notifier).createTab(),
+                ),
+                if (onSettings != null) ...[
+                  const SizedBox(width: 2),
                   _IconButton(
                     icon: Icons.settings_outlined,
                     theme: theme,
                     onTap: onSettings!,
                   ),
-                const SizedBox(width: 4),
-                _IconButton(
-                  icon: Icons.add,
-                  theme: theme,
-                  onTap: () =>
-                      ref.read(sessionProvider.notifier).createSession(),
-                ),
+                ],
               ],
             ),
           ),
         ],
       ),
-    );
-
-    if (Platform.isMacOS) {
-      return Container(
-        color: theme.tabBarBackground,
-        child: TitlebarSafeArea(child: content),
-      );
-    }
-
-    return Container(
-      color: theme.tabBarBackground,
-      child: content,
+    ),
     );
   }
 }
@@ -115,6 +117,11 @@ class _Tab extends StatefulWidget {
 class _TabState extends State<_Tab> {
   bool _hovered = false;
 
+  /// Whether the title needs gradient fade (exceeds available space).
+  /// We use a LayoutBuilder to detect this.
+  static const _maxTabWidth = 180.0;
+  static const _fontSize = 11.0;
+
   @override
   Widget build(BuildContext context) {
     final bg = widget.isActive
@@ -129,71 +136,103 @@ class _TabState extends State<_Tab> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: widget.onTap,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 180, minWidth: 60),
-          margin: const EdgeInsets.only(right: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(6),
+        child: Tooltip(
+          message: widget.fullTitle,
+          waitDuration: const Duration(milliseconds: 600),
+          child: Container(
+            constraints: const BoxConstraints(
+            maxWidth: _maxTabWidth,
+            minWidth: 130,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Status icon
-              _StatusIcon(status: widget.status, theme: widget.theme),
+            margin: const EdgeInsets.only(right: 1),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Centered title with status icon
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _StatusIcon(status: widget.status, theme: widget.theme),
+                    Flexible(child: _buildTitle(fg)),
+                  ],
+                ),
 
-              // Tab title with gradient fade + tooltip
-              Flexible(
-                child: Tooltip(
-                  message: widget.fullTitle,
-                  waitDuration: const Duration(milliseconds: 500),
-                  child: ShaderMask(
-                    shaderCallback: (Rect bounds) {
-                      return const LinearGradient(
-                        stops: [0.0, 0.7, 1.0],
-                        colors: [
-                          Colors.white,
-                          Colors.white,
-                          Colors.transparent,
-                        ],
-                      ).createShader(bounds);
-                    },
-                    blendMode: BlendMode.dstIn,
-                    child: Text(
-                      widget.title,
-                      overflow: TextOverflow.clip,
-                      maxLines: 1,
-                      softWrap: false,
-                      style: TextStyle(
-                        color: fg,
-                        fontSize: 12,
-                        fontFamily: 'Operator Mono',
-                        decoration: TextDecoration.none,
+                // Close button — pinned to right edge, hover only
+                if (_hovered)
+                  Positioned(
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: widget.onClose,
+                      child: Icon(
+                        Icons.close,
+                        size: 11,
+                        color: widget.theme.dimForeground,
                       ),
                     ),
                   ),
-                ),
-              ),
-
-              // Close button
-              if (_hovered || widget.isActive) ...[
-                const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: widget.onClose,
-                  child: Icon(
-                    Icons.close,
-                    size: 13,
-                    color: widget.theme.dimForeground,
-                  ),
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTitle(Color fg) {
+    final text = Text(
+      widget.title,
+      overflow: TextOverflow.clip,
+      maxLines: 1,
+      softWrap: false,
+      style: TextStyle(
+        color: fg,
+        fontSize: _fontSize,
+        fontFamily: 'Operator Mono',
+        decoration: TextDecoration.none,
+      ),
+    );
+
+    // Use LayoutBuilder to detect if the text overflows.
+    // Only apply gradient fade when it actually clips.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: widget.title,
+            style: const TextStyle(fontSize: _fontSize, fontFamily: 'Operator Mono'),
+          ),
+          maxLines: 1,
+          textDirection: TextDirection.ltr,
+        )..layout();
+
+        final overflows = textPainter.width > constraints.maxWidth;
+
+        if (!overflows) return text;
+
+        return ShaderMask(
+          shaderCallback: (Rect bounds) {
+            return const LinearGradient(
+              stops: [0.0, 0.75, 1.0],
+              colors: [
+                Colors.white,
+                Colors.white,
+                Colors.transparent,
+              ],
+            ).createShader(bounds);
+          },
+          blendMode: BlendMode.dstIn,
+          child: text,
+        );
+      },
     );
   }
 }
@@ -209,22 +248,22 @@ class _StatusIcon extends StatelessWidget {
     switch (status) {
       case TabStatus.running:
         return Padding(
-          padding: const EdgeInsets.only(right: 6),
-          child: Text(
-            '●',
-            style: TextStyle(
+          padding: const EdgeInsets.only(right: 5),
+          child: Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
               color: theme.ansiGreen,
-              fontSize: 8,
-              decoration: TextDecoration.none,
+              shape: BoxShape.circle,
             ),
           ),
         );
       case TabStatus.error:
         return Padding(
-          padding: const EdgeInsets.only(right: 6),
+          padding: const EdgeInsets.only(right: 5),
           child: Icon(
             Icons.error_outline,
-            size: 13,
+            size: 11,
             color: theme.exitFailureFg,
           ),
         );
@@ -251,10 +290,13 @@ class _IconButton extends StatelessWidget {
       onTap: onTap,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
-        child: Icon(
-          icon,
-          size: 16,
-          color: theme.dimForeground,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(
+            icon,
+            size: 14,
+            color: theme.dimForeground,
+          ),
         ),
       ),
     );
