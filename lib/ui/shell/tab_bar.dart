@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_window_utils/widgets/titlebar_safe_area.dart';
 
+import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/session_provider.dart';
 
-/// Custom tab bar rendered inside the macOS title bar area.
+/// Tab bar rendered in the macOS title bar area.
 ///
-/// Uses [TitlebarSafeArea] to keep tabs clear of the traffic light buttons.
-/// Each tab shows the session title and a close button on hover.
+/// Shows tabs with dynamic titles (current/last command), status icons
+/// (running dot, error icon), gradient-fade truncation, and tooltips.
 class BolonTabBar extends ConsumerWidget {
   final VoidCallback? onSettings;
 
@@ -25,7 +26,7 @@ class BolonTabBar extends ConsumerWidget {
       height: 38,
       child: Row(
         children: [
-          // Tab list — scrollable if many tabs
+          // Tabs — scrollable
           Expanded(
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
@@ -35,10 +36,13 @@ class BolonTabBar extends ConsumerWidget {
                 final session = sessionState.sessions[index];
                 final isActive = index == sessionState.activeIndex;
                 return _Tab(
-                  title: session.title,
+                  title: session.tabTitle,
+                  fullTitle: session.fullTabTitle,
+                  status: session.tabStatus,
                   isActive: isActive,
                   theme: theme,
-                  onTap: () => ref.read(sessionProvider.notifier).switchTo(index),
+                  onTap: () =>
+                      ref.read(sessionProvider.notifier).switchTo(index),
                   onClose: () =>
                       ref.read(sessionProvider.notifier).closeSession(index),
                 );
@@ -71,7 +75,6 @@ class BolonTabBar extends ConsumerWidget {
       ),
     );
 
-    // On macOS, wrap in TitlebarSafeArea to avoid traffic lights.
     if (Platform.isMacOS) {
       return Container(
         color: theme.tabBarBackground,
@@ -88,6 +91,8 @@ class BolonTabBar extends ConsumerWidget {
 
 class _Tab extends StatefulWidget {
   final String title;
+  final String fullTitle;
+  final TabStatus status;
   final bool isActive;
   final BolonTheme theme;
   final VoidCallback onTap;
@@ -95,6 +100,8 @@ class _Tab extends StatefulWidget {
 
   const _Tab({
     required this.title,
+    required this.fullTitle,
+    required this.status,
     required this.isActive,
     required this.theme,
     required this.onTap,
@@ -125,7 +132,7 @@ class _TabState extends State<_Tab> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 180, minWidth: 80),
+          constraints: const BoxConstraints(maxWidth: 180, minWidth: 60),
           margin: const EdgeInsets.only(right: 2),
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
@@ -135,18 +142,43 @@ class _TabState extends State<_Tab> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Status icon
+              _StatusIcon(status: widget.status, theme: widget.theme),
+
+              // Tab title with gradient fade + tooltip
               Flexible(
-                child: Text(
-                  widget.title,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: fg,
-                    fontSize: 12,
-                    fontFamily: 'Operator Mono',
+                child: Tooltip(
+                  message: widget.fullTitle,
+                  waitDuration: const Duration(milliseconds: 500),
+                  child: ShaderMask(
+                    shaderCallback: (Rect bounds) {
+                      return const LinearGradient(
+                        stops: [0.0, 0.7, 1.0],
+                        colors: [
+                          Colors.white,
+                          Colors.white,
+                          Colors.transparent,
+                        ],
+                      ).createShader(bounds);
+                    },
+                    blendMode: BlendMode.dstIn,
+                    child: Text(
+                      widget.title,
+                      overflow: TextOverflow.clip,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: TextStyle(
+                        color: fg,
+                        fontSize: 12,
+                        fontFamily: 'Operator Mono',
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
                   ),
                 ),
               ),
+
+              // Close button
               if (_hovered || widget.isActive) ...[
                 const SizedBox(width: 4),
                 GestureDetector(
@@ -163,6 +195,42 @@ class _TabState extends State<_Tab> {
         ),
       ),
     );
+  }
+}
+
+class _StatusIcon extends StatelessWidget {
+  final TabStatus status;
+  final BolonTheme theme;
+
+  const _StatusIcon({required this.status, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    switch (status) {
+      case TabStatus.running:
+        return Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: Text(
+            '●',
+            style: TextStyle(
+              color: theme.ansiGreen,
+              fontSize: 8,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        );
+      case TabStatus.error:
+        return Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: Icon(
+            Icons.error_outline,
+            size: 13,
+            color: theme.exitFailureFg,
+          ),
+        );
+      case TabStatus.idle:
+        return const SizedBox.shrink();
+    }
   }
 }
 

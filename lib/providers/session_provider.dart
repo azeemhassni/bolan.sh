@@ -4,22 +4,27 @@ import '../core/terminal/session.dart';
 import '../core/terminal/session_manager.dart';
 
 /// Notifier that manages the terminal session lifecycle and active session state.
+///
+/// Listens to each session's ChangeNotifier so the tab bar updates when
+/// commands start/finish (changing tab titles and status icons).
 class SessionNotifier extends Notifier<SessionState> {
   late final SessionManager _manager;
 
   @override
   SessionState build() {
     _manager = SessionManager();
-    // Load persisted history, then create an initial session.
     _manager.history.load();
-    _manager.createSession();
+    final session = _manager.createSession();
+    _attachListener(session);
     ref.onDispose(_manager.disposeAll);
     return _stateFromManager();
   }
 
   /// Creates a new tab / session.
   void createSession({String? workingDirectory}) {
-    _manager.createSession(workingDirectory: workingDirectory);
+    final session =
+        _manager.createSession(workingDirectory: workingDirectory);
+    _attachListener(session);
     state = _stateFromManager();
   }
 
@@ -33,8 +38,17 @@ class SessionNotifier extends Notifier<SessionState> {
   void closeSession(int index) {
     final wasLast = _manager.closeSession(index);
     if (wasLast) {
-      _manager.createSession();
+      final session = _manager.createSession();
+      _attachListener(session);
     }
+    state = _stateFromManager();
+  }
+
+  void _attachListener(TerminalSession session) {
+    session.addListener(_onSessionChanged);
+  }
+
+  void _onSessionChanged() {
     state = _stateFromManager();
   }
 

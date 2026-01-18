@@ -12,6 +12,9 @@ import 'command_block.dart';
 import 'command_history.dart';
 import 'shell_integration.dart';
 
+/// Tab status indicator.
+enum TabStatus { idle, running, error }
+
 /// Wraps a PTY process and an xterm Terminal model into a single session.
 ///
 /// Handles bidirectional data flow: terminal keyboard output goes to PTY input,
@@ -127,6 +130,51 @@ class TerminalSession extends ChangeNotifier {
 
   /// Shell name (e.g. "zsh", "bash").
   String get shellName => title;
+
+  /// Dynamic tab title — shows current or last command name.
+  String get tabTitle {
+    if (_commandRunning && _activeBlock != null) {
+      return _extractProgramName(_activeBlock!.command);
+    }
+    if (_blocks.isNotEmpty) {
+      return _extractProgramName(_blocks.last.command);
+    }
+    return title;
+  }
+
+  /// Full command text for tooltip.
+  String get fullTabTitle {
+    if (_commandRunning && _activeBlock != null) {
+      return _activeBlock!.command.trim();
+    }
+    if (_blocks.isNotEmpty) {
+      return _blocks.last.command.trim();
+    }
+    return title;
+  }
+
+  /// Tab status for icon display.
+  TabStatus get tabStatus {
+    if (_commandRunning) return TabStatus.running;
+    if (_blocks.isNotEmpty &&
+        _blocks.last.exitCode != null &&
+        _blocks.last.exitCode! > 0) {
+      return TabStatus.error;
+    }
+    return TabStatus.idle;
+  }
+
+  static String _extractProgramName(String command) {
+    final trimmed = command.trim();
+    if (trimmed.isEmpty) return 'zsh';
+    const prefixes = {'sudo', 'env', 'nice', 'nohup', 'time'};
+    final parts = trimmed.split(RegExp(r'\s+'));
+    for (final part in parts) {
+      if (prefixes.contains(part)) continue;
+      return part.split('/').last;
+    }
+    return parts.first.split('/').last;
+  }
 
   /// Terminal column count.
   int get cols => terminal.viewWidth;

@@ -186,9 +186,10 @@ class _SessionViewState extends ConsumerState<SessionView> {
     if (widget.session.isCommandRunning) return false;
     if (event is! KeyDownEvent) return false;
 
-    // If the prompt already has focus, let it handle the event
+    // Don't steal focus when history search or other overlays are open
     final promptState = _promptKey.currentState;
     if (promptState == null) return false;
+    if (promptState.isHistorySearchOpen) return false;
 
     final isPrintable = event.character != null &&
         event.character!.isNotEmpty &&

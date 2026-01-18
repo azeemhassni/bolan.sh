@@ -73,6 +73,8 @@ class PromptInputState extends State<PromptInput> {
 
   void requestFocus() => _focusNode.requestFocus();
 
+  bool get isHistorySearchOpen => _showHistorySearch;
+
   @override
   void dispose() {
     _controller.removeListener(_onTextChanged);

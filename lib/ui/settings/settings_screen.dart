@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
@@ -29,10 +30,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
 
-    return Scaffold(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape):
+            () => Navigator.of(context).pop(),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
       backgroundColor: theme.background,
       appBar: AppBar(
         backgroundColor: theme.tabBarBackground,
+        automaticallyImplyLeading: false,
         title: Text(
           'Settings',
           style: TextStyle(
@@ -41,10 +50,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             fontSize: 14,
           ),
         ),
-        leading: IconButton(
-          icon: Icon(Icons.close, color: theme.foreground, size: 18),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.close, color: theme.foreground, size: 18),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          const SizedBox(width: 8),
+        ],
         elevation: 0,
       ),
       body: ListView(
@@ -163,6 +175,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ],
+      ),
+    ),
       ),
     );
   }
