@@ -95,6 +95,99 @@ class PaneManager {
     return null;
   }
 
+  /// Moves a leaf pane from [sourceId] to a new position relative to
+  /// [targetId]. The session is preserved (not disposed/recreated).
+  static PaneNode? movePane(
+    PaneNode root,
+    String sourceId,
+    String targetId,
+    DropPosition position,
+  ) {
+    if (sourceId == targetId) return root;
+
+    // Detach the source leaf without disposing
+    final (detachedRoot, detachedLeaf) = detachLeaf(root, sourceId);
+    if (detachedRoot == null || detachedLeaf == null) return root;
+
+    // Insert it at the target position
+    return insertLeaf(detachedRoot, targetId, detachedLeaf, position);
+  }
+
+  /// Removes a leaf from the tree WITHOUT disposing its session.
+  /// Returns the new root and the detached leaf.
+  static (PaneNode?, LeafPane?) detachLeaf(PaneNode root, String leafId) {
+    if (root is LeafPane && root.id == leafId) {
+      return (null, root);
+    }
+    if (root is! SplitPane) return (root, null);
+
+    // Direct child check
+    if (root.first is LeafPane && (root.first as LeafPane).id == leafId) {
+      return (root.second, root.first as LeafPane);
+    }
+    if (root.second is LeafPane && (root.second as LeafPane).id == leafId) {
+      return (root.first, root.second as LeafPane);
+    }
+
+    // Recurse into first child
+    final (newFirst, leaf) = detachLeaf(root.first, leafId);
+    if (leaf != null) {
+      if (newFirst == null) return (root.second, leaf);
+      return (
+        SplitPane(
+          id: root.id,
+          first: newFirst,
+          second: root.second,
+          axis: root.axis,
+          ratio: root.ratio,
+        ),
+        leaf,
+      );
+    }
+
+    // Recurse into second child
+    final (newSecond, leaf2) = detachLeaf(root.second, leafId);
+    if (leaf2 != null) {
+      if (newSecond == null) return (root.first, leaf2);
+      return (
+        SplitPane(
+          id: root.id,
+          first: root.first,
+          second: newSecond,
+          axis: root.axis,
+          ratio: root.ratio,
+        ),
+        leaf2,
+      );
+    }
+
+    return (root, null);
+  }
+
+  /// Inserts a leaf pane at a position relative to [targetId].
+  static PaneNode insertLeaf(
+    PaneNode root,
+    String targetId,
+    LeafPane leaf,
+    DropPosition position,
+  ) {
+    final axis = (position == DropPosition.left ||
+            position == DropPosition.right)
+        ? Axis.horizontal
+        : Axis.vertical;
+    final insertFirst =
+        position == DropPosition.left || position == DropPosition.top;
+
+    return _replaceNode(root, targetId, (target) {
+      return SplitPane(
+        id: _uuid.v4(),
+        first: insertFirst ? leaf : target,
+        second: insertFirst ? target : leaf,
+        axis: axis,
+      );
+    });
+  }
+
   /// Disposes all sessions in the tree.
   static void disposeAll(PaneNode root) {
     for (final leaf in allLeaves(root)) {

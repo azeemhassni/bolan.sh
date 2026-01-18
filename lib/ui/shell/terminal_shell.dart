@@ -3,12 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/config_loader.dart';
+import '../../core/pane/pane_node.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/default_dark.dart';
 import '../../providers/config_provider.dart';
 import '../../providers/font_size_provider.dart';
 import '../../providers/session_provider.dart';
 import '../settings/settings_screen.dart';
+import 'pane_focus_registry.dart';
 import 'pane_tree_widget.dart';
 import 'tab_bar.dart';
 
@@ -32,6 +34,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
     _configLoader.addListener(_onConfigChanged);
     _configLoader.load();
     _configLoader.startWatching();
+    HardwareKeyboard.instance.addHandler(_globalKeyHandler);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(configLoaderProvider.notifier).state = _configLoader;
     });
@@ -39,6 +42,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_globalKeyHandler);
     _configLoader.removeListener(_onConfigChanged);
     _configLoader.dispose();
     super.dispose();
@@ -50,6 +54,34 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
     if (config.editor.fontSize != currentFontSize) {
       ref.read(fontSizeProvider.notifier).setSize(config.editor.fontSize);
     }
+  }
+
+  /// Global key handler: forwards printable key presses to the focused pane's
+  /// prompt input, so typing anywhere automatically goes to the right pane.
+  bool _globalKeyHandler(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+
+    final s = ref.read(sessionProvider);
+    final tab = s.activeTab;
+    if (tab == null) return false;
+
+    // Don't interfere during command execution
+    final session = tab.focusedSession;
+    if (session != null && session.isCommandRunning) return false;
+
+    final promptState = PaneFocusRegistry.get(tab.focusedPaneId);
+    if (promptState == null) return false;
+    if (promptState.isHistorySearchOpen) return false;
+
+    final isPrintable = event.character != null &&
+        event.character!.isNotEmpty &&
+        !HardwareKeyboard.instance.isControlPressed &&
+        !HardwareKeyboard.instance.isMetaPressed;
+
+    if (isPrintable) {
+      promptState.requestFocus();
+    }
+    return false;
   }
 
   void _switchTab(int delta) {
@@ -143,6 +175,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
                               'tab-${sessionState.activeTabIndex}'),
                           node: activeTab.rootPane,
                           focusedPaneId: activeTab.focusedPaneId,
+                          isSinglePane: activeTab.rootPane is LeafPane,
                         )
                       : const SizedBox.shrink(),
                 ),

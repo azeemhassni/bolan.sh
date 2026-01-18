@@ -2,6 +2,9 @@ import 'package:flutter/widgets.dart';
 
 import '../terminal/session.dart';
 
+/// Where a dragged pane should be placed relative to the drop target.
+enum DropPosition { left, right, top, bottom }
+
 /// A node in the pane tree. Either a leaf (single terminal) or a split
 /// (two children separated by a resizable divider).
 sealed class PaneNode {

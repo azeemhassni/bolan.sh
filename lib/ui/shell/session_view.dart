@@ -12,6 +12,7 @@ import '../blocks/command_block_widget.dart';
 import '../prompt/prompt_area.dart';
 import '../prompt/prompt_input.dart';
 import '../shared/font_size_toast.dart';
+import 'pane_focus_registry.dart';
 
 /// Renders a terminal session with Warp-style flowing layout.
 ///
@@ -20,8 +21,17 @@ import '../shared/font_size_toast.dart';
 /// right after the last content.
 class SessionView extends ConsumerStatefulWidget {
   final TerminalSession session;
+  final bool isFocusedPane;
+  final String? paneId;
+  final void Function(TapDownDetails)? onSecondaryTap;
 
-  const SessionView({super.key, required this.session});
+  const SessionView({
+    super.key,
+    required this.session,
+    this.isFocusedPane = true,
+    this.paneId,
+    this.onSecondaryTap,
+  });
 
   @override
   ConsumerState<SessionView> createState() => _SessionViewState();
@@ -40,7 +50,12 @@ class _SessionViewState extends ConsumerState<SessionView> {
     super.initState();
     _terminalFocusNode = FocusNode(debugLabel: 'terminal-${widget.session.id}');
     widget.session.addListener(_onSessionChanged);
-    HardwareKeyboard.instance.addHandler(_globalKeyHandler);
+    // Register prompt for global focus forwarding after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.paneId != null && _promptKey.currentState != null) {
+        PaneFocusRegistry.register(widget.paneId!, _promptKey.currentState!);
+      }
+    });
   }
 
   @override
@@ -54,7 +69,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_globalKeyHandler);
+    if (widget.paneId != null) PaneFocusRegistry.unregister(widget.paneId!);
     widget.session.removeListener(_onSessionChanged);
     _terminalController.dispose();
     _scrollController.dispose();
@@ -157,6 +172,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
                     block: block,
                     fontSize: fontSize,
                     lineHeight: lineHeight,
+                    onSecondaryTap: widget.onSecondaryTap,
                   ),
                 PromptArea(
                   session: widget.session,
@@ -180,26 +196,6 @@ class _SessionViewState extends ConsumerState<SessionView> {
         ],
       ),
     );
-  }
-
-  bool _globalKeyHandler(KeyEvent event) {
-    if (widget.session.isCommandRunning) return false;
-    if (event is! KeyDownEvent) return false;
-
-    // Don't steal focus when history search or other overlays are open
-    final promptState = _promptKey.currentState;
-    if (promptState == null) return false;
-    if (promptState.isHistorySearchOpen) return false;
-
-    final isPrintable = event.character != null &&
-        event.character!.isNotEmpty &&
-        !HardwareKeyboard.instance.isControlPressed &&
-        !HardwareKeyboard.instance.isMetaPressed;
-
-    if (isPrintable) {
-      promptState.requestFocus();
-    }
-    return false; // Don't consume — let the event propagate
   }
 
   void _increaseFontSize() {

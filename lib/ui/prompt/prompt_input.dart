@@ -168,6 +168,7 @@ class PromptInputState extends State<PromptInput> {
                   autofocus: true,
                   maxLines: null,
                   minLines: 1,
+                  contextMenuBuilder: (_, __) => const SizedBox.shrink(),
                   style: TextStyle(
                     color: theme.foreground,
                     fontFamily: 'Operator Mono',

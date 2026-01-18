@@ -13,12 +13,14 @@ class CommandBlockWidget extends StatefulWidget {
   final CommandBlock block;
   final double fontSize;
   final double lineHeight;
+  final void Function(TapDownDetails)? onSecondaryTap;
 
   const CommandBlockWidget({
     super.key,
     required this.block,
     this.fontSize = 13,
     this.lineHeight = 1.2,
+    this.onSecondaryTap,
   });
 
   @override
@@ -114,13 +116,11 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                   padding: const EdgeInsets.only(top: 2),
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
-                    child: SelectableText(
-                      block.output,
-                      contextMenuBuilder: (context, editableTextState) {
-                        return AdaptiveTextSelectionToolbar.editableText(
-                          editableTextState: editableTextState,
-                        );
-                      },
+                    child: GestureDetector(
+                      onSecondaryTapDown: widget.onSecondaryTap,
+                      child: SelectableText(
+                        block.output,
+                        contextMenuBuilder: (_, __) => const SizedBox.shrink(),
                       style: TextStyle(
                         color: theme.foreground,
                         fontFamily: 'Operator Mono',
@@ -128,6 +128,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                         height: widget.lineHeight,
                         decoration: TextDecoration.none,
                       ),
+                    ),
                     ),
                   ),
                 ),

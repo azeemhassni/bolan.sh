@@ -7,6 +7,8 @@ import '../core/pane/pane_node.dart';
 import '../core/terminal/command_history.dart';
 import '../core/terminal/session.dart';
 
+export '../core/pane/pane_node.dart' show DropPosition;
+
 const _uuid = Uuid();
 
 /// State for a single tab — a tree of panes with a focused pane.
@@ -145,6 +147,21 @@ class SessionNotifier extends Notifier<SessionState> {
       direction,
     );
     if (targetId != null) setFocusedPane(targetId);
+  }
+
+  void movePane(String sourceId, String targetId, DropPosition position) {
+    final tab = state.activeTab;
+    if (tab == null || sourceId == targetId) return;
+
+    final newRoot = PaneManager.movePane(
+      tab.rootPane, sourceId, targetId, position,
+    );
+    if (newRoot == null) return;
+
+    _updateActiveTab(TabState(
+      rootPane: newRoot,
+      focusedPaneId: sourceId,
+    ));
   }
 
   void updateSplitRatio(String splitPaneId, double ratio) {
