@@ -1,13 +1,16 @@
 import 'package:uuid/uuid.dart';
 
+import 'command_history.dart';
 import 'session.dart';
 
 /// Manages the lifecycle of terminal sessions.
 ///
 /// Handles creating, switching, and closing sessions. Maintains the list of
 /// active sessions and tracks which session is currently focused.
+/// All sessions share a single [CommandHistory] instance.
 class SessionManager {
   final List<TerminalSession> _sessions = [];
+  final CommandHistory history = CommandHistory();
   int _activeIndex = -1;
 
   static const _uuid = Uuid();
@@ -25,6 +28,7 @@ class SessionManager {
   TerminalSession createSession({String? workingDirectory}) {
     final session = TerminalSession.start(
       id: _uuid.v4(),
+      history: history,
       workingDirectory: workingDirectory,
     );
     _sessions.add(session);

@@ -9,6 +9,7 @@ import 'package:xterm/xterm.dart';
 
 import '../completion/completion_engine.dart';
 import 'command_block.dart';
+import 'command_history.dart';
 import 'shell_integration.dart';
 
 /// Wraps a PTY process and an xterm Terminal model into a single session.
@@ -43,16 +44,21 @@ class TerminalSession extends ChangeNotifier {
   // Completion engine — lazily initialized
   CompletionEngine? _completionEngine;
 
+  /// Shared command history — persisted across sessions.
+  final CommandHistory history;
+
   TerminalSession._({
     required this.id,
     required this.title,
     required this.terminal,
     required Pty pty,
+    required this.history,
   }) : _pty = pty;
 
   /// Creates a new terminal session by spawning a shell process.
   factory TerminalSession.start({
     required String id,
+    required CommandHistory history,
     String? title,
     String? workingDirectory,
     int rows = 25,
@@ -80,6 +86,7 @@ class TerminalSession extends ChangeNotifier {
       title: title ?? shell.split('/').last,
       terminal: terminal,
       pty: pty,
+      history: history,
     );
 
     session._connect();

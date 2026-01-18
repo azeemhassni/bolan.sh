@@ -10,7 +10,8 @@ class SessionNotifier extends Notifier<SessionState> {
   @override
   SessionState build() {
     _manager = SessionManager();
-    // Create an initial session on startup.
+    // Load persisted history, then create an initial session.
+    _manager.history.load();
     _manager.createSession();
     ref.onDispose(_manager.disposeAll);
     return _stateFromManager();

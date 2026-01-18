@@ -4,12 +4,16 @@ import 'package:flutter/services.dart';
 import '../../core/completion/completion_engine.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
+import 'completion_popup.dart';
+import 'history_search.dart';
 
-/// Prompt input with inline ghost-text completions.
+/// Prompt input with ghost text from history and tab completion.
 ///
-/// - Tab or Right Arrow accepts the ghost completion.
-/// - When multiple completions exist, Tab cycles through them.
-/// - Ghost text shows as dimmed text after the cursor.
+/// - Arrow Up/Down navigates command history.
+/// - Ctrl+R opens inline history search.
+/// - While typing, shows closest history match as ghost text.
+/// - Tab triggers file/command completion with ghost text cycling.
+/// - Right Arrow at end of input accepts ghost text.
 class PromptInput extends StatefulWidget {
   final TerminalSession session;
   final double fontSize;
@@ -27,7 +31,6 @@ class PromptInput extends StatefulWidget {
 class PromptInputState extends State<PromptInput> {
   final _controller = TextEditingController();
   late final FocusNode _focusNode;
-  final List<String> _history = [];
   int _historyIndex = -1;
   String _savedInput = '';
 
@@ -37,13 +40,28 @@ class PromptInputState extends State<PromptInput> {
   CompletionResult? _activeResult;
   bool _completionLoading = false;
 
-  /// The ghost text to show after the cursor.
+  // History search state
+  bool _showHistorySearch = false;
+
+  /// Ghost text: from completions or history match.
   String get _ghostText {
-    if (_completions.isEmpty || _activeResult == null) return '';
-    final current = _completions[_completionIndex];
-    final prefix = _activeResult!.prefix;
-    if (current.length <= prefix.length) return '';
-    return current.substring(prefix.length);
+    // Tab completion ghost takes priority
+    if (_completions.isNotEmpty && _activeResult != null) {
+      final current = _completions[_completionIndex];
+      final prefix = _activeResult!.prefix;
+      if (current.length > prefix.length) {
+        return current.substring(prefix.length);
+      }
+    }
+    // History ghost — show matching command from history
+    final text = _controller.text;
+    if (text.isNotEmpty && _historyIndex == -1) {
+      final match = widget.session.history.findMatch(text);
+      if (match != null) {
+        return match.substring(text.length);
+      }
+    }
+    return '';
   }
 
   @override
@@ -64,12 +82,16 @@ class PromptInputState extends State<PromptInput> {
   }
 
   void _onTextChanged() {
+    // Dismiss tab completions when typing
     if (_completions.isNotEmpty) {
       setState(() {
         _completions = [];
         _activeResult = null;
         _completionIndex = 0;
       });
+    } else {
+      // Refresh ghost text from history
+      setState(() {});
     }
   }
 
@@ -80,60 +102,89 @@ class PromptInputState extends State<PromptInput> {
 
     return Material(
       color: Colors.transparent,
-      child: Padding(
-        padding:
-            const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 10),
-        child: Stack(
-          children: [
-            // Ghost text overlay — positioned after the real text
-            if (ghost.isNotEmpty)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: _GhostTextOverlay(
-                    controller: _controller,
-                    ghostText: ghost,
-                    style: TextStyle(
-                      color: theme.dimForeground,
-                      fontFamily: 'Operator Mono',
-                      fontSize: widget.fontSize,
-                      height: 1.4,
-                      decoration: TextDecoration.none,
-                    ),
-                    realStyle: TextStyle(
-                      color: Colors.transparent,
-                      fontFamily: 'Operator Mono',
-                      fontSize: widget.fontSize,
-                      height: 1.4,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                ),
-              ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // History search popup
+          if (_showHistorySearch)
+            HistorySearch(
+              fontSize: widget.fontSize,
+              onSearch: widget.session.history.search,
+              onSelect: _acceptHistorySearch,
+              onDismiss: _dismissHistorySearch,
+            ),
 
-            // Real input
-            TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              autofocus: true,
-              maxLines: null,
-              minLines: 1,
-              style: TextStyle(
-                color: theme.foreground,
-                fontFamily: 'Operator Mono',
+          // Completion popup
+          if (_completions.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+              child: CompletionPopup(
+                items: _completions,
+                selectedIndex: _completionIndex,
+                prefix: _activeResult?.prefix ?? '',
                 fontSize: widget.fontSize,
-                height: 1.4,
-                decoration: TextDecoration.none,
-              ),
-              cursorColor: theme.cursor,
-              cursorWidth: 2,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                isDense: true,
+                onSelect: _acceptCompletion,
               ),
             ),
-          ],
-        ),
+
+          // Input with ghost text overlay
+          Padding(
+            padding:
+                const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 10),
+            child: Stack(
+              children: [
+                // Ghost text
+                if (ghost.isNotEmpty)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: _GhostTextOverlay(
+                        controller: _controller,
+                        ghostText: ghost,
+                        style: TextStyle(
+                          color: theme.dimForeground,
+                          fontFamily: 'Operator Mono',
+                          fontSize: widget.fontSize,
+                          height: 1.4,
+                          decoration: TextDecoration.none,
+                        ),
+                        realStyle: TextStyle(
+                          color: Colors.transparent,
+                          fontFamily: 'Operator Mono',
+                          fontSize: widget.fontSize,
+                          height: 1.4,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Real input
+                TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  autofocus: true,
+                  maxLines: null,
+                  minLines: 1,
+                  style: TextStyle(
+                    color: theme.foreground,
+                    fontFamily: 'Operator Mono',
+                    fontSize: widget.fontSize,
+                    height: 1.4,
+                    decoration: TextDecoration.none,
+                  ),
+                  cursorColor: theme.cursor,
+                  cursorWidth: 2,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -144,28 +195,64 @@ class PromptInputState extends State<PromptInput> {
     final ctrl = HardwareKeyboard.instance.isControlPressed;
     final shift = HardwareKeyboard.instance.isShiftPressed;
 
-    switch (event.logicalKey) {
-      // Tab — request completions or cycle through them
-      case LogicalKeyboardKey.tab:
-        if (_completions.isEmpty) {
-          _requestCompletion();
-        } else {
-          // Cycle to next completion
+    // Tab completion popup navigation
+    if (_completions.length > 1) {
+      switch (event.logicalKey) {
+        case LogicalKeyboardKey.tab:
+        case LogicalKeyboardKey.arrowDown:
           setState(() {
             _completionIndex =
                 (_completionIndex + 1) % _completions.length;
           });
+          return KeyEventResult.handled;
+
+        case LogicalKeyboardKey.arrowUp:
+          setState(() {
+            _completionIndex =
+                (_completionIndex - 1 + _completions.length) %
+                    _completions.length;
+          });
+          return KeyEventResult.handled;
+
+        case LogicalKeyboardKey.enter:
+          _acceptCompletion(_completionIndex);
+          return KeyEventResult.handled;
+
+        case LogicalKeyboardKey.escape:
+          setState(() {
+            _completions = [];
+            _activeResult = null;
+          });
+          return KeyEventResult.handled;
+
+        default:
+          break;
+      }
+    }
+
+    switch (event.logicalKey) {
+      // Tab — file/command completion
+      case LogicalKeyboardKey.tab:
+        if (_completions.isEmpty) {
+          _requestCompletion();
+        } else if (_completions.length == 1) {
+          _acceptCompletion(0);
         }
         return KeyEventResult.handled;
 
-      // Right arrow at end of text — accept ghost completion
+      // Right Arrow at end — accept ghost text
       case LogicalKeyboardKey.arrowRight
           when _ghostText.isNotEmpty &&
               _controller.selection.baseOffset == _controller.text.length:
-        _acceptCurrentCompletion();
+        _acceptGhostText();
         return KeyEventResult.handled;
 
-      // Escape — dismiss completions
+      // Ctrl+R — open history search
+      case LogicalKeyboardKey.keyR when ctrl:
+        setState(() => _showHistorySearch = true);
+        return KeyEventResult.handled;
+
+      // Escape — dismiss completions/ghost
       case LogicalKeyboardKey.escape:
         if (_completions.isNotEmpty) {
           setState(() {
@@ -176,23 +263,28 @@ class PromptInputState extends State<PromptInput> {
         }
         return KeyEventResult.ignored;
 
+      // Enter — submit
       case LogicalKeyboardKey.enter when !shift:
         _onSubmit(_controller.text);
         return KeyEventResult.handled;
 
+      // Shift+Enter — newline
       case LogicalKeyboardKey.enter when shift:
         final pos = _controller.selection.baseOffset;
         final text = _controller.text;
-        _controller.removeListener(_onTextChanged);
-        _controller.text =
-            '${text.substring(0, pos)}\n${text.substring(pos)}';
-        _controller.selection = TextSelection.collapsed(offset: pos + 1);
-        _controller.addListener(_onTextChanged);
+        _withoutListener(() {
+          _controller.text =
+              '${text.substring(0, pos)}\n${text.substring(pos)}';
+          _controller.selection = TextSelection.collapsed(offset: pos + 1);
+        });
         return KeyEventResult.handled;
 
+      // Arrow Up — history back
       case LogicalKeyboardKey.arrowUp when !ctrl:
         _navigateHistory(back: true);
         return KeyEventResult.handled;
+
+      // Arrow Down — history forward
       case LogicalKeyboardKey.arrowDown when !ctrl:
         _navigateHistory(back: false);
         return KeyEventResult.handled;
@@ -242,6 +334,90 @@ class PromptInputState extends State<PromptInput> {
     }
   }
 
+  // --- History ---
+
+  void _navigateHistory({required bool back}) {
+    final history = widget.session.history;
+    if (history.length == 0) return;
+
+    if (back) {
+      if (_historyIndex == -1) {
+        _savedInput = _controller.text;
+        _historyIndex = 0;
+      } else if (_historyIndex < history.length - 1) {
+        _historyIndex++;
+      }
+      _withoutListener(() {
+        _controller.text = history.entryFromEnd(_historyIndex) ?? '';
+        _controller.selection = TextSelection.collapsed(
+          offset: _controller.text.length,
+        );
+      });
+      setState(() {});
+    } else {
+      if (_historyIndex == -1) return;
+      if (_historyIndex > 0) {
+        _historyIndex--;
+        _withoutListener(() {
+          _controller.text = history.entryFromEnd(_historyIndex) ?? '';
+          _controller.selection = TextSelection.collapsed(
+            offset: _controller.text.length,
+          );
+        });
+      } else {
+        _historyIndex = -1;
+        _withoutListener(() {
+          _controller.text = _savedInput;
+          _controller.selection = TextSelection.collapsed(
+            offset: _controller.text.length,
+          );
+        });
+      }
+      setState(() {});
+    }
+  }
+
+  void _acceptHistorySearch(String command) {
+    _withoutListener(() {
+      _controller.text = command;
+      _controller.selection = TextSelection.collapsed(
+        offset: command.length,
+      );
+    });
+    setState(() => _showHistorySearch = false);
+    _focusNode.requestFocus();
+  }
+
+  void _dismissHistorySearch() {
+    setState(() => _showHistorySearch = false);
+    _focusNode.requestFocus();
+  }
+
+  // --- Ghost text ---
+
+  void _acceptGhostText() {
+    final ghost = _ghostText;
+    if (ghost.isEmpty) return;
+
+    // If from tab completion, accept that
+    if (_completions.isNotEmpty && _activeResult != null) {
+      _acceptCompletion(_completionIndex);
+      return;
+    }
+
+    // Otherwise accept history ghost
+    final text = _controller.text;
+    _withoutListener(() {
+      _controller.text = '$text$ghost';
+      _controller.selection = TextSelection.collapsed(
+        offset: _controller.text.length,
+      );
+    });
+    setState(() {});
+  }
+
+  // --- Tab completion ---
+
   Future<void> _requestCompletion() async {
     if (_completionLoading) return;
     _completionLoading = true;
@@ -255,10 +431,12 @@ class PromptInputState extends State<PromptInput> {
       if (!mounted) return;
 
       if (result.isSingle) {
-        // Single match — accept immediately
         _applyCompletion(result.items.first, result);
       } else if (result.items.isNotEmpty) {
-        // Multiple matches — show ghost text for first item
+        final lcp = longestCommonPrefix(result.items);
+        if (lcp.length > result.prefix.length) {
+          _applyCompletion(lcp, result);
+        }
         setState(() {
           _completions = result.items;
           _completionIndex = 0;
@@ -270,9 +448,9 @@ class PromptInputState extends State<PromptInput> {
     }
   }
 
-  void _acceptCurrentCompletion() {
-    if (_activeResult == null || _completions.isEmpty) return;
-    _applyCompletion(_completions[_completionIndex], _activeResult!);
+  void _acceptCompletion(int index) {
+    if (_activeResult == null || index >= _completions.length) return;
+    _applyCompletion(_completions[index], _activeResult!);
     setState(() {
       _completions = [];
       _activeResult = null;
@@ -297,49 +475,22 @@ class PromptInputState extends State<PromptInput> {
     });
   }
 
+  // --- Submit ---
+
   void _onSubmit(String text) {
     final command = text.trim();
     if (command.isEmpty) {
       widget.session.writeInput('\n');
     } else {
       widget.session.writeInput('$command\n');
-      _addToHistory(command);
+      widget.session.history.add(command);
     }
     _controller.clear();
     _historyIndex = -1;
     _focusNode.requestFocus();
   }
 
-  void _addToHistory(String command) {
-    if (_history.isNotEmpty && _history.last == command) return;
-    _history.add(command);
-  }
-
-  void _navigateHistory({required bool back}) {
-    if (_history.isEmpty) return;
-
-    if (back) {
-      if (_historyIndex == -1) {
-        _savedInput = _controller.text;
-        _historyIndex = _history.length - 1;
-      } else if (_historyIndex > 0) {
-        _historyIndex--;
-      }
-      _controller.text = _history[_historyIndex];
-    } else {
-      if (_historyIndex == -1) return;
-      if (_historyIndex < _history.length - 1) {
-        _historyIndex++;
-        _controller.text = _history[_historyIndex];
-      } else {
-        _historyIndex = -1;
-        _controller.text = _savedInput;
-      }
-    }
-    _controller.selection = TextSelection.collapsed(
-      offset: _controller.text.length,
-    );
-  }
+  // --- Helpers ---
 
   void _deleteWordBefore() {
     final text = _controller.text;
@@ -360,7 +511,6 @@ class PromptInputState extends State<PromptInput> {
     });
   }
 
-  /// Modifies the controller without triggering _onTextChanged.
   void _withoutListener(VoidCallback fn) {
     _controller.removeListener(_onTextChanged);
     fn();
@@ -369,9 +519,6 @@ class PromptInputState extends State<PromptInput> {
 }
 
 /// Renders ghost/shadow text after the real text content.
-///
-/// Uses a transparent copy of the real text followed by the dimmed ghost text
-/// so the ghost aligns exactly after the cursor position.
 class _GhostTextOverlay extends StatelessWidget {
   final TextEditingController controller;
   final String ghostText;
@@ -390,9 +537,7 @@ class _GhostTextOverlay extends StatelessWidget {
     return RichText(
       text: TextSpan(
         children: [
-          // Invisible copy of real text to push ghost to the right position
           TextSpan(text: controller.text, style: realStyle),
-          // Ghost text in dim color
           TextSpan(text: ghostText, style: style),
         ],
       ),

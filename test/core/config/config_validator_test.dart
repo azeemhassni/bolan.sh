@@ -9,7 +9,7 @@ void main() {
       final config = validator.validate({});
       expect(config.activeTheme, 'default-dark');
       expect(config.editor.fontSize, 13.0);
-      expect(config.editor.fontFamily, 'JetBrainsMono');
+      expect(config.editor.fontFamily, 'Operator Mono');
       expect(config.editor.cursorStyle, 'block');
       expect(config.ai.provider, 'ollama');
       expect(config.ai.enabled, false);
