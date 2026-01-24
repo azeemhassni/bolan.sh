@@ -197,6 +197,7 @@ class PromptInputState extends State<PromptInput> {
 
     final ctrl = HardwareKeyboard.instance.isControlPressed;
     final shift = HardwareKeyboard.instance.isShiftPressed;
+    final meta = HardwareKeyboard.instance.isMetaPressed;
 
     // Tab completion popup navigation
     if (_completions.length > 1) {
@@ -329,6 +330,13 @@ class PromptInputState extends State<PromptInput> {
 
       case LogicalKeyboardKey.keyL when ctrl:
         widget.session.clearBlocks();
+        widget.session.writeInput('\x0c');
+        return KeyEventResult.handled;
+
+      // Cmd+K — clear everything (blocks + scrollback)
+      case LogicalKeyboardKey.keyK when meta:
+        widget.session.clearBlocks();
+        widget.session.terminal.buffer.clear();
         widget.session.writeInput('\x0c');
         return KeyEventResult.handled;
 
