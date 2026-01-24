@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/ai/api_key_storage.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -145,23 +146,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _DropdownOption(
             label: 'Provider',
             value: _config.ai.provider,
-            options: const ['ollama', 'openai', 'anthropic'],
+            options: const ['gemini', 'ollama', 'openai', 'anthropic'],
             theme: theme,
             onChanged: (v) => _updateAi(provider: v),
           ),
-          _TextOption(
-            label: 'Model',
-            value: _config.ai.model,
-            hint: 'Default',
-            theme: theme,
-            onChanged: (v) => _updateAi(model: v),
-          ),
-          _TextOption(
-            label: 'Ollama URL',
-            value: _config.ai.ollamaUrl,
-            theme: theme,
-            onChanged: (v) => _updateAi(ollamaUrl: v),
-          ),
+
+          // Provider-specific settings
+          if (_config.ai.provider == 'gemini') ...[
+            _ApiKeyOption(
+              label: 'Gemini API Key',
+              provider: 'gemini',
+              theme: theme,
+            ),
+            _TextOption(
+              label: 'Model',
+              value: _config.ai.geminiModel,
+              hint: 'gemini-2.5-flash',
+              theme: theme,
+              onChanged: (v) => _updateAi(geminiModel: v),
+            ),
+          ],
+
+          if (_config.ai.provider == 'openai') ...[
+            _ApiKeyOption(
+              label: 'OpenAI API Key',
+              provider: 'openai',
+              theme: theme,
+            ),
+            _TextOption(
+              label: 'Model',
+              value: _config.ai.openaiModel,
+              hint: 'gpt-4o',
+              theme: theme,
+              onChanged: (v) => _updateAi(openaiModel: v),
+            ),
+          ],
+
+          if (_config.ai.provider == 'anthropic') ...[
+            _ApiKeyOption(
+              label: 'Anthropic API Key',
+              provider: 'anthropic',
+              theme: theme,
+            ),
+            _TextOption(
+              label: 'Model',
+              value: _config.ai.anthropicModel,
+              hint: 'claude-sonnet-4-20250514',
+              theme: theme,
+              onChanged: (v) => _updateAi(anthropicModel: v),
+            ),
+          ],
+
+          if (_config.ai.provider == 'ollama') ...[
+            _TextOption(
+              label: 'Ollama URL',
+              value: _config.ai.ollamaUrl,
+              theme: theme,
+              onChanged: (v) => _updateAi(ollamaUrl: v),
+            ),
+            _TextOption(
+              label: 'Model',
+              value: _config.ai.model,
+              hint: 'llama3',
+              theme: theme,
+              onChanged: (v) => _updateAi(model: v),
+            ),
+          ],
 
           const SizedBox(height: 32),
 
@@ -229,6 +279,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String? provider,
     String? model,
     String? ollamaUrl,
+    String? geminiModel,
+    String? openaiModel,
+    String? anthropicModel,
     bool? enabled,
   }) {
     setState(() {
@@ -239,6 +292,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           provider: provider ?? _config.ai.provider,
           model: model ?? _config.ai.model,
           ollamaUrl: ollamaUrl ?? _config.ai.ollamaUrl,
+          geminiModel: geminiModel ?? _config.ai.geminiModel,
+          openaiModel: openaiModel ?? _config.ai.openaiModel,
+          anthropicModel: anthropicModel ?? _config.ai.anthropicModel,
           enabled: enabled ?? _config.ai.enabled,
         ),
         activeTheme: _config.activeTheme,
@@ -518,5 +574,166 @@ class _DropdownOption extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _ApiKeyOption extends StatefulWidget {
+  final String label;
+  final String provider;
+  final BolonTheme theme;
+
+  const _ApiKeyOption({
+    required this.label,
+    required this.provider,
+    required this.theme,
+  });
+
+  @override
+  State<_ApiKeyOption> createState() => _ApiKeyOptionState();
+}
+
+class _ApiKeyOptionState extends State<_ApiKeyOption> {
+  bool _hasKey = false;
+  bool _editing = false;
+  final _controller = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkKey();
+  }
+
+  Future<void> _checkKey() async {
+    final has = await ApiKeyStorage.hasKey(widget.provider);
+    if (mounted) setState(() => _hasKey = has);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 180,
+            child: Text(
+              widget.label,
+              style: TextStyle(
+                color: widget.theme.blockHeaderFg,
+                fontFamily: 'Operator Mono',
+                fontSize: 12,
+              ),
+            ),
+          ),
+          if (_editing)
+            Expanded(
+              child: Material(
+                color: widget.theme.statusChipBg,
+                borderRadius: BorderRadius.circular(4),
+                child: TextField(
+                  controller: _controller,
+                  obscureText: true,
+                  style: TextStyle(
+                    color: widget.theme.foreground,
+                    fontFamily: 'Operator Mono',
+                    fontSize: 12,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Paste API key...',
+                    hintStyle: TextStyle(
+                      color: widget.theme.dimForeground,
+                      fontSize: 12,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: widget.theme.blockBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: widget.theme.blockBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: widget.theme.cursor),
+                    ),
+                    isDense: true,
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.check, size: 16, color: widget.theme.exitSuccessFg),
+                      onPressed: _saveKey,
+                    ),
+                  ),
+                  onSubmitted: (_) => _saveKey(),
+                ),
+              ),
+            )
+          else
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _hasKey ? '••••••••••••' : 'Not set',
+                  style: TextStyle(
+                    color: _hasKey ? widget.theme.foreground : widget.theme.dimForeground,
+                    fontFamily: 'Operator Mono',
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => setState(() => _editing = true),
+                  child: Text(
+                    _hasKey ? 'Change' : 'Set',
+                    style: TextStyle(
+                      color: widget.theme.cursor,
+                      fontFamily: 'Operator Mono',
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                if (_hasKey) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _deleteKey,
+                    child: Text(
+                      'Remove',
+                      style: TextStyle(
+                        color: widget.theme.exitFailureFg,
+                        fontFamily: 'Operator Mono',
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveKey() async {
+    final key = _controller.text.trim();
+    if (key.isEmpty) return;
+    await ApiKeyStorage.saveKey(widget.provider, key);
+    _controller.clear();
+    setState(() {
+      _hasKey = true;
+      _editing = false;
+    });
+  }
+
+  Future<void> _deleteKey() async {
+    await ApiKeyStorage.deleteKey(widget.provider);
+    setState(() => _hasKey = false);
   }
 }

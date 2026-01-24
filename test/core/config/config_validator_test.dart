@@ -11,7 +11,7 @@ void main() {
       expect(config.editor.fontSize, 13.0);
       expect(config.editor.fontFamily, 'Operator Mono');
       expect(config.editor.cursorStyle, 'block');
-      expect(config.ai.provider, 'ollama');
+      expect(config.ai.provider, 'gemini');
       expect(config.ai.enabled, false);
     });
 
@@ -53,7 +53,7 @@ void main() {
       final config = validator.validate({
         'ai': {'provider': 'skynet'},
       });
-      expect(config.ai.provider, 'ollama');
+      expect(config.ai.provider, 'gemini');
     });
 
     test('handles wrong types gracefully', () {

@@ -52,12 +52,18 @@ class AiConfig {
   final String provider;
   final String model;
   final String ollamaUrl;
+  final String geminiModel;
+  final String openaiModel;
+  final String anthropicModel;
   final bool enabled;
 
   const AiConfig({
-    this.provider = 'ollama',
+    this.provider = 'gemini',
     this.model = '',
     this.ollamaUrl = 'http://127.0.0.1:11434',
+    this.geminiModel = 'gemini-2.5-flash',
+    this.openaiModel = 'gpt-4o',
+    this.anthropicModel = 'claude-sonnet-4-20250514',
     this.enabled = false,
   });
 }

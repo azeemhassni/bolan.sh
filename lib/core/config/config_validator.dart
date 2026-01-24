@@ -39,9 +39,12 @@ class ConfigValidator {
   AiConfig _validateAi(Map<String, dynamic>? raw) {
     if (raw == null) return const AiConfig();
     return AiConfig(
-      provider: _oneOf(raw['provider'], ['ollama', 'openai', 'anthropic'], 'ollama'),
+      provider: _oneOf(raw['provider'], ['gemini', 'ollama', 'openai', 'anthropic'], 'gemini'),
       model: _string(raw['model'], ''),
       ollamaUrl: _string(raw['ollama_url'], 'http://127.0.0.1:11434'),
+      geminiModel: _string(raw['gemini_model'], 'gemini-2.5-flash'),
+      openaiModel: _string(raw['openai_model'], 'gpt-4o'),
+      anthropicModel: _string(raw['anthropic_model'], 'claude-sonnet-4-20250514'),
       enabled: _bool(raw['enabled'], false),
     );
   }

@@ -119,6 +119,9 @@ class ConfigLoader extends ChangeNotifier {
     sb.writeln('provider = "${c.ai.provider}"');
     if (c.ai.model.isNotEmpty) sb.writeln('model = "${c.ai.model}"');
     sb.writeln('ollama_url = "${c.ai.ollamaUrl}"');
+    sb.writeln('gemini_model = "${c.ai.geminiModel}"');
+    sb.writeln('openai_model = "${c.ai.openaiModel}"');
+    sb.writeln('anthropic_model = "${c.ai.anthropicModel}"');
     sb.writeln('enabled = ${c.ai.enabled}');
 
     return sb.toString();
