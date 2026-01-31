@@ -33,7 +33,7 @@ class GeminiProvider {
         ],
         'generationConfig': {
           'temperature': 0.2,
-          'maxOutputTokens': 512,
+          'maxOutputTokens': 2048,
         },
       },
     );

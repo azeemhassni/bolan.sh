@@ -9,7 +9,8 @@ import 'prompt_input.dart';
 ///
 /// Sits at the bottom of the session view with a distinct background
 /// and top border. Chips show shell, CWD, and git info with outlined style.
-class PromptArea extends StatelessWidget {
+/// Background changes when AI mode is active (# prefix).
+class PromptArea extends StatefulWidget {
   final TerminalSession session;
   final double fontSize;
   final String geminiModel;
@@ -24,12 +25,53 @@ class PromptArea extends StatelessWidget {
   });
 
   @override
+  State<PromptArea> createState() => _PromptAreaState();
+}
+
+class _PromptAreaState extends State<PromptArea> {
+  bool _aiMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _attachListener();
+    });
+  }
+
+  @override
+  void didUpdateWidget(PromptArea oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.promptInputKey != widget.promptInputKey) {
+      _attachListener();
+    }
+  }
+
+  void _attachListener() {
+    final state = widget.promptInputKey?.currentState;
+    if (state != null) {
+      state.aiModeNotifier.removeListener(_onAiModeChanged);
+      state.aiModeNotifier.addListener(_onAiModeChanged);
+    }
+  }
+
+  void _onAiModeChanged() {
+    final state = widget.promptInputKey?.currentState;
+    if (state == null) return;
+    if (mounted && _aiMode != state.isAiMode) {
+      setState(() => _aiMode = state.isAiMode);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.promptBackground,
+        color: _aiMode
+            ? theme.ansiMagenta.withAlpha(15)
+            : theme.promptBackground,
         border: Border(
           top: BorderSide(color: theme.blockBorder, width: 1),
         ),
@@ -47,7 +89,7 @@ class PromptArea extends StatelessWidget {
               children: [
                 // Shell chip with terminal icon
                 StatusChip(
-                  text: session.shellName,
+                  text: widget.session.shellName,
                   fg: theme.statusShellFg,
                   bg: theme.statusChipBg,
                   icon: Icons.chevron_right,
@@ -55,9 +97,9 @@ class PromptArea extends StatelessWidget {
                 const SizedBox(width: 6),
 
                 // CWD chip with folder icon
-                if (session.abbreviatedCwd.isNotEmpty) ...[
+                if (widget.session.abbreviatedCwd.isNotEmpty) ...[
                   StatusChip(
-                    text: session.abbreviatedCwd,
+                    text: widget.session.abbreviatedCwd,
                     fg: theme.statusCwdFg,
                     bg: theme.statusChipBg,
                     icon: Icons.folder_outlined,
@@ -66,9 +108,9 @@ class PromptArea extends StatelessWidget {
                 ],
 
                 // Git branch chip with branch icon
-                if (session.gitBranch.isNotEmpty)
+                if (widget.session.gitBranch.isNotEmpty)
                   StatusChip(
-                    text: '${session.gitBranch}${session.gitDirty ? " !" : ""}',
+                    text: '${widget.session.gitBranch}${widget.session.gitDirty ? " !" : ""}',
                     fg: theme.statusGitFg,
                     bg: theme.statusChipBg,
                     icon: Icons.fork_right,
@@ -79,10 +121,10 @@ class PromptArea extends StatelessWidget {
 
           // Text input
           PromptInput(
-            key: promptInputKey,
-            session: session,
-            fontSize: fontSize,
-            geminiModel: geminiModel,
+            key: widget.promptInputKey,
+            session: widget.session,
+            fontSize: widget.fontSize,
+            geminiModel: widget.geminiModel,
           ),
         ],
       ),

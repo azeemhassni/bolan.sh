@@ -55,22 +55,35 @@ Query: $query''';
   String _cleanResponse(String response) {
     var cmd = response.trim();
 
-    // Strip markdown code fences
-    if (cmd.startsWith('```')) {
+    // Strip markdown code fences (```bash ... ```)
+    if (cmd.contains('```')) {
       final lines = cmd.split('\n');
-      // Remove first line (```bash or ```) and last line (```)
       final inner = <String>[];
-      for (var i = 1; i < lines.length; i++) {
-        if (lines[i].trim() == '```') continue;
-        inner.add(lines[i]);
+      var inFence = false;
+      for (final line in lines) {
+        if (line.trim().startsWith('```')) {
+          inFence = !inFence;
+          continue;
+        }
+        if (inFence) {
+          inner.add(line);
+        }
       }
-      cmd = inner.join('\n').trim();
+      // If we extracted content from fences, use it
+      if (inner.isNotEmpty) {
+        cmd = inner.join('\n').trim();
+      }
     }
 
-    // Strip leading $ or > prompt characters
-    if (cmd.startsWith(r'$ ')) cmd = cmd.substring(2);
-    if (cmd.startsWith('> ')) cmd = cmd.substring(2);
+    // Strip leading $ or > prompt characters (per line)
+    final lines = cmd.split('\n');
+    final cleaned = lines.map((l) {
+      var s = l;
+      if (s.startsWith(r'$ ')) s = s.substring(2);
+      if (s.startsWith('> ')) s = s.substring(2);
+      return s;
+    }).join('\n');
 
-    return cmd.trim();
+    return cleaned.trim();
   }
 }

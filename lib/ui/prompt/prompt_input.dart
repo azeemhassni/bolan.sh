@@ -50,6 +50,10 @@ class PromptInputState extends State<PromptInput> {
 
   // AI state
   bool _aiLoading = false;
+  bool _isAiMode = false;
+
+  /// Notifier for parent widgets to react to AI mode changes.
+  final aiModeNotifier = ValueNotifier<bool>(false);
 
   /// Ghost text: AI loading indicator, completions, or history match.
   String get _ghostText {
@@ -84,27 +88,33 @@ class PromptInputState extends State<PromptInput> {
   void requestFocus() => _focusNode.requestFocus();
 
   bool get isHistorySearchOpen => _showHistorySearch;
+  bool get isAiMode => _isAiMode || _aiLoading;
 
   @override
   void dispose() {
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _focusNode.dispose();
+    aiModeNotifier.dispose();
     super.dispose();
   }
 
   void _onTextChanged() {
+    final aiMode = _controller.text.startsWith('#') &&
+        _controller.text.length > 1;
+
     // Dismiss tab completions when typing
     if (_completions.isNotEmpty) {
       setState(() {
         _completions = [];
         _activeResult = null;
         _completionIndex = 0;
+        _isAiMode = aiMode;
       });
     } else {
-      // Refresh ghost text from history
-      setState(() {});
+      setState(() => _isAiMode = aiMode);
     }
+    aiModeNotifier.value = _isAiMode || _aiLoading;
   }
 
   @override
@@ -142,58 +152,83 @@ class PromptInputState extends State<PromptInput> {
 
           // Input with ghost text overlay
           Padding(
-            padding:
-                const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 10),
-            child: Stack(
+            padding: const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 10),
+            child: Row(
               children: [
-                // Ghost text
-                if (ghost.isNotEmpty)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: _GhostTextOverlay(
+                Expanded(
+                  child: Stack(
+                    children: [
+                      // Ghost text
+                      if (ghost.isNotEmpty)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: _GhostTextOverlay(
+                              controller: _controller,
+                              ghostText: ghost,
+                              style: TextStyle(
+                                color: theme.dimForeground,
+                                fontFamily: 'Operator Mono',
+                                fontSize: widget.fontSize,
+                                height: 1.4,
+                                decoration: TextDecoration.none,
+                              ),
+                              realStyle: TextStyle(
+                                color: Colors.transparent,
+                                fontFamily: 'Operator Mono',
+                                fontSize: widget.fontSize,
+                                height: 1.4,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // Real input
+                      TextField(
                         controller: _controller,
-                        ghostText: ghost,
+                        focusNode: _focusNode,
+                        autofocus: true,
+                        maxLines: null,
+                        minLines: 1,
+                        contextMenuBuilder: (_, __) => const SizedBox.shrink(),
                         style: TextStyle(
-                          color: theme.dimForeground,
+                          color: theme.foreground,
                           fontFamily: 'Operator Mono',
                           fontSize: widget.fontSize,
                           height: 1.4,
                           decoration: TextDecoration.none,
                         ),
-                        realStyle: TextStyle(
-                          color: Colors.transparent,
-                          fontFamily: 'Operator Mono',
-                          fontSize: widget.fontSize,
-                          height: 1.4,
-                          decoration: TextDecoration.none,
+                        cursorColor: _isAiMode ? theme.ansiMagenta : theme.cursor,
+                        cursorWidth: 2,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                          isDense: true,
                         ),
                       ),
-                    ),
-                  ),
-
-                // Real input
-                TextField(
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  autofocus: true,
-                  maxLines: null,
-                  minLines: 1,
-                  contextMenuBuilder: (_, __) => const SizedBox.shrink(),
-                  style: TextStyle(
-                    color: theme.foreground,
-                    fontFamily: 'Operator Mono',
-                    fontSize: widget.fontSize,
-                    height: 1.4,
-                    decoration: TextDecoration.none,
-                  ),
-                  cursorColor: theme.cursor,
-                  cursorWidth: 2,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    isDense: true,
+                    ],
                   ),
                 ),
+
+                // AI mode indicator icon
+                if (_isAiMode || _aiLoading)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: _aiLoading
+                        ? SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: theme.ansiMagenta,
+                            ),
+                          )
+                        : Icon(
+                            Icons.auto_awesome,
+                            size: 16,
+                            color: theme.ansiMagenta,
+                          ),
+                  ),
               ],
             ),
           ),
@@ -528,6 +563,7 @@ class PromptInputState extends State<PromptInput> {
 
     _withoutListener(() => _controller.clear());
     setState(() => _aiLoading = true);
+    aiModeNotifier.value = true;
 
     try {
       final apiKey = await ApiKeyStorage.readKey('gemini');
@@ -568,7 +604,10 @@ class PromptInputState extends State<PromptInput> {
       if (!mounted) return;
       _showAiError('AI error: $e');
     } finally {
-      if (mounted) setState(() => _aiLoading = false);
+      if (mounted) {
+        setState(() => _aiLoading = false);
+        aiModeNotifier.value = _isAiMode;
+      }
     }
   }
 
