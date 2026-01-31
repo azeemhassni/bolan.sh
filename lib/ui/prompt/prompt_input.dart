@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/ai/api_key_storage.dart';
+import '../../core/ai/features/git_commit.dart';
 import '../../core/ai/features/nlp_to_command.dart';
 import '../../core/ai/gemini_provider.dart';
 import '../../core/completion/completion_engine.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
+import '../ai/git_commit_panel.dart';
 import 'completion_popup.dart';
 import 'history_search.dart';
 
@@ -54,6 +56,10 @@ class PromptInputState extends State<PromptInput> {
 
   /// Notifier for parent widgets to react to AI mode changes.
   final aiModeNotifier = ValueNotifier<bool>(false);
+
+  // Git commit panel state
+  bool _showCommitPanel = false;
+  String _commitMessage = '';
 
   /// Ghost text: AI loading indicator, completions, or history match.
   String get _ghostText {
@@ -128,6 +134,14 @@ class PromptInputState extends State<PromptInput> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Git commit panel
+          if (_showCommitPanel)
+            GitCommitPanel(
+              message: _commitMessage,
+              onCommit: _doCommit,
+              onCancel: _cancelCommit,
+            ),
+
           // History search popup
           if (_showHistorySearch)
             HistorySearch(
@@ -536,6 +550,12 @@ class PromptInputState extends State<PromptInput> {
   void _onSubmit(String text) {
     final command = text.trim();
 
+    // Git commit intercept: generate AI commit message
+    if (_isGitCommitWithoutMessage(command)) {
+      _handleGitCommit();
+      return;
+    }
+
     // NLP-to-command: # prefix triggers AI
     if (command.startsWith('#') && command.length > 1) {
       final query = command.substring(1).trim();
@@ -619,6 +639,84 @@ class PromptInputState extends State<PromptInput> {
       );
     });
     setState(() {});
+  }
+
+  // --- Git commit ---
+
+  bool _isGitCommitWithoutMessage(String cmd) {
+    final trimmed = cmd.trim();
+    return (trimmed == 'git commit' ||
+            trimmed.startsWith('git commit ')) &&
+        !trimmed.contains('-m') &&
+        !trimmed.contains('--message');
+  }
+
+  Future<void> _handleGitCommit() async {
+    if (_aiLoading) return;
+
+    final apiKey = await ApiKeyStorage.readKey('gemini');
+    if (apiKey == null || apiKey.isEmpty) {
+      // No API key — just run the command normally (opens editor)
+      widget.session.writeInput('git commit\n');
+      await widget.session.history.add('git commit');
+      _controller.clear();
+      return;
+    }
+
+    _withoutListener(() => _controller.clear());
+    setState(() => _aiLoading = true);
+    aiModeNotifier.value = true;
+
+    try {
+      final provider = GeminiProvider(
+        apiKey: apiKey,
+        model: widget.geminiModel,
+      );
+      final generator = GitCommitGenerator(provider);
+      final message = await generator.generate(widget.session.cwd);
+
+      if (!mounted) return;
+
+      if (message == null || message.isEmpty) {
+        _showAiError('No staged changes found. Stage files with git add first.');
+        return;
+      }
+
+      setState(() {
+        _commitMessage = message;
+        _showCommitPanel = true;
+      });
+    } on Exception catch (e) {
+      if (!mounted) return;
+      _showAiError('AI error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _aiLoading = false);
+        aiModeNotifier.value = false;
+      }
+    }
+  }
+
+  void _doCommit(String message) {
+    if (message.isEmpty) return;
+    // Escape single quotes in the message
+    final escaped = message.replaceAll("'", "'\\''");
+    widget.session.writeInput("git commit -m '$escaped'\n");
+    widget.session.history.add("git commit -m '$escaped'");
+    setState(() {
+      _showCommitPanel = false;
+      _commitMessage = '';
+    });
+    _controller.clear();
+    _focusNode.requestFocus();
+  }
+
+  void _cancelCommit() {
+    setState(() {
+      _showCommitPanel = false;
+      _commitMessage = '';
+    });
+    _focusNode.requestFocus();
   }
 
   // --- Helpers ---
