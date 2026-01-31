@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/ai/api_key_storage.dart';
+import '../../core/ai/features/nlp_to_command.dart';
+import '../../core/ai/gemini_provider.dart';
 import '../../core/completion/completion_engine.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -17,11 +20,13 @@ import 'history_search.dart';
 class PromptInput extends StatefulWidget {
   final TerminalSession session;
   final double fontSize;
+  final String geminiModel;
 
   const PromptInput({
     super.key,
     required this.session,
     this.fontSize = 13.0,
+    this.geminiModel = 'gemini-2.5-flash',
   });
 
   @override
@@ -43,8 +48,13 @@ class PromptInputState extends State<PromptInput> {
   // History search state
   bool _showHistorySearch = false;
 
-  /// Ghost text: from completions or history match.
+  // AI state
+  bool _aiLoading = false;
+
+  /// Ghost text: AI loading indicator, completions, or history match.
   String get _ghostText {
+    if (_aiLoading) return 'Thinking...';
+
     // Tab completion ghost takes priority
     if (_completions.isNotEmpty && _activeResult != null) {
       final current = _completions[_completionIndex];
@@ -490,6 +500,16 @@ class PromptInputState extends State<PromptInput> {
 
   void _onSubmit(String text) {
     final command = text.trim();
+
+    // NLP-to-command: # prefix triggers AI
+    if (command.startsWith('#') && command.length > 1) {
+      final query = command.substring(1).trim();
+      if (query.isNotEmpty) {
+        _handleNlpQuery(query);
+        return;
+      }
+    }
+
     if (command.isEmpty) {
       widget.session.writeInput('\n');
     } else {
@@ -499,6 +519,67 @@ class PromptInputState extends State<PromptInput> {
     _controller.clear();
     _historyIndex = -1;
     _focusNode.requestFocus();
+  }
+
+  // --- NLP-to-command ---
+
+  Future<void> _handleNlpQuery(String query) async {
+    if (_aiLoading) return;
+
+    _withoutListener(() => _controller.clear());
+    setState(() => _aiLoading = true);
+
+    try {
+      final apiKey = await ApiKeyStorage.readKey('gemini');
+      if (apiKey == null || apiKey.isEmpty) {
+        _showAiError('No Gemini API key set. Go to Settings (Cmd+,) to add one.');
+        return;
+      }
+
+      final provider = GeminiProvider(
+        apiKey: apiKey,
+        model: widget.geminiModel,
+      );
+      final nlp = NlpToCommand(provider);
+
+      final recentCommands = widget.session.blocks
+          .map((b) => b.command.trim())
+          .where((c) => c.isNotEmpty)
+          .toList();
+
+      final result = await nlp.convert(
+        query: query,
+        cwd: widget.session.cwd,
+        shellName: widget.session.shellName,
+        recentCommands: recentCommands,
+      );
+
+      if (!mounted) return;
+
+      // Place the generated command in the input for user review
+      _withoutListener(() {
+        _controller.text = result;
+        _controller.selection = TextSelection.collapsed(
+          offset: result.length,
+        );
+      });
+      setState(() {});
+    } on Exception catch (e) {
+      if (!mounted) return;
+      _showAiError('AI error: $e');
+    } finally {
+      if (mounted) setState(() => _aiLoading = false);
+    }
+  }
+
+  void _showAiError(String message) {
+    _withoutListener(() {
+      _controller.text = '# $message';
+      _controller.selection = TextSelection.collapsed(
+        offset: _controller.text.length,
+      );
+    });
+    setState(() {});
   }
 
   // --- Helpers ---

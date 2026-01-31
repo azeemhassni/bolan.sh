@@ -177,6 +177,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
                 PromptArea(
                   session: widget.session,
                   fontSize: fontSize,
+                  geminiModel: configLoader?.config.ai.geminiModel ?? 'gemini-2.5-flash',
                   promptInputKey: _promptKey,
                 ),
               ],

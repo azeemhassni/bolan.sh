@@ -12,12 +12,14 @@ import 'prompt_input.dart';
 class PromptArea extends StatelessWidget {
   final TerminalSession session;
   final double fontSize;
+  final String geminiModel;
   final GlobalKey<PromptInputState>? promptInputKey;
 
   const PromptArea({
     super.key,
     required this.session,
     this.fontSize = 13.0,
+    this.geminiModel = 'gemini-2.5-flash',
     this.promptInputKey,
   });
 
@@ -80,6 +82,7 @@ class PromptArea extends StatelessWidget {
             key: promptInputKey,
             session: session,
             fontSize: fontSize,
+            geminiModel: geminiModel,
           ),
         ],
       ),
