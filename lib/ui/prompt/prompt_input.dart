@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -645,21 +647,35 @@ class PromptInputState extends State<PromptInput> {
 
   bool _isGitCommitWithoutMessage(String cmd) {
     final trimmed = cmd.trim();
-    return (trimmed == 'git commit' ||
-            trimmed.startsWith('git commit ')) &&
-        !trimmed.contains('-m') &&
-        !trimmed.contains('--message');
+    if (trimmed == 'git commit' || trimmed == 'git commit -m' ||
+        trimmed == 'git commit --message') {
+      return true;
+    }
+    if (!trimmed.startsWith('git commit')) return false;
+    // Has -m with an actual value — don't intercept
+    final mFlag = RegExp(r'-m\s+\S');
+    final msgFlag = RegExp(r'--message\s+\S|--message=\S');
+    if (mFlag.hasMatch(trimmed) || msgFlag.hasMatch(trimmed)) return false;
+    // git commit with other flags but no message value
+    return true;
   }
 
   Future<void> _handleGitCommit() async {
     if (_aiLoading) return;
 
-    final apiKey = await ApiKeyStorage.readKey('gemini');
+    String? apiKey;
+    try {
+      apiKey = await ApiKeyStorage.readKey('gemini');
+    } on Exception {
+      // Keychain error — fall back to normal git commit
+    }
+
     if (apiKey == null || apiKey.isEmpty) {
-      // No API key — just run the command normally (opens editor)
+      // No API key or keychain error — run git commit normally
+      _controller.clear();
+      _historyIndex = -1;
       widget.session.writeInput('git commit\n');
       await widget.session.history.add('git commit');
-      _controller.clear();
       return;
     }
 
@@ -699,10 +715,34 @@ class PromptInputState extends State<PromptInput> {
 
   void _doCommit(String message) {
     if (message.isEmpty) return;
-    // Escape single quotes in the message
-    final escaped = message.replaceAll("'", "'\\''");
-    widget.session.writeInput("git commit -m '$escaped'\n");
-    widget.session.history.add("git commit -m '$escaped'");
+    // Use Process.run to commit directly — avoids shell escaping issues
+    // with newlines, quotes, and special characters.
+    _runGitCommit(message);
+  }
+
+  Future<void> _runGitCommit(String message) async {
+    try {
+      final result = await Process.run(
+        'git',
+        ['commit', '-m', message],
+        workingDirectory: widget.session.cwd,
+      );
+      if (!mounted) return;
+
+      final error = (result.stderr as String).trim();
+      final firstLine = message.split('\n').first;
+
+      if (result.exitCode == 0) {
+        widget.session.writeInput('echo "Committed: $firstLine"\n');
+      } else {
+        widget.session.writeInput('echo "Commit failed: $error"\n');
+      }
+    } on Exception catch (e) {
+      if (!mounted) return;
+      widget.session.writeInput('echo "Commit error: $e"\n');
+    }
+
+    await widget.session.history.add('git commit');
     setState(() {
       _showCommitPanel = false;
       _commitMessage = '';
