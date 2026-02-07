@@ -389,7 +389,7 @@ class TerminalSession extends ChangeNotifier {
   /// Strips ANSI escape sequences from terminal output for clean text display.
   static String _stripAnsiEscapes(String input) {
     return input.replaceAll(
-      RegExp(r'\x1B\[[0-9;]*[a-zA-Z]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)|\x1B[()][0-9A-Z]|\x1B[>=<]'),
+      RegExp(r'\x1B\[[0-9;?]*[a-zA-Z]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)|\x1B[()][0-9A-Z]|\x1B[>=<]'),
       '',
     );
   }
