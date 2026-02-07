@@ -106,8 +106,9 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
       },
       onLeave: (_) => setState(() => _hoverPosition = null),
       builder: (context, candidateData, rejectedData) {
-        return Draggable<String>(
+        return LongPressDraggable<String>(
           data: widget.leaf.id,
+          delay: const Duration(milliseconds: 300),
           feedback: _buildDragFeedback(context, theme),
           childWhenDragging: Opacity(opacity: 0.3, child: content),
           child: Stack(
