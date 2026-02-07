@@ -40,8 +40,6 @@ class BolonTabBar extends ConsumerWidget {
               itemCount: sessionState.tabs.length,
               padding: EdgeInsets.only(
                 left: Platform.isMacOS ? 78 : 8,
-                top: 4,
-                bottom: 4,
               ),
               itemBuilder: (context, index) {
                 final tab = sessionState.tabs[index];
@@ -125,13 +123,14 @@ class _TabState extends State<_Tab> {
   @override
   Widget build(BuildContext context) {
     final bg = widget.isActive
-        ? widget.theme.blockBackground
+        ? widget.theme.tabBarBackground
         : _hovered
             ? widget.theme.statusChipBg
-            : Colors.transparent;
+            : widget.theme.blockBackground;
     final fg = widget.isActive
         ? widget.theme.foreground
         : widget.theme.dimForeground;
+    final fontWeight = widget.isActive ? FontWeight.w500 : FontWeight.normal;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -144,14 +143,18 @@ class _TabState extends State<_Tab> {
           waitDuration: const Duration(milliseconds: 600),
           child: Container(
             constraints: const BoxConstraints(
-            maxWidth: _maxTabWidth,
-            minWidth: 130,
-          ),
-            margin: const EdgeInsets.only(right: 1),
+              maxWidth: _maxTabWidth,
+              minWidth: 130,
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(5),
+              border: Border(
+                right: BorderSide(
+                  color: widget.theme.blockBorder,
+                  width: 1,
+                ),
+              ),
             ),
             child: Stack(
               alignment: Alignment.center,
@@ -162,7 +165,7 @@ class _TabState extends State<_Tab> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _StatusIcon(status: widget.status, theme: widget.theme),
-                    Flexible(child: _buildTitle(fg)),
+                    Flexible(child: _buildTitle(fg, fontWeight)),
                   ],
                 ),
 
@@ -187,7 +190,7 @@ class _TabState extends State<_Tab> {
     );
   }
 
-  Widget _buildTitle(Color fg) {
+  Widget _buildTitle(Color fg, FontWeight fontWeight) {
     final text = Text(
       widget.title,
       overflow: TextOverflow.clip,
@@ -197,6 +200,7 @@ class _TabState extends State<_Tab> {
         color: fg,
         fontSize: _fontSize,
         fontFamily: 'Operator Mono',
+        fontWeight: fontWeight,
         decoration: TextDecoration.none,
       ),
     );
