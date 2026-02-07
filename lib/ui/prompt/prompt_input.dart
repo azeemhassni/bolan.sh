@@ -739,17 +739,18 @@ class PromptInputState extends State<PromptInput> {
       );
       if (!mounted) return;
 
+      final stdout = (result.stdout as String).trim();
       final error = (result.stderr as String).trim();
-      final firstLine = message.split('\n').first;
 
+      // Write result directly to the terminal — avoids shell escaping issues
       if (result.exitCode == 0) {
-        widget.session.writeInput('echo "Committed: $firstLine"\n');
+        widget.session.terminal.write('$stdout\r\n');
       } else {
-        widget.session.writeInput('echo "Commit failed: $error"\n');
+        widget.session.terminal.write('Commit failed: $error\r\n');
       }
     } on Exception catch (e) {
       if (!mounted) return;
-      widget.session.writeInput('echo "Commit error: $e"\n');
+      widget.session.terminal.write('Commit error: $e\r\n');
     }
 
     await widget.session.history.add('git commit');
