@@ -7,12 +7,13 @@ import '../../core/theme/bolan_theme.dart';
 /// Renders a completed command as a Warp-style block.
 ///
 /// Shows the command text as a header with a subtle left accent border
-/// (green for success, red for failure), followed by the output text.
-/// Click to copy output.
+/// (green for success, red for failure), followed by scrollable output.
+/// Large outputs are capped with scroll-to-top/bottom arrow buttons.
 class CommandBlockWidget extends StatefulWidget {
   final CommandBlock block;
   final double fontSize;
   final double lineHeight;
+  final bool scrollable;
   final void Function(TapDownDetails)? onSecondaryTap;
 
   const CommandBlockWidget({
@@ -20,6 +21,7 @@ class CommandBlockWidget extends StatefulWidget {
     required this.block,
     this.fontSize = 13,
     this.lineHeight = 1.2,
+    this.scrollable = false,
     this.onSecondaryTap,
   });
 
@@ -30,12 +32,44 @@ class CommandBlockWidget extends StatefulWidget {
 class _CommandBlockWidgetState extends State<CommandBlockWidget> {
   bool _hovered = false;
   bool _copied = false;
+  final _scrollController = ScrollController();
+  bool _showTopArrow = false;
+  bool _showBottomArrow = false;
+
+  static const _maxOutputHeight = 400.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_updateArrows);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateArrows());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _updateArrows() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    final atTop = pos.pixels <= 0;
+    final atBottom = pos.pixels >= pos.maxScrollExtent;
+    final needsScroll = pos.maxScrollExtent > 0;
+
+    if (mounted) {
+      setState(() {
+        _showTopArrow = needsScroll && !atTop;
+        _showBottomArrow = needsScroll && !atBottom;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
     final block = widget.block;
-    // Only show red left accent for explicit failures (exit code > 0)
     final isFailed = block.exitCode != null && block.exitCode! > 0;
 
     return MouseRegion(
@@ -45,14 +79,10 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
         onTap: block.hasOutput ? _copyOutput : null,
         child: Container(
           decoration: BoxDecoration(
-            color: _hovered
-                ? theme.blockBackground
-                : theme.background,
+            color: _hovered ? theme.blockBackground : theme.background,
             border: Border(
               left: BorderSide(
-                color: isFailed
-                    ? theme.exitFailureFg
-                    : Colors.transparent,
+                color: isFailed ? theme.exitFailureFg : Colors.transparent,
                 width: 3,
               ),
             ),
@@ -61,9 +91,9 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
             left: 9, right: 12, top: 4, bottom: 4,
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Command header line
+              // Command header
               Row(
                 children: [
                   Expanded(
@@ -78,7 +108,6 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                       ),
                     ),
                   ),
-                  // Copy indicator
                   if (_copied)
                     Text(
                       'Copied',
@@ -110,32 +139,90 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                 ],
               ),
 
-              // Output body — pre-formatted, preserves whitespace alignment
+              // Output body
               if (block.hasOutput)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: GestureDetector(
-                      onSecondaryTapDown: widget.onSecondaryTap,
-                      child: SelectableText(
-                        block.output,
-                        contextMenuBuilder: (_, __) => const SizedBox.shrink(),
-                      style: TextStyle(
-                        color: theme.foreground,
-                        fontFamily: 'Operator Mono',
-                        fontSize: widget.fontSize,
-                        height: widget.lineHeight,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    ),
-                  ),
+                  child: widget.scrollable
+                      ? _buildScrollableOutput(block, theme)
+                      : _buildPlainOutput(block, theme),
                 ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPlainOutput(CommandBlock block, BolonTheme theme) {
+    return GestureDetector(
+      onSecondaryTapDown: widget.onSecondaryTap,
+      child: SelectableText(
+        block.output,
+        contextMenuBuilder: (_, __) => const SizedBox.shrink(),
+        style: TextStyle(
+          color: theme.foreground,
+          fontFamily: 'Operator Mono',
+          fontSize: widget.fontSize,
+          height: widget.lineHeight,
+          decoration: TextDecoration.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScrollableOutput(CommandBlock block, BolonTheme theme) {
+    return Stack(
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: _maxOutputHeight),
+          child: GestureDetector(
+            onSecondaryTapDown: widget.onSecondaryTap,
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              child: SelectableText(
+                block.output,
+                contextMenuBuilder: (_, __) => const SizedBox.shrink(),
+                style: TextStyle(
+                  color: theme.foreground,
+                  fontFamily: 'Operator Mono',
+                  fontSize: widget.fontSize,
+                  height: widget.lineHeight,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (_showTopArrow)
+          Positioned(
+            top: 0,
+            right: 0,
+            child: _ScrollArrow(
+              icon: Icons.keyboard_arrow_up,
+              theme: theme,
+              onTap: () => _scrollController.animateTo(
+                0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+              ),
+            ),
+          ),
+        if (_showBottomArrow)
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: _ScrollArrow(
+              icon: Icons.keyboard_arrow_down,
+              theme: theme,
+              onTap: () => _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -155,5 +242,36 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
       return '${d.inSeconds}.${(d.inMilliseconds.remainder(1000) ~/ 100)}s';
     }
     return '${d.inMilliseconds}ms';
+  }
+}
+
+class _ScrollArrow extends StatelessWidget {
+  final IconData icon;
+  final BolonTheme theme;
+  final VoidCallback onTap;
+
+  const _ScrollArrow({
+    required this.icon,
+    required this.theme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            color: theme.blockBackground,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: theme.blockBorder, width: 1),
+          ),
+          child: Icon(icon, size: 16, color: theme.dimForeground),
+        ),
+      ),
+    );
   }
 }

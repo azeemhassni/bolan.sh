@@ -161,7 +161,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _TextOption(
               label: 'Model',
               value: _config.ai.geminiModel,
-              hint: 'gemini-2.5-flash',
+              hint: 'gemma-3-27b-it',
               theme: theme,
               onChanged: (v) => _updateAi(geminiModel: v),
             ),
@@ -183,18 +183,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
 
           if (_config.ai.provider == 'anthropic') ...[
-            _ApiKeyOption(
-              label: 'Anthropic API Key',
-              provider: 'anthropic',
+            _DropdownOption(
+              label: 'Mode',
+              value: _config.ai.anthropicMode,
+              options: const ['claude-code', 'api'],
               theme: theme,
+              onChanged: (v) => _updateAi(anthropicMode: v),
             ),
-            _TextOption(
-              label: 'Model',
-              value: _config.ai.anthropicModel,
-              hint: 'claude-sonnet-4-20250514',
-              theme: theme,
-              onChanged: (v) => _updateAi(anthropicModel: v),
-            ),
+            if (_config.ai.anthropicMode == 'api') ...[
+              _ApiKeyOption(
+                label: 'Anthropic API Key',
+                provider: 'anthropic',
+                theme: theme,
+              ),
+              _TextOption(
+                label: 'Model',
+                value: _config.ai.anthropicModel,
+                hint: 'claude-sonnet-4-20250514',
+                theme: theme,
+                onChanged: (v) => _updateAi(anthropicModel: v),
+              ),
+            ],
           ],
 
           if (_config.ai.provider == 'ollama') ...[
@@ -282,6 +291,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String? geminiModel,
     String? openaiModel,
     String? anthropicModel,
+    String? anthropicMode,
     bool? enabled,
   }) {
     setState(() {
@@ -295,6 +305,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           geminiModel: geminiModel ?? _config.ai.geminiModel,
           openaiModel: openaiModel ?? _config.ai.openaiModel,
           anthropicModel: anthropicModel ?? _config.ai.anthropicModel,
+          anthropicMode: anthropicMode ?? _config.ai.anthropicMode,
           enabled: enabled ?? _config.ai.enabled,
         ),
         activeTheme: _config.activeTheme,

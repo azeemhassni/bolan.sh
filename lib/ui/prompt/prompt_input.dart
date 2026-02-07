@@ -24,13 +24,17 @@ import 'history_search.dart';
 class PromptInput extends StatefulWidget {
   final TerminalSession session;
   final double fontSize;
+  final String aiProvider;
   final String geminiModel;
+  final String anthropicMode;
 
   const PromptInput({
     super.key,
     required this.session,
     this.fontSize = 13.0,
-    this.geminiModel = 'gemini-2.5-flash',
+    this.aiProvider = 'gemini',
+    this.geminiModel = 'gemma-3-27b-it',
+    this.anthropicMode = 'claude-code',
   });
 
   @override
@@ -588,17 +592,25 @@ class PromptInputState extends State<PromptInput> {
     aiModeNotifier.value = true;
 
     try {
-      final apiKey = await ApiKeyStorage.readKey('gemini');
-      if (apiKey == null || apiKey.isEmpty) {
-        _showAiError('No Gemini API key set. Go to Settings (Cmd+,) to add one.');
-        return;
+      final useClaudeCode = widget.aiProvider == 'anthropic' &&
+          widget.anthropicMode == 'claude-code';
+
+      GeminiProvider? geminiProvider;
+      if (!useClaudeCode) {
+        try {
+          final apiKey = await ApiKeyStorage.readKey(widget.aiProvider);
+          if (apiKey != null && apiKey.isNotEmpty) {
+            geminiProvider = GeminiProvider(apiKey: apiKey, model: widget.geminiModel);
+          }
+        } on Exception {
+          // Keychain error
+        }
       }
 
-      final provider = GeminiProvider(
-        apiKey: apiKey,
-        model: widget.geminiModel,
+      final nlp = NlpToCommand(
+        geminiProvider: geminiProvider,
+        useClaudeCode: useClaudeCode,
       );
-      final nlp = NlpToCommand(provider);
 
       final recentCommands = widget.session.blocks
           .map((b) => b.command.trim())
@@ -663,32 +675,30 @@ class PromptInputState extends State<PromptInput> {
   Future<void> _handleGitCommit() async {
     if (_aiLoading) return;
 
-    String? apiKey;
-    try {
-      apiKey = await ApiKeyStorage.readKey('gemini');
-    } on Exception {
-      // Keychain error — fall back to normal git commit
-    }
-
-    if (apiKey == null || apiKey.isEmpty) {
-      // No API key or keychain error — run git commit normally
-      _controller.clear();
-      _historyIndex = -1;
-      widget.session.writeInput('git commit\n');
-      await widget.session.history.add('git commit');
-      return;
-    }
-
     _withoutListener(() => _controller.clear());
     setState(() => _aiLoading = true);
     aiModeNotifier.value = true;
 
     try {
-      final provider = GeminiProvider(
-        apiKey: apiKey,
-        model: widget.geminiModel,
+      final useClaudeCode = widget.aiProvider == 'anthropic' &&
+          widget.anthropicMode == 'claude-code';
+
+      GeminiProvider? geminiProvider;
+      if (!useClaudeCode) {
+        try {
+          final apiKey = await ApiKeyStorage.readKey(widget.aiProvider);
+          if (apiKey != null && apiKey.isNotEmpty) {
+            geminiProvider = GeminiProvider(apiKey: apiKey, model: widget.geminiModel);
+          }
+        } on Exception {
+          // Keychain error
+        }
+      }
+
+      final generator = GitCommitGenerator(
+        geminiProvider: geminiProvider,
+        useClaudeCode: useClaudeCode,
       );
-      final generator = GitCommitGenerator(provider);
       final message = await generator.generate(widget.session.cwd);
 
       if (!mounted) return;

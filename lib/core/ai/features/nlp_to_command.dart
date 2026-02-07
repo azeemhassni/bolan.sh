@@ -1,12 +1,19 @@
 import 'dart:io';
 
+import '../claude_provider.dart';
 import '../gemini_provider.dart';
 
-/// Converts natural language queries to shell commands using Gemini.
+/// Converts natural language queries to shell commands using AI.
+///
+/// Tries Claude Code CLI first (no API key needed), falls back to Gemini.
 class NlpToCommand {
-  final GeminiProvider _provider;
+  final GeminiProvider? _geminiProvider;
+  final bool _useClaudeCode;
+  final ClaudeProvider _claudeProvider = ClaudeProvider();
 
-  NlpToCommand(this._provider);
+  NlpToCommand({GeminiProvider? geminiProvider, bool useClaudeCode = false})
+      : _geminiProvider = geminiProvider,
+        _useClaudeCode = useClaudeCode;
 
   /// Converts a natural language [query] to a shell command.
   Future<String> convert({
@@ -16,7 +23,21 @@ class NlpToCommand {
     required List<String> recentCommands,
   }) async {
     final prompt = _buildPrompt(query, cwd, shellName, recentCommands);
-    final response = await _provider.generateContent(prompt);
+
+    // Use Claude Code if configured
+    if (_useClaudeCode) {
+      if (await ClaudeProvider.isAvailable()) {
+        final response = await _claudeProvider.generateContent(prompt);
+        return _cleanResponse(response);
+      }
+      throw Exception('Claude Code is not installed. Install it or switch to API mode in Settings.');
+    }
+
+    // Use Gemini/other API provider
+    if (_geminiProvider == null) {
+      throw Exception('No AI provider available. Install Claude Code or set a Gemini API key.');
+    }
+    final response = await _geminiProvider.generateContent(prompt);
     return _cleanResponse(response);
   }
 

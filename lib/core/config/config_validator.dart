@@ -42,9 +42,10 @@ class ConfigValidator {
       provider: _oneOf(raw['provider'], ['gemini', 'ollama', 'openai', 'anthropic'], 'gemini'),
       model: _string(raw['model'], ''),
       ollamaUrl: _string(raw['ollama_url'], 'http://127.0.0.1:11434'),
-      geminiModel: _string(raw['gemini_model'], 'gemini-2.5-flash'),
+      geminiModel: _string(raw['gemini_model'], 'gemma-3-27b-it'),
       openaiModel: _string(raw['openai_model'], 'gpt-4o'),
       anthropicModel: _string(raw['anthropic_model'], 'claude-sonnet-4-20250514'),
+      anthropicMode: _oneOf(raw['anthropic_mode'], ['api', 'claude-code'], 'claude-code'),
       enabled: _bool(raw['enabled'], false),
     );
   }

@@ -36,6 +36,7 @@ class EditorConfig {
   final bool cursorBlink;
   final int scrollbackLines;
   final bool blockMode;
+  final bool scrollableBlocks;
 
   const EditorConfig({
     this.fontFamily = 'Operator Mono',
@@ -45,6 +46,7 @@ class EditorConfig {
     this.cursorBlink = true,
     this.scrollbackLines = 10000,
     this.blockMode = false,
+    this.scrollableBlocks = false,
   });
 }
 
@@ -55,15 +57,17 @@ class AiConfig {
   final String geminiModel;
   final String openaiModel;
   final String anthropicModel;
+  final String anthropicMode; // 'api' or 'claude-code'
   final bool enabled;
 
   const AiConfig({
     this.provider = 'gemini',
     this.model = '',
     this.ollamaUrl = 'http://127.0.0.1:11434',
-    this.geminiModel = 'gemini-2.5-flash',
+    this.geminiModel = 'gemma-3-27b-it',
     this.openaiModel = 'gpt-4o',
     this.anthropicModel = 'claude-sonnet-4-20250514',
+    this.anthropicMode = 'claude-code',
     this.enabled = false,
   });
 }

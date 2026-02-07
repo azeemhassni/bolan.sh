@@ -1,12 +1,19 @@
 import 'dart:io';
 
+import '../claude_provider.dart';
 import '../gemini_provider.dart';
 
 /// Generates git commit messages from staged changes using AI.
+///
+/// Tries Claude Code CLI first, falls back to Gemini.
 class GitCommitGenerator {
-  final GeminiProvider _provider;
+  final GeminiProvider? _geminiProvider;
+  final bool _useClaudeCode;
+  final ClaudeProvider _claudeProvider = ClaudeProvider();
 
-  GitCommitGenerator(this._provider);
+  GitCommitGenerator({GeminiProvider? geminiProvider, bool useClaudeCode = false})
+      : _geminiProvider = geminiProvider,
+        _useClaudeCode = useClaudeCode;
 
   /// Gets the staged diff and generates a commit message.
   /// Returns null if there are no staged changes.
@@ -15,7 +22,21 @@ class GitCommitGenerator {
     if (diff.isEmpty) return null;
 
     final prompt = _buildPrompt(diff);
-    final response = await _provider.generateContent(prompt);
+
+    // Use Claude Code if configured
+    if (_useClaudeCode) {
+      if (await ClaudeProvider.isAvailable()) {
+        final response = await _claudeProvider.generateContent(prompt);
+        return _cleanResponse(response);
+      }
+      throw Exception('Claude Code is not installed. Install it or switch to API mode in Settings.');
+    }
+
+    // Use Gemini/other API provider
+    if (_geminiProvider == null) {
+      throw Exception('No AI provider available. Install Claude Code or set a Gemini API key.');
+    }
+    final response = await _geminiProvider.generateContent(prompt);
     return _cleanResponse(response);
   }
 
@@ -27,7 +48,6 @@ class GitCommitGenerator {
     );
     if (result.exitCode != 0) return '';
     final output = (result.stdout as String).trim();
-    // Limit diff size to avoid token limits
     if (output.length > 8000) {
       return '${output.substring(0, 8000)}\n... (diff truncated)';
     }
@@ -53,7 +73,6 @@ $diff''';
   String _cleanResponse(String response) {
     var msg = response.trim();
 
-    // Strip code fences
     if (msg.contains('```')) {
       final lines = msg.split('\n');
       final inner = <String>[];
@@ -70,7 +89,6 @@ $diff''';
       if (inner.isNotEmpty) msg = inner.join('\n').trim();
     }
 
-    // Strip quotes
     if (msg.startsWith('"') && msg.endsWith('"')) {
       msg = msg.substring(1, msg.length - 1);
     }

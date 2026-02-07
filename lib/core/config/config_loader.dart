@@ -122,6 +122,7 @@ class ConfigLoader extends ChangeNotifier {
     sb.writeln('gemini_model = "${c.ai.geminiModel}"');
     sb.writeln('openai_model = "${c.ai.openaiModel}"');
     sb.writeln('anthropic_model = "${c.ai.anthropicModel}"');
+    sb.writeln('anthropic_mode = "${c.ai.anthropicMode}"');
     sb.writeln('enabled = ${c.ai.enabled}');
 
     return sb.toString();
