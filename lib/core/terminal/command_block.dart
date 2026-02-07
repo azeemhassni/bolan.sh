@@ -7,6 +7,7 @@ class CommandBlock {
   final String id;
   final String command;
   final String output;
+  final String rawOutput; // preserves ANSI color codes for rendering
   final DateTime startedAt;
   final DateTime? finishedAt;
   final int? exitCode;
@@ -16,6 +17,7 @@ class CommandBlock {
     required this.id,
     required this.command,
     this.output = '',
+    this.rawOutput = '',
     required this.startedAt,
     this.finishedAt,
     this.exitCode,
@@ -26,6 +28,7 @@ class CommandBlock {
     String? id,
     String? command,
     String? output,
+    String? rawOutput,
     DateTime? startedAt,
     DateTime? finishedAt,
     int? exitCode,
@@ -35,6 +38,7 @@ class CommandBlock {
       id: id ?? this.id,
       command: command ?? this.command,
       output: output ?? this.output,
+      rawOutput: rawOutput ?? this.rawOutput,
       startedAt: startedAt ?? this.startedAt,
       finishedAt: finishedAt ?? this.finishedAt,
       exitCode: exitCode ?? this.exitCode,

@@ -347,13 +347,16 @@ class TerminalSession extends ChangeNotifier {
       return;
     }
 
-    // Clean up the captured output — strip ANSI escape sequences,
-    // expand tabs to spaces, trim trailing whitespace.
-    final rawOutput = _outputCapture.toString();
-    final cleanOutput = _expandTabs(_stripAnsiEscapes(rawOutput)).trim();
+    // Clean up the captured output.
+    // rawOutput preserves SGR color codes for colored rendering.
+    // output is fully stripped for plain-text copy.
+    final captured = _outputCapture.toString();
+    final cleanOutput = _expandTabs(_stripAnsiEscapes(captured)).trim();
+    final colorOutput = _expandTabs(_stripNonSgrEscapes(captured)).trim();
 
     _blocks.add(_activeBlock!.copyWith(
       output: cleanOutput,
+      rawOutput: colorOutput,
       exitCode: exitCode ?? -1,
       finishedAt: DateTime.now(),
       isRunning: false,
@@ -390,6 +393,20 @@ class TerminalSession extends ChangeNotifier {
   static String _stripAnsiEscapes(String input) {
     return input.replaceAll(
       RegExp(r'\x1B\[[0-9;?]*[a-zA-Z]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)|\x1B[()][0-9A-Z]|\x1B[>=<]'),
+      '',
+    );
+  }
+
+  /// Strips all escape sequences EXCEPT SGR color codes (\e[...m).
+  /// Used to preserve colors for rich text rendering in blocks.
+  static String _stripNonSgrEscapes(String input) {
+    return input.replaceAll(
+      RegExp(
+        r'\x1B\[[0-9;?]*[a-ln-zA-Z]'  // CSI except 'm'
+        r'|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'  // OSC
+        r'|\x1B[()*/+][0-9A-Z%]?'  // Charset
+        r'|\x1B[@-Z\\^_]',  // Single-char Fe
+      ),
       '',
     );
   }

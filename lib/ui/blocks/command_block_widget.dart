@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/terminal/command_block.dart';
 import '../../core/theme/bolan_theme.dart';
+import 'ansi_text_parser.dart';
 
 /// Renders a completed command as a Warp-style block.
 ///
@@ -155,23 +156,63 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
   }
 
   Widget _buildPlainOutput(CommandBlock block, BolonTheme theme) {
+    final baseStyle = TextStyle(
+      color: theme.foreground,
+      fontFamily: 'Operator Mono',
+      fontSize: widget.fontSize,
+      height: widget.lineHeight,
+      decoration: TextDecoration.none,
+    );
+
+    // Use colored output if available
+    if (block.rawOutput.isNotEmpty) {
+      final parser = AnsiTextParser(theme);
+      final spans = parser.parse(block.rawOutput, baseStyle: baseStyle);
+
+      return GestureDetector(
+        onSecondaryTapDown: widget.onSecondaryTap,
+        child: SelectableText.rich(
+          TextSpan(children: spans),
+          contextMenuBuilder: (_, __) => const SizedBox.shrink(),
+        ),
+      );
+    }
+
     return GestureDetector(
       onSecondaryTapDown: widget.onSecondaryTap,
       child: SelectableText(
         block.output,
         contextMenuBuilder: (_, __) => const SizedBox.shrink(),
-        style: TextStyle(
-          color: theme.foreground,
-          fontFamily: 'Operator Mono',
-          fontSize: widget.fontSize,
-          height: widget.lineHeight,
-          decoration: TextDecoration.none,
-        ),
+        style: baseStyle,
       ),
     );
   }
 
   Widget _buildScrollableOutput(CommandBlock block, BolonTheme theme) {
+    final baseStyle = TextStyle(
+      color: theme.foreground,
+      fontFamily: 'Operator Mono',
+      fontSize: widget.fontSize,
+      height: widget.lineHeight,
+      decoration: TextDecoration.none,
+    );
+
+    Widget textWidget;
+    if (block.rawOutput.isNotEmpty) {
+      final parser = AnsiTextParser(theme);
+      final spans = parser.parse(block.rawOutput, baseStyle: baseStyle);
+      textWidget = SelectableText.rich(
+        TextSpan(children: spans),
+        contextMenuBuilder: (_, __) => const SizedBox.shrink(),
+      );
+    } else {
+      textWidget = SelectableText(
+        block.output,
+        contextMenuBuilder: (_, __) => const SizedBox.shrink(),
+        style: baseStyle,
+      );
+    }
+
     return Stack(
       children: [
         ConstrainedBox(
@@ -180,17 +221,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
             onSecondaryTapDown: widget.onSecondaryTap,
             child: SingleChildScrollView(
               controller: _scrollController,
-              child: SelectableText(
-                block.output,
-                contextMenuBuilder: (_, __) => const SizedBox.shrink(),
-                style: TextStyle(
-                  color: theme.foreground,
-                  fontFamily: 'Operator Mono',
-                  fontSize: widget.fontSize,
-                  height: widget.lineHeight,
-                  decoration: TextDecoration.none,
-                ),
-              ),
+              child: textWidget,
             ),
           ),
         ),
