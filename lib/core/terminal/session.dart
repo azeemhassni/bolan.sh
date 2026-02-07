@@ -386,27 +386,12 @@ class TerminalSession extends ChangeNotifier {
     return _cursorUpRe.allMatches(input).length;
   }
 
-  /// Strips all ANSI/VT escape sequences from terminal output for clean
-  /// text display. Covers the full ECMA-48 specification:
-  /// - CSI sequences (with private mode prefixes and intermediate bytes)
-  /// - OSC, DCS, APC, PM, SOS string sequences
-  /// - Single-character Fe escape sequences (\e7, \eM, \ec, etc.)
-  /// - Character set designation (\e(B, \e)0, etc.)
-  /// - 8-bit C1 control characters
-  static final _ansiEscapeRe = RegExp(
-    r'\x1B\[[?>=!]?[0-9:;<=>?]*[ -/]*[@-~]'  // CSI sequences
-    r'|\x1BP[^\x1B]*?(?:\x1B\\|\x07)'          // DCS sequences
-    r'|\x1B\][^\x1B\x07]*(?:\x07|\x1B\\)'      // OSC sequences
-    r'|\x1B_[^\x1B]*(?:\x1B\\|\x07)'           // APC sequences
-    r'|\x1B\^[^\x1B]*(?:\x1B\\|\x07)'          // PM sequences
-    r'|\x1BX[^\x1B]*(?:\x1B\\|\x07)'           // SOS sequences
-    r'|\x1B[()*/+][0-9A-Z%]?'                  // Character set designation
-    r'|\x1B[@-Z\\^_]'                           // Single-char Fe sequences
-    r'|[\x80-\x9F]',                            // 8-bit C1 controls
-  );
-
+  /// Strips ANSI escape sequences from terminal output for clean text display.
   static String _stripAnsiEscapes(String input) {
-    return input.replaceAll(_ansiEscapeRe, '');
+    return input.replaceAll(
+      RegExp(r'\x1B\[[0-9;?]*[a-zA-Z]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)|\x1B[()][0-9A-Z]|\x1B[>=<]'),
+      '',
+    );
   }
 
   /// Expands tab characters to spaces using 8-character tab stops.
