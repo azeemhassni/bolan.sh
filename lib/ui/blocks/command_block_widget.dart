@@ -15,6 +15,9 @@ class CommandBlockWidget extends StatefulWidget {
   final double fontSize;
   final double lineHeight;
   final bool scrollable;
+  final RegExp? searchHighlight;
+  final int currentMatchIndex;
+  final int blockMatchStartIndex;
   final void Function(TapDownDetails)? onSecondaryTap;
 
   const CommandBlockWidget({
@@ -23,6 +26,9 @@ class CommandBlockWidget extends StatefulWidget {
     this.fontSize = 13,
     this.lineHeight = 1.2,
     this.scrollable = false,
+    this.searchHighlight,
+    this.currentMatchIndex = -1,
+    this.blockMatchStartIndex = 0,
     this.onSecondaryTap,
   });
 
@@ -165,27 +171,86 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
     );
 
     // Use colored output if available
+    List<TextSpan> spans;
     if (block.rawOutput.isNotEmpty) {
       final parser = AnsiTextParser(theme);
-      final spans = parser.parse(block.rawOutput, baseStyle: baseStyle);
+      spans = parser.parse(block.rawOutput, baseStyle: baseStyle);
+    } else {
+      spans = [TextSpan(text: block.output, style: baseStyle)];
+    }
 
-      return GestureDetector(
-        onSecondaryTapDown: widget.onSecondaryTap,
-        child: SelectableText.rich(
-          TextSpan(children: spans),
-          contextMenuBuilder: (_, __) => const SizedBox.shrink(),
-        ),
+    // Apply search highlights if active
+    if (widget.searchHighlight != null) {
+      spans = _applySearchHighlights(
+        block.output, spans, baseStyle, theme,
       );
     }
 
     return GestureDetector(
       onSecondaryTapDown: widget.onSecondaryTap,
-      child: SelectableText(
-        block.output,
+      child: SelectableText.rich(
+        TextSpan(children: spans),
         contextMenuBuilder: (_, __) => const SizedBox.shrink(),
-        style: baseStyle,
       ),
     );
+  }
+
+  /// Overlays search highlights on top of existing styled spans.
+  /// Rebuilds spans from plain text with highlights, preserving colors
+  /// from the ANSI parser would be complex — so we use plain text
+  /// with highlights for simplicity when search is active.
+  List<TextSpan> _applySearchHighlights(
+    String plainText,
+    List<TextSpan> coloredSpans,
+    TextStyle baseStyle,
+    BolonTheme theme,
+  ) {
+    final regex = widget.searchHighlight!;
+    final matches = regex.allMatches(plainText).toList();
+    if (matches.isEmpty) return coloredSpans;
+
+    final highlightStyle = baseStyle.copyWith(
+      backgroundColor: theme.ansiYellow.withAlpha(60),
+    );
+    final currentHighlightStyle = baseStyle.copyWith(
+      backgroundColor: theme.ansiYellow.withAlpha(150),
+      color: theme.background,
+    );
+
+    final result = <TextSpan>[];
+    var lastEnd = 0;
+
+    for (var i = 0; i < matches.length; i++) {
+      final match = matches[i];
+      final globalIndex = widget.blockMatchStartIndex + i;
+      final isCurrent = globalIndex == widget.currentMatchIndex;
+
+      // Text before match
+      if (match.start > lastEnd) {
+        result.add(TextSpan(
+          text: plainText.substring(lastEnd, match.start),
+          style: baseStyle,
+        ));
+      }
+
+      // Highlighted match
+      result.add(TextSpan(
+        text: plainText.substring(match.start, match.end),
+        style: isCurrent ? currentHighlightStyle : highlightStyle,
+      ));
+
+      lastEnd = match.end;
+    }
+
+    // Remaining text
+    if (lastEnd < plainText.length) {
+      result.add(TextSpan(
+        text: plainText.substring(lastEnd),
+        style: baseStyle,
+      ));
+    }
+
+    return result;
   }
 
   Widget _buildScrollableOutput(CommandBlock block, BolonTheme theme) {

@@ -12,6 +12,7 @@ import '../blocks/command_block_widget.dart';
 import '../prompt/prompt_area.dart';
 import '../prompt/prompt_input.dart';
 import '../shared/font_size_toast.dart';
+import 'find_bar.dart';
 import 'pane_focus_registry.dart';
 
 /// Renders a terminal session with Warp-style flowing layout.
@@ -44,6 +45,13 @@ class _SessionViewState extends ConsumerState<SessionView> {
   final _promptKey = GlobalKey<PromptInputState>();
   bool _showToast = false;
   bool _wasRunning = false;
+
+  // Find bar state
+  bool _showFindBar = false;
+  int _findCurrentMatch = 0;
+  int _findTotalMatches = 0;
+  List<_FindMatch> _findMatches = [];
+  FindResult? _lastFindResult;
 
   @override
   void initState() {
@@ -124,6 +132,8 @@ class _SessionViewState extends ConsumerState<SessionView> {
 
     return CallbackShortcuts(
       bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
+            () => setState(() => _showFindBar = !_showFindBar),
         const SingleActivator(LogicalKeyboardKey.equal, meta: true):
             _increaseFontSize,
         const SingleActivator(LogicalKeyboardKey.minus, meta: true):
@@ -167,12 +177,15 @@ class _SessionViewState extends ConsumerState<SessionView> {
               physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.only(top: 8),
               children: [
-                for (final block in blocks)
+                for (var i = 0; i < blocks.length; i++)
                   CommandBlockWidget(
-                    block: block,
+                    block: blocks[i],
                     fontSize: fontSize,
                     lineHeight: lineHeight,
                     scrollable: configLoader?.config.editor.scrollableBlocks ?? false,
+                    searchHighlight: _buildSearchRegex(),
+                    currentMatchIndex: _findCurrentMatch,
+                    blockMatchStartIndex: _matchStartIndexForBlock(i),
                     onSecondaryTap: widget.onSecondaryTap,
                   ),
                 PromptArea(
@@ -197,9 +210,119 @@ class _SessionViewState extends ConsumerState<SessionView> {
                 },
               ),
             ),
+
+          // Find bar — top right, rendered last so it's on top
+          if (_showFindBar)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: FindBar(
+                currentMatch: _findCurrentMatch,
+                totalMatches: _findTotalMatches,
+                onSearch: _onFind,
+                onNext: _onFindNext,
+                onPrevious: _onFindPrevious,
+                onClose: () => setState(() {
+                  _showFindBar = false;
+                  _findMatches = [];
+                  _findTotalMatches = 0;
+                  _findCurrentMatch = 0;
+                }),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  // --- Find ---
+
+  void _onFind(FindResult result) {
+    _lastFindResult = result;
+    if (result.query.isEmpty) {
+      setState(() {
+        _findMatches = [];
+        _findTotalMatches = 0;
+        _findCurrentMatch = 0;
+      });
+      return;
+    }
+
+    final matches = <_FindMatch>[];
+    final blocks = widget.session.blocks;
+
+    RegExp? regex;
+    try {
+      regex = result.isRegex
+          ? RegExp(result.query,
+              caseSensitive: result.caseSensitive)
+          : RegExp(
+              RegExp.escape(result.query),
+              caseSensitive: result.caseSensitive,
+            );
+    } on FormatException {
+      // Invalid regex
+      setState(() {
+        _findMatches = [];
+        _findTotalMatches = 0;
+        _findCurrentMatch = 0;
+      });
+      return;
+    }
+
+    for (var i = 0; i < blocks.length; i++) {
+      final text = blocks[i].output;
+      for (final m in regex.allMatches(text)) {
+        matches.add(_FindMatch(blockIndex: i, start: m.start, end: m.end));
+      }
+      // Also search command text
+      for (final m in regex.allMatches(blocks[i].command)) {
+        matches.add(_FindMatch(blockIndex: i, start: m.start, end: m.end, inCommand: true));
+      }
+    }
+
+    setState(() {
+      _findMatches = matches;
+      _findTotalMatches = matches.length;
+      _findCurrentMatch = matches.isNotEmpty ? 0 : 0;
+    });
+  }
+
+  void _onFindNext() {
+    if (_findMatches.isEmpty) return;
+    setState(() {
+      _findCurrentMatch = (_findCurrentMatch + 1) % _findMatches.length;
+    });
+  }
+
+  void _onFindPrevious() {
+    if (_findMatches.isEmpty) return;
+    setState(() {
+      _findCurrentMatch =
+          (_findCurrentMatch - 1 + _findMatches.length) % _findMatches.length;
+    });
+  }
+
+  RegExp? _buildSearchRegex() {
+    if (!_showFindBar || _findMatches.isEmpty || _lastFindResult == null) {
+      return null;
+    }
+    final r = _lastFindResult!;
+    try {
+      return r.isRegex
+          ? RegExp(r.query, caseSensitive: r.caseSensitive)
+          : RegExp(RegExp.escape(r.query), caseSensitive: r.caseSensitive);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  int _matchStartIndexForBlock(int blockIndex) {
+    var count = 0;
+    for (final m in _findMatches) {
+      if (m.blockIndex < blockIndex) count++;
+    }
+    return count;
   }
 
   void _increaseFontSize() {
@@ -216,4 +339,18 @@ class _SessionViewState extends ConsumerState<SessionView> {
     ref.read(fontSizeProvider.notifier).reset();
     setState(() => _showToast = true);
   }
+}
+
+class _FindMatch {
+  final int blockIndex;
+  final int start;
+  final int end;
+  final bool inCommand;
+
+  const _FindMatch({
+    required this.blockIndex,
+    required this.start,
+    required this.end,
+    this.inCommand = false,
+  });
 }
