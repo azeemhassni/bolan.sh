@@ -87,7 +87,7 @@ class _PromptAreaState extends State<PromptArea> {
           // Status chips row
           Padding(
             padding: const EdgeInsets.only(
-              left: 12, right: 12, top: 10, bottom: 2,
+              left: 12, right: 12, top: 10, bottom: 12,
             ),
             child: Row(
               children: [
@@ -96,7 +96,7 @@ class _PromptAreaState extends State<PromptArea> {
                   text: widget.session.shellName,
                   fg: theme.statusShellFg,
                   bg: theme.statusChipBg,
-                  icon: Icons.chevron_right,
+                  svgIcon: 'assets/icons/ic_terminal.svg',
                 ),
                 const SizedBox(width: 6),
 
@@ -106,7 +106,7 @@ class _PromptAreaState extends State<PromptArea> {
                     text: widget.session.abbreviatedCwd,
                     fg: theme.statusCwdFg,
                     bg: theme.statusChipBg,
-                    icon: Icons.folder_outlined,
+                    svgIcon: 'assets/icons/ic_folder_code.svg',
                   ),
                   const SizedBox(width: 6),
                 ],
@@ -117,7 +117,7 @@ class _PromptAreaState extends State<PromptArea> {
                     text: '${widget.session.gitBranch}${widget.session.gitDirty ? " !" : ""}',
                     fg: theme.statusGitFg,
                     bg: theme.statusChipBg,
-                    icon: Icons.fork_right,
+                    svgIcon: 'assets/icons/ic_git.svg',
                   ),
               ],
             ),

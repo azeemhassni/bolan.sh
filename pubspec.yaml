@@ -38,6 +38,9 @@ dependencies:
   # Fonts
   google_fonts: ^6.2.0
 
+  # SVG rendering
+  flutter_svg: ^2.0.0
+
   # Utilities
   uuid: ^4.5.0
   intl: ^0.20.0
@@ -59,6 +62,7 @@ flutter:
   assets:
     - assets/shell-integration/
     - assets/fonts/JetBrainsMono/
+    - assets/icons/
 
   fonts:
     - family: JetBrainsMono

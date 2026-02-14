@@ -43,10 +43,10 @@ class FindBar extends StatefulWidget {
   });
 
   @override
-  State<FindBar> createState() => _FindBarState();
+  State<FindBar> createState() => FindBarState();
 }
 
-class _FindBarState extends State<FindBar> {
+class FindBarState extends State<FindBar> {
   final _controller = TextEditingController();
   late final FocusNode _focusNode;
   bool _isRegex = false;
@@ -60,6 +60,14 @@ class _FindBarState extends State<FindBar> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
+  }
+
+  void requestFocus() {
+    _focusNode.requestFocus();
+    _controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _controller.text.length,
+    );
   }
 
   @override
@@ -108,7 +116,7 @@ class _FindBarState extends State<FindBar> {
     final theme = BolonTheme.of(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: theme.promptBackground,
         border: Border(
@@ -120,7 +128,7 @@ class _FindBarState extends State<FindBar> {
         children: [
           // Search input
           SizedBox(
-            width: 260,
+            width: 300,
             child: Material(
               color: theme.statusChipBg,
               borderRadius: BorderRadius.circular(4),
@@ -133,7 +141,7 @@ class _FindBarState extends State<FindBar> {
                       style: TextStyle(
                         color: theme.foreground,
                         fontFamily: 'Operator Mono',
-                        fontSize: 12,
+                        fontSize: 15,
                         decoration: TextDecoration.none,
                       ),
                       cursorColor: theme.cursor,
@@ -143,7 +151,7 @@ class _FindBarState extends State<FindBar> {
                         hintStyle: TextStyle(
                           color: theme.dimForeground,
                           fontFamily: 'Operator Mono',
-                          fontSize: 12,
+                          fontSize: 15,
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -201,7 +209,7 @@ class _FindBarState extends State<FindBar> {
             style: TextStyle(
               color: theme.dimForeground,
               fontFamily: 'Operator Mono',
-              fontSize: 12,
+              fontSize: 15,
               decoration: TextDecoration.none,
             ),
           ),
@@ -211,11 +219,13 @@ class _FindBarState extends State<FindBar> {
           // Previous / Next
           _IconBtn(
             icon: Icons.keyboard_arrow_down,
+            size: 20,
             theme: theme,
             onTap: widget.onNext,
           ),
           _IconBtn(
             icon: Icons.keyboard_arrow_up,
+            size: 20,
             theme: theme,
             onTap: widget.onPrevious,
           ),
@@ -223,6 +233,7 @@ class _FindBarState extends State<FindBar> {
           // Close
           _IconBtn(
             icon: Icons.close,
+            size: 18,
             theme: theme,
             onTap: widget.onClose,
           ),
@@ -265,14 +276,14 @@ class _ToggleButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(3),
             ),
             child: icon != null
-                ? Icon(icon, size: 14,
+                ? Icon(icon, size: 18,
                     color: active ? theme.cursor : theme.dimForeground)
                 : Text(
                     label!,
                     style: TextStyle(
                       color: active ? theme.cursor : theme.dimForeground,
                       fontFamily: 'Operator Mono',
-                      fontSize: 11,
+                      fontSize: 15,
                       fontWeight: active ? FontWeight.w600 : FontWeight.normal,
                       decoration: TextDecoration.none,
                     ),
@@ -286,11 +297,13 @@ class _ToggleButton extends StatelessWidget {
 
 class _IconBtn extends StatelessWidget {
   final IconData icon;
+  final double size;
   final BolonTheme theme;
   final VoidCallback onTap;
 
   const _IconBtn({
     required this.icon,
+    this.size = 16,
     required this.theme,
     required this.onTap,
   });
@@ -303,7 +316,7 @@ class _IconBtn extends StatelessWidget {
         cursor: SystemMouseCursors.click,
         child: Padding(
           padding: const EdgeInsets.all(4),
-          child: Icon(icon, size: 16, color: theme.dimForeground),
+          child: Icon(icon, size: size, color: theme.dimForeground),
         ),
       ),
     );

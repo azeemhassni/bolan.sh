@@ -47,6 +47,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
   bool _wasRunning = false;
 
   // Find bar state
+  final _findBarKey = GlobalKey<FindBarState>();
   bool _showFindBar = false;
   int _findCurrentMatch = 0;
   int _findTotalMatches = 0;
@@ -133,7 +134,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
-            () => setState(() => _showFindBar = !_showFindBar),
+            _toggleFindBar,
         const SingleActivator(LogicalKeyboardKey.equal, meta: true):
             _increaseFontSize,
         const SingleActivator(LogicalKeyboardKey.minus, meta: true):
@@ -217,6 +218,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
               top: 0,
               right: 0,
               child: FindBar(
+                key: _findBarKey,
                 currentMatch: _findCurrentMatch,
                 totalMatches: _findTotalMatches,
                 onSearch: _onFind,
@@ -233,6 +235,15 @@ class _SessionViewState extends ConsumerState<SessionView> {
         ],
       ),
     );
+  }
+
+  void _toggleFindBar() {
+    if (_showFindBar) {
+      // Already open — focus it
+      _findBarKey.currentState?.requestFocus();
+    } else {
+      setState(() => _showFindBar = true);
+    }
   }
 
   // --- Find ---
