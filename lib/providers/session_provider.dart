@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -75,6 +77,7 @@ class SessionNotifier extends Notifier<SessionState> {
 
   void switchTab(int index) {
     if (index < 0 || index >= state.tabs.length) return;
+    _debounceTimer?.cancel();
     state = SessionState(tabs: state.tabs, activeTabIndex: index);
   }
 
@@ -200,12 +203,18 @@ class SessionNotifier extends Notifier<SessionState> {
     session.addListener(_onSessionChanged);
   }
 
+  Timer? _debounceTimer;
+
   void _onSessionChanged() {
-    // Trigger rebuild to update tab titles, status icons, etc.
-    state = SessionState(
-      tabs: state.tabs,
-      activeTabIndex: state.activeTabIndex,
-    );
+    // Debounce session notifications to avoid excessive rebuilds.
+    // Tab titles and status icons don't need 60fps updates.
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 50), () {
+      state = SessionState(
+        tabs: state.tabs,
+        activeTabIndex: state.activeTabIndex,
+      );
+    });
   }
 
   void _updateActiveTab(TabState newTab) {
