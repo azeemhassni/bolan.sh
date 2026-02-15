@@ -493,11 +493,11 @@ PROMPT=''
 __bolan_prompt_start() { printf '\e]133;A\a'; }
 __bolan_prompt_end()   { printf '\e]133;B\a'; }
 __bolan_cmd_start()    { printf '\e]133;C;%s\a' "$1"; }
-__bolan_cmd_end()      { printf "\e]133;D;$?\a"; }
+__bolan_cmd_end()      { local ec=$?; printf "\e]133;D;$ec\a"; }
 __bolan_osc7()         { printf '\e]7;file://%s%s\a' "$HOST" "$PWD"; }
 autoload -Uz add-zsh-hook
-add-zsh-hook precmd  __bolan_prompt_start
 add-zsh-hook precmd  __bolan_cmd_end
+add-zsh-hook precmd  __bolan_prompt_start
 add-zsh-hook precmd  __bolan_osc7
 add-zsh-hook preexec __bolan_prompt_end
 add-zsh-hook preexec __bolan_cmd_start
@@ -508,7 +508,7 @@ PS1=''
 __bolan_prompt_start() { printf '\e]133;A\a'; }
 __bolan_prompt_end()   { printf '\e]133;B\a'; }
 __bolan_cmd_start()    { printf '\e]133;C;%s\a' "$BASH_COMMAND"; }
-__bolan_cmd_end()      { printf "\e]133;D;$?\a"; }
+__bolan_cmd_end()      { local ec=$?; printf "\e]133;D;$ec\a"; }
 __bolan_osc7()         { printf '\e]7;file://%s%s\a' "$HOSTNAME" "$PWD"; }
 __bolan_preexec() { __bolan_prompt_end; __bolan_cmd_start; }
 __bolan_precmd() { __bolan_cmd_end; __bolan_prompt_start; __bolan_osc7; }

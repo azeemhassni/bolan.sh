@@ -207,8 +207,8 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                   ),
                 ),
 
-              // "Explain Error" button for failed commands
-              if (isFailed && _explanation == null && _hovered)
+              // "Explain Error" button for failed commands — always visible
+              if (isFailed && _explanation == null)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: GestureDetector(
