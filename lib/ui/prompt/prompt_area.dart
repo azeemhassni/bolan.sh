@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../shared/status_chip.dart';
+import 'git_diff_panel.dart';
 import 'prompt_input.dart';
 
 /// Warp-style prompt area: status chips on top, text input below.
@@ -40,6 +41,7 @@ class PromptArea extends StatefulWidget {
 
 class _PromptAreaState extends State<PromptArea> {
   bool _aiMode = false;
+  bool _showDiffPanel = false;
 
   @override
   void initState() {
@@ -117,17 +119,90 @@ class _PromptAreaState extends State<PromptArea> {
                   const SizedBox(width: 6),
                 ],
 
-                // Git branch chip with branch icon
-                if (widget.session.gitBranch.isNotEmpty)
+                // Git branch chip
+                if (widget.session.gitBranch.isNotEmpty) ...[
                   StatusChip(
                     text: '${widget.session.gitBranch}${widget.session.gitDirty ? " !" : ""}',
                     fg: theme.statusGitFg,
                     bg: theme.statusChipBg,
                     svgIcon: 'assets/icons/ic_git.svg',
                   ),
+                  const SizedBox(width: 6),
+                ],
+
+                // Git changes chip — clickable to show diff
+                if (widget.session.hasGitStats)
+                  GestureDetector(
+                    onTap: () =>
+                        setState(() => _showDiffPanel = !_showDiffPanel),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: theme.statusChipBg,
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(
+                            color: _showDiffPanel
+                                ? theme.cursor.withAlpha(80)
+                                : theme.foreground.withAlpha(40),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.description_outlined,
+                                size: 14, color: theme.foreground),
+                            const SizedBox(width: 5),
+                            Text(
+                              '${widget.session.gitFilesChanged}',
+                              style: TextStyle(
+                                color: theme.foreground,
+                                fontFamily: 'Operator Mono',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '+${widget.session.gitInsertions}',
+                              style: TextStyle(
+                                color: theme.exitSuccessFg,
+                                fontFamily: 'Operator Mono',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '-${widget.session.gitDeletions}',
+                              style: TextStyle(
+                                color: theme.exitFailureFg,
+                                fontFamily: 'Operator Mono',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
+
+          // Diff panel
+          if (_showDiffPanel)
+            GitDiffPanel(
+              cwd: widget.session.cwd,
+              onClose: () => setState(() => _showDiffPanel = false),
+            ),
 
           // Text input
           PromptInput(

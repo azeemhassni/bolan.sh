@@ -42,6 +42,9 @@ class TerminalSession extends ChangeNotifier {
   String _cwd = '';
   String _gitBranch = '';
   bool _gitDirty = false;
+  int _gitFilesChanged = 0;
+  int _gitInsertions = 0;
+  int _gitDeletions = 0;
 
   // Buffer for capturing command output between C and D markers
   final StringBuffer _outputCapture = StringBuffer();
@@ -129,6 +132,18 @@ class TerminalSession extends ChangeNotifier {
 
   /// Whether the git working tree has uncommitted changes.
   bool get gitDirty => _gitDirty;
+
+  /// Number of files with changes.
+  int get gitFilesChanged => _gitFilesChanged;
+
+  /// Lines added across all changed files.
+  int get gitInsertions => _gitInsertions;
+
+  /// Lines removed across all changed files.
+  int get gitDeletions => _gitDeletions;
+
+  /// Whether there are trackable git stats to show.
+  bool get hasGitStats => _gitFilesChanged > 0;
 
   /// Shell name (e.g. "zsh", "bash").
   String get shellName => title;
@@ -468,14 +483,29 @@ class TerminalSession extends ChangeNotifier {
           workingDirectory: _cwd,
         );
         _gitDirty = (statusResult.stdout as String).trim().isNotEmpty;
+
+        // Get change stats
+        final shortstat = await Process.run(
+          'git',
+          ['diff', '--shortstat'],
+          workingDirectory: _cwd,
+        );
+        _parseShortstat((shortstat.stdout as String).trim());
+
         notifyListeners();
       } else {
         _gitBranch = '';
         _gitDirty = false;
+        _gitFilesChanged = 0;
+        _gitInsertions = 0;
+        _gitDeletions = 0;
       }
     } on ProcessException {
       _gitBranch = '';
       _gitDirty = false;
+      _gitFilesChanged = 0;
+      _gitInsertions = 0;
+      _gitDeletions = 0;
     }
   }
 
@@ -526,6 +556,23 @@ PROMPT_COMMAND="__bolan_precmd;${PROMPT_COMMAND}"
       await scriptFile.writeAsString(script!);
       writeInput('source ${scriptFile.path} && clear\n');
     });
+  }
+
+  /// Parses `git diff --shortstat` output like:
+  /// "3 files changed, 218 insertions(+), 19 deletions(-)"
+  void _parseShortstat(String output) {
+    _gitFilesChanged = 0;
+    _gitInsertions = 0;
+    _gitDeletions = 0;
+    if (output.isEmpty) return;
+
+    final filesMatch = RegExp(r'(\d+) files? changed').firstMatch(output);
+    final insMatch = RegExp(r'(\d+) insertions?').firstMatch(output);
+    final delMatch = RegExp(r'(\d+) deletions?').firstMatch(output);
+
+    if (filesMatch != null) _gitFilesChanged = int.parse(filesMatch.group(1)!);
+    if (insMatch != null) _gitInsertions = int.parse(insMatch.group(1)!);
+    if (delMatch != null) _gitDeletions = int.parse(delMatch.group(1)!);
   }
 
   static String _defaultShell() {
