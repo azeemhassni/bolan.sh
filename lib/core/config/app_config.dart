@@ -59,6 +59,8 @@ class AiConfig {
   final String anthropicModel;
   final String anthropicMode; // 'api' or 'claude-code'
   final bool enabled;
+  final bool commandSuggestions;
+  final bool shareHistory; // consent to send history to AI for better suggestions
 
   const AiConfig({
     this.provider = 'gemini',
@@ -69,5 +71,7 @@ class AiConfig {
     this.anthropicModel = 'claude-sonnet-4-20250514',
     this.anthropicMode = 'claude-code',
     this.enabled = false,
+    this.commandSuggestions = true,
+    this.shareHistory = false,
   });
 }

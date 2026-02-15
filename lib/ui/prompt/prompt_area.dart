@@ -16,6 +16,8 @@ class PromptArea extends StatefulWidget {
   final String aiProvider;
   final String geminiModel;
   final String anthropicMode;
+  final bool commandSuggestions;
+  final bool shareHistory;
   final GlobalKey<PromptInputState>? promptInputKey;
 
   const PromptArea({
@@ -25,6 +27,8 @@ class PromptArea extends StatefulWidget {
     this.aiProvider = 'gemini',
     this.geminiModel = 'gemma-3-27b-it',
     this.anthropicMode = 'claude-code',
+    this.commandSuggestions = true,
+    this.shareHistory = false,
     this.promptInputKey,
   });
 
@@ -131,6 +135,8 @@ class _PromptAreaState extends State<PromptArea> {
             aiProvider: widget.aiProvider,
             geminiModel: widget.geminiModel,
             anthropicMode: widget.anthropicMode,
+            commandSuggestions: widget.commandSuggestions,
+            shareHistory: widget.shareHistory,
           ),
         ],
       ),

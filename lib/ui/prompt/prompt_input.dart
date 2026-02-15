@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/ai/api_key_storage.dart';
+import '../../core/ai/features/command_suggest.dart';
 import '../../core/ai/features/git_commit.dart';
 import '../../core/ai/features/nlp_to_command.dart';
 import '../../core/ai/gemini_provider.dart';
@@ -27,6 +28,8 @@ class PromptInput extends StatefulWidget {
   final String aiProvider;
   final String geminiModel;
   final String anthropicMode;
+  final bool commandSuggestions;
+  final bool shareHistory;
 
   const PromptInput({
     super.key,
@@ -35,6 +38,8 @@ class PromptInput extends StatefulWidget {
     this.aiProvider = 'gemini',
     this.geminiModel = 'gemma-3-27b-it',
     this.anthropicMode = 'claude-code',
+    this.commandSuggestions = true,
+    this.shareHistory = false,
   });
 
   @override
@@ -59,6 +64,7 @@ class PromptInputState extends State<PromptInput> {
   // AI state
   bool _aiLoading = false;
   bool _isAiMode = false;
+  String? _aiSuggestion; // ghost text suggestion from AI
 
   /// Notifier for parent widgets to react to AI mode changes.
   final aiModeNotifier = ValueNotifier<bool>(false);
@@ -87,14 +93,22 @@ class PromptInputState extends State<PromptInput> {
         return match.substring(text.length);
       }
     }
+    // AI suggestion ghost — when input is empty
+    if (text.isEmpty && _aiSuggestion != null) {
+      return _aiSuggestion!;
+    }
     return '';
   }
+
+  int _lastBlockCount = 0;
 
   @override
   void initState() {
     super.initState();
     _focusNode = FocusNode(onKeyEvent: _handleKeyEvent);
     _controller.addListener(_onTextChanged);
+    widget.session.addListener(_onSessionChanged);
+    _lastBlockCount = widget.session.blocks.length;
   }
 
   void requestFocus() => _focusNode.requestFocus();
@@ -104,11 +118,24 @@ class PromptInputState extends State<PromptInput> {
 
   @override
   void dispose() {
+    widget.session.removeListener(_onSessionChanged);
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _focusNode.dispose();
     aiModeNotifier.dispose();
     super.dispose();
+  }
+
+  void _onSessionChanged() {
+    // Detect when a new block is added (command completed)
+    final blocks = widget.session.blocks;
+    if (blocks.length > _lastBlockCount && widget.commandSuggestions) {
+      _lastBlockCount = blocks.length;
+      final lastBlock = blocks.last;
+      _requestSuggestion(lastBlock.command, lastBlock.output,
+          lastBlock.exitCode ?? 0);
+    }
+    _lastBlockCount = blocks.length;
   }
 
   void _onTextChanged() {
@@ -124,7 +151,11 @@ class PromptInputState extends State<PromptInput> {
         _isAiMode = aiMode;
       });
     } else {
-      setState(() => _isAiMode = aiMode);
+      setState(() {
+        _isAiMode = aiMode;
+        // Clear AI suggestion when user starts typing
+        if (_controller.text.isNotEmpty) _aiSuggestion = null;
+      });
     }
     aiModeNotifier.value = _isAiMode || _aiLoading;
   }
@@ -481,7 +512,7 @@ class PromptInputState extends State<PromptInput> {
       return;
     }
 
-    // Otherwise accept history ghost
+    // Accept history or AI suggestion ghost
     final text = _controller.text;
     _withoutListener(() {
       _controller.text = '$text$ghost';
@@ -489,6 +520,7 @@ class PromptInputState extends State<PromptInput> {
         offset: _controller.text.length,
       );
     });
+    _aiSuggestion = null;
     setState(() {});
   }
 
@@ -653,6 +685,71 @@ class PromptInputState extends State<PromptInput> {
       );
     });
     setState(() {});
+  }
+
+  // --- AI command suggestion ---
+
+  Future<void> _requestSuggestion(
+    String lastCommand,
+    String lastOutput,
+    int lastExitCode,
+  ) async {
+    if (_aiLoading) return;
+
+    try {
+      final useClaudeCode = widget.aiProvider == 'anthropic' &&
+          widget.anthropicMode == 'claude-code';
+
+      GeminiProvider? geminiProvider;
+      if (!useClaudeCode) {
+        try {
+          final apiKey = await ApiKeyStorage.readKey(widget.aiProvider);
+          if (apiKey != null && apiKey.isNotEmpty) {
+            geminiProvider = GeminiProvider(
+                apiKey: apiKey, model: widget.geminiModel);
+          }
+        } on Exception {
+          // Keychain error
+        }
+      }
+
+      if (geminiProvider == null && !useClaudeCode) return;
+
+      final suggestor = CommandSuggestor(
+        geminiProvider: geminiProvider,
+        useClaudeCode: useClaudeCode,
+      );
+
+      // Build history list — only if user consented
+      final history = widget.shareHistory
+          ? widget.session.history.entries
+              .reversed
+              .take(20)
+              .toList()
+              .reversed
+              .toList()
+          : <String>[lastCommand];
+
+      final suggestion = await suggestor.suggest(
+        lastCommand: lastCommand,
+        lastOutput: lastOutput,
+        lastExitCode: lastExitCode,
+        cwd: widget.session.cwd,
+        shellName: widget.session.shellName,
+        recentHistory: history,
+        gitBranch: widget.session.gitBranch.isNotEmpty
+            ? widget.session.gitBranch
+            : null,
+        gitDirty: widget.session.gitDirty,
+      );
+
+      if (!mounted) return;
+      if (suggestion != null && _controller.text.isEmpty) {
+        setState(() => _aiSuggestion = suggestion);
+      }
+    } on Exception {
+      // Silently fail — suggestions are best-effort
+    }
   }
 
   // --- Git commit ---

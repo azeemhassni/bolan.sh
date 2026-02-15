@@ -124,6 +124,8 @@ class ConfigLoader extends ChangeNotifier {
     sb.writeln('anthropic_model = "${c.ai.anthropicModel}"');
     sb.writeln('anthropic_mode = "${c.ai.anthropicMode}"');
     sb.writeln('enabled = ${c.ai.enabled}');
+    sb.writeln('command_suggestions = ${c.ai.commandSuggestions}');
+    sb.writeln('share_history = ${c.ai.shareHistory}');
 
     return sb.toString();
   }

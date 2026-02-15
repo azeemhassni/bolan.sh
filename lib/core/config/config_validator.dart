@@ -47,6 +47,8 @@ class ConfigValidator {
       anthropicModel: _string(raw['anthropic_model'], 'claude-sonnet-4-20250514'),
       anthropicMode: _oneOf(raw['anthropic_mode'], ['api', 'claude-code'], 'claude-code'),
       enabled: _bool(raw['enabled'], false),
+      commandSuggestions: _bool(raw['command_suggestions'], true),
+      shareHistory: _bool(raw['share_history'], false),
     );
   }
 

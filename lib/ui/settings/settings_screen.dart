@@ -143,6 +143,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             theme: theme,
             onChanged: (v) => _updateAi(enabled: v),
           ),
+          _ToggleOption(
+            label: 'Command Suggestions',
+            value: _config.ai.commandSuggestions,
+            theme: theme,
+            onChanged: (v) => _updateAi(commandSuggestions: v),
+          ),
+          _ToggleOption(
+            label: 'Share History with AI',
+            value: _config.ai.shareHistory,
+            theme: theme,
+            onChanged: (v) => _updateAi(shareHistory: v),
+          ),
           _DropdownOption(
             label: 'Provider',
             value: _config.ai.provider,
@@ -293,6 +305,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String? anthropicModel,
     String? anthropicMode,
     bool? enabled,
+    bool? commandSuggestions,
+    bool? shareHistory,
   }) {
     setState(() {
       _config = AppConfig(
@@ -307,6 +321,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           anthropicModel: anthropicModel ?? _config.ai.anthropicModel,
           anthropicMode: anthropicMode ?? _config.ai.anthropicMode,
           enabled: enabled ?? _config.ai.enabled,
+          commandSuggestions: commandSuggestions ?? _config.ai.commandSuggestions,
+          shareHistory: shareHistory ?? _config.ai.shareHistory,
         ),
         activeTheme: _config.activeTheme,
       );
