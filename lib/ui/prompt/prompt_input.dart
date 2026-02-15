@@ -8,6 +8,7 @@ import '../../core/ai/features/command_suggest.dart';
 import '../../core/ai/features/git_commit.dart';
 import '../../core/ai/features/nlp_to_command.dart';
 import '../../core/ai/gemini_provider.dart';
+import '../../core/ai/history_sanitizer.dart';
 import '../../core/completion/completion_engine.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -644,10 +645,12 @@ class PromptInputState extends State<PromptInput> {
         useClaudeCode: useClaudeCode,
       );
 
-      final recentCommands = widget.session.blocks
-          .map((b) => b.command.trim())
-          .where((c) => c.isNotEmpty)
-          .toList();
+      final recentCommands = HistorySanitizer.sanitize(
+        widget.session.blocks
+            .map((b) => b.command.trim())
+            .where((c) => c.isNotEmpty)
+            .toList(),
+      );
 
       final result = await nlp.convert(
         query: query,
@@ -720,8 +723,8 @@ class PromptInputState extends State<PromptInput> {
         useClaudeCode: useClaudeCode,
       );
 
-      // Build history list — only if user consented
-      final history = widget.shareHistory
+      // Build history list — only if user consented, always sanitized
+      final rawHistory = widget.shareHistory
           ? widget.session.history.entries
               .reversed
               .take(20)
@@ -729,6 +732,7 @@ class PromptInputState extends State<PromptInput> {
               .reversed
               .toList()
           : <String>[lastCommand];
+      final history = HistorySanitizer.sanitize(rawHistory);
 
       final suggestion = await suggestor.suggest(
         lastCommand: lastCommand,
