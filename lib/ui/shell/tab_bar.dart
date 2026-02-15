@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:macos_window_utils/macos_window_utils.dart';
 
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -22,13 +21,7 @@ class BolonTabBar extends ConsumerWidget {
     final theme = BolonTheme.of(context);
     final sessionState = ref.watch(sessionProvider);
 
-    return GestureDetector(
-      onDoubleTap: () {
-        if (Platform.isMacOS) {
-          WindowManipulator.zoomWindow();
-        }
-      },
-      child: Container(
+    return Container(
       height: 36,
       color: theme.tabBarBackground,
       child: Row(
@@ -84,7 +77,6 @@ class BolonTabBar extends ConsumerWidget {
           ),
         ],
       ),
-    ),
     );
   }
 }
