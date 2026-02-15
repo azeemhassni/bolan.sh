@@ -48,6 +48,7 @@ class ConfigValidator {
       anthropicMode: _oneOf(raw['anthropic_mode'], ['api', 'claude-code'], 'claude-code'),
       enabled: _bool(raw['enabled'], false),
       commandSuggestions: _bool(raw['command_suggestions'], true),
+      smartHistorySearch: _bool(raw['smart_history_search'], true),
       shareHistory: _bool(raw['share_history'], false),
     );
   }

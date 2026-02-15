@@ -30,6 +30,7 @@ class PromptInput extends StatefulWidget {
   final String geminiModel;
   final String anthropicMode;
   final bool commandSuggestions;
+  final bool smartHistorySearch;
   final bool shareHistory;
 
   const PromptInput({
@@ -40,6 +41,7 @@ class PromptInput extends StatefulWidget {
     this.geminiModel = 'gemma-3-27b-it',
     this.anthropicMode = 'claude-code',
     this.commandSuggestions = true,
+    this.smartHistorySearch = true,
     this.shareHistory = false,
   });
 
@@ -188,6 +190,7 @@ class PromptInputState extends State<PromptInput> {
               fullHistory: widget.session.history.entries,
               onSelect: _acceptHistorySearch,
               onDismiss: _dismissHistorySearch,
+              smartSearchEnabled: widget.smartHistorySearch,
               aiProvider: widget.aiProvider,
               geminiModel: widget.geminiModel,
               anthropicMode: widget.anthropicMode,

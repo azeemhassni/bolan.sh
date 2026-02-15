@@ -209,6 +209,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
                   geminiModel: configLoader?.config.ai.geminiModel ?? 'gemma-3-27b-it',
                   anthropicMode: configLoader?.config.ai.anthropicMode ?? 'claude-code',
                   commandSuggestions: configLoader?.config.ai.commandSuggestions ?? true,
+                  smartHistorySearch: configLoader?.config.ai.smartHistorySearch ?? true,
                   shareHistory: configLoader?.config.ai.shareHistory ?? false,
                   promptInputKey: _promptKey,
                 ),

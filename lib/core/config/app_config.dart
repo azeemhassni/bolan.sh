@@ -60,6 +60,7 @@ class AiConfig {
   final String anthropicMode; // 'api' or 'claude-code'
   final bool enabled;
   final bool commandSuggestions;
+  final bool smartHistorySearch;
   final bool shareHistory; // consent to send history to AI for better suggestions
 
   const AiConfig({
@@ -72,6 +73,7 @@ class AiConfig {
     this.anthropicMode = 'claude-code',
     this.enabled = false,
     this.commandSuggestions = true,
+    this.smartHistorySearch = true,
     this.shareHistory = false,
   });
 }

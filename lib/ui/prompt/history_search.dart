@@ -17,6 +17,7 @@ class HistorySearch extends StatefulWidget {
   final ValueChanged<String> onSelect;
   final VoidCallback onDismiss;
   final double fontSize;
+  final bool smartSearchEnabled;
   final String aiProvider;
   final String geminiModel;
   final String anthropicMode;
@@ -28,6 +29,7 @@ class HistorySearch extends StatefulWidget {
     required this.onSelect,
     required this.onDismiss,
     this.fontSize = 13,
+    this.smartSearchEnabled = true,
     this.aiProvider = 'gemini',
     this.geminiModel = 'gemma-3-27b-it',
     this.anthropicMode = 'claude-code',
@@ -102,7 +104,8 @@ class _HistorySearchState extends State<HistorySearch> {
   }
 
   void _onSearchChanged(String query) {
-    final isNL = SmartHistorySearch.isNaturalLanguage(query);
+    final isNL = widget.smartSearchEnabled &&
+        SmartHistorySearch.isNaturalLanguage(query);
 
     if (isNL && !_aiSearching) {
       // Debounce AI search

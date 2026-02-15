@@ -270,6 +270,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onChanged: (v) => _updateAi(commandSuggestions: v),
       ),
       _Toggle(
+        label: 'Smart History Search',
+        help: 'Use AI for natural language history search (Ctrl+R)',
+        value: _config.ai.smartHistorySearch,
+        theme: theme,
+        onChanged: (v) => _updateAi(smartHistorySearch: v),
+      ),
+      _Toggle(
         label: 'Share History with AI',
         help: 'Send recent commands for better suggestions',
         value: _config.ai.shareHistory,
@@ -442,6 +449,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String? anthropicMode,
     bool? enabled,
     bool? commandSuggestions,
+    bool? smartHistorySearch,
     bool? shareHistory,
   }) {
     setState(() {
@@ -459,6 +467,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           enabled: enabled ?? _config.ai.enabled,
           commandSuggestions:
               commandSuggestions ?? _config.ai.commandSuggestions,
+          smartHistorySearch:
+              smartHistorySearch ?? _config.ai.smartHistorySearch,
           shareHistory: shareHistory ?? _config.ai.shareHistory,
         ),
         activeTheme: _config.activeTheme,
