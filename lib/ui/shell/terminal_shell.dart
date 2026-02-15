@@ -106,7 +106,6 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
   @override
   Widget build(BuildContext context) {
     final sessionState = ref.watch(sessionProvider);
-    final activeTab = sessionState.activeTab;
 
     return BolonThemeProvider(
       theme: bolonDefaultDark,
@@ -169,15 +168,18 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
               children: [
                 BolonTabBar(onSettings: _openSettings),
                 Expanded(
-                  child: activeTab != null
-                      ? PaneTreeWidget(
-                          key: ValueKey(
-                              'tab-${sessionState.activeTabIndex}'),
-                          node: activeTab.rootPane,
-                          focusedPaneId: activeTab.focusedPaneId,
-                          isSinglePane: activeTab.rootPane is LeafPane,
-                        )
-                      : const SizedBox.shrink(),
+                  child: IndexedStack(
+                    index: sessionState.activeTabIndex,
+                    children: [
+                      for (var i = 0; i < sessionState.tabs.length; i++)
+                        PaneTreeWidget(
+                          node: sessionState.tabs[i].rootPane,
+                          focusedPaneId: sessionState.tabs[i].focusedPaneId,
+                          isSinglePane:
+                              sessionState.tabs[i].rootPane is LeafPane,
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ),
