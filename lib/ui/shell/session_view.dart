@@ -8,6 +8,7 @@ import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/xterm_theme.dart';
 import '../../providers/config_provider.dart';
 import '../../providers/font_size_provider.dart';
+import '../../providers/session_provider.dart';
 import '../blocks/command_block_widget.dart';
 import '../prompt/prompt_area.dart';
 import '../prompt/prompt_input.dart';
@@ -131,7 +132,14 @@ class _SessionViewState extends ConsumerState<SessionView> {
     final blocks = widget.session.blocks;
     final isRunning = widget.session.isCommandRunning;
 
-    return CallbackShortcuts(
+    return Listener(
+      onPointerDown: (_) {
+        // Any click inside this pane updates the focused pane
+        if (widget.paneId != null) {
+          ref.read(sessionProvider.notifier).setFocusedPane(widget.paneId!);
+        }
+      },
+      child: CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
             _toggleFindBar,
@@ -184,6 +192,11 @@ class _SessionViewState extends ConsumerState<SessionView> {
                     fontSize: fontSize,
                     lineHeight: lineHeight,
                     scrollable: configLoader?.config.editor.scrollableBlocks ?? false,
+                    cwd: widget.session.cwd,
+                    shellName: widget.session.shellName,
+                    aiProvider: configLoader?.config.ai.provider ?? 'gemini',
+                    geminiModel: configLoader?.config.ai.geminiModel ?? 'gemma-3-27b-it',
+                    anthropicMode: configLoader?.config.ai.anthropicMode ?? 'claude-code',
                     searchHighlight: _buildSearchRegex(),
                     currentMatchIndex: _findCurrentMatch,
                     blockMatchStartIndex: _matchStartIndexForBlock(i),
@@ -234,6 +247,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
             ),
         ],
       ),
+    ),
     );
   }
 

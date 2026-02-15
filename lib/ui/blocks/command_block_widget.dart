@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/ai/api_key_storage.dart';
+import '../../core/ai/features/error_explain.dart';
+import '../../core/ai/gemini_provider.dart';
 import '../../core/terminal/command_block.dart';
 import '../../core/theme/bolan_theme.dart';
 import 'ansi_text_parser.dart';
@@ -15,6 +18,11 @@ class CommandBlockWidget extends StatefulWidget {
   final double fontSize;
   final double lineHeight;
   final bool scrollable;
+  final String cwd;
+  final String shellName;
+  final String aiProvider;
+  final String geminiModel;
+  final String anthropicMode;
   final RegExp? searchHighlight;
   final int currentMatchIndex;
   final int blockMatchStartIndex;
@@ -26,6 +34,11 @@ class CommandBlockWidget extends StatefulWidget {
     this.fontSize = 13,
     this.lineHeight = 1.2,
     this.scrollable = false,
+    this.cwd = '',
+    this.shellName = 'zsh',
+    this.aiProvider = 'gemini',
+    this.geminiModel = 'gemma-3-27b-it',
+    this.anthropicMode = 'claude-code',
     this.searchHighlight,
     this.currentMatchIndex = -1,
     this.blockMatchStartIndex = 0,
@@ -39,6 +52,8 @@ class CommandBlockWidget extends StatefulWidget {
 class _CommandBlockWidgetState extends State<CommandBlockWidget> {
   bool _hovered = false;
   bool _copied = false;
+  bool _explaining = false;
+  String? _explanation;
   final _scrollController = ScrollController();
   bool _showTopArrow = false;
   bool _showBottomArrow = false;
@@ -153,6 +168,82 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                   child: widget.scrollable
                       ? _buildScrollableOutput(block, theme)
                       : _buildPlainOutput(block, theme),
+                ),
+
+              // Error explanation
+              if (isFailed && _explanation != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: theme.ansiMagenta.withAlpha(10),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: theme.ansiMagenta.withAlpha(40),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.auto_awesome,
+                            size: 14, color: theme.ansiMagenta),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SelectableText(
+                            _explanation!,
+                            style: TextStyle(
+                              color: theme.foreground,
+                              fontFamily: 'Operator Mono',
+                              fontSize: widget.fontSize - 1,
+                              height: 1.4,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // "Explain Error" button for failed commands
+              if (isFailed && _explanation == null && _hovered)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: GestureDetector(
+                    onTap: _explaining ? null : _explainError,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_explaining)
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: theme.ansiMagenta,
+                              ),
+                            )
+                          else
+                            Icon(Icons.auto_awesome,
+                                size: 13, color: theme.ansiMagenta),
+                          const SizedBox(width: 6),
+                          Text(
+                            _explaining ? 'Explaining...' : 'Explain Error',
+                            style: TextStyle(
+                              color: theme.ansiMagenta,
+                              fontFamily: 'Operator Mono',
+                              fontSize: 12,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -320,6 +411,52 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
           ),
       ],
     );
+  }
+
+  Future<void> _explainError() async {
+    if (_explaining) return;
+    setState(() => _explaining = true);
+
+    try {
+      final useClaudeCode = widget.aiProvider == 'anthropic' &&
+          widget.anthropicMode == 'claude-code';
+
+      GeminiProvider? geminiProvider;
+      if (!useClaudeCode) {
+        try {
+          final apiKey = await ApiKeyStorage.readKey(widget.aiProvider);
+          if (apiKey != null && apiKey.isNotEmpty) {
+            geminiProvider = GeminiProvider(
+              apiKey: apiKey,
+              model: widget.geminiModel,
+            );
+          }
+        } on Exception {
+          // Keychain error
+        }
+      }
+
+      final explainer = ErrorExplainer(
+        geminiProvider: geminiProvider,
+        useClaudeCode: useClaudeCode,
+      );
+
+      final result = await explainer.explain(
+        command: widget.block.command,
+        output: widget.block.output,
+        exitCode: widget.block.exitCode ?? 1,
+        cwd: widget.cwd,
+        shellName: widget.shellName,
+      );
+
+      if (!mounted) return;
+      setState(() => _explanation = result);
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() => _explanation = 'Error: $e');
+    } finally {
+      if (mounted) setState(() => _explaining = false);
+    }
   }
 
   Future<void> _copyOutput() async {

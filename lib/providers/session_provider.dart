@@ -102,13 +102,15 @@ class SessionNotifier extends Notifier<SessionState> {
     final tab = state.activeTab;
     if (tab == null) return;
 
+    final currentFocusId = tab.focusedPaneId;
     final (newRoot, newLeaf) =
-        PaneManager.split(tab.rootPane, tab.focusedPaneId, axis, history);
+        PaneManager.split(tab.rootPane, currentFocusId, axis, history);
     _attachSessionListener(newLeaf.session);
 
+    // Keep focus on the original pane, not the new one
     _updateActiveTab(TabState(
       rootPane: newRoot,
-      focusedPaneId: newLeaf.id,
+      focusedPaneId: currentFocusId,
     ));
   }
 

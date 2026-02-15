@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -174,6 +176,30 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
     );
   }
 
+  PopupMenuItem<String> _menuItem(
+    String value,
+    String label,
+    String shortcut, {
+    bool enabled = true,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      enabled: enabled,
+      child: Row(
+        children: [
+          Expanded(child: Text(label)),
+          Text(
+            shortcut,
+            style: TextStyle(
+              color: BolonTheme.of(context).dimForeground,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showContextMenu(
     BuildContext context,
     TapDownDetails details,
@@ -184,9 +210,13 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
 
     if (!context.mounted) return;
 
+    final mod = Platform.isMacOS ? '⌘' : 'Ctrl+';
+    final shift = Platform.isMacOS ? '⇧' : 'Shift+';
+
     final value = await showMenu<String>(
       context: context,
       popUpAnimationStyle: AnimationStyle.noAnimation,
+      constraints: const BoxConstraints(minWidth: 260),
       position: RelativeRect.fromLTRB(
         details.globalPosition.dx,
         details.globalPosition.dy,
@@ -194,20 +224,14 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
         details.globalPosition.dy,
       ),
       items: [
-        const PopupMenuItem(value: 'copy', child: Text('Copy')),
-        PopupMenuItem(
-          value: 'paste',
-          enabled: hasClipboard,
-          child: const Text('Paste'),
-        ),
+        _menuItem('copy', 'Copy', '${mod}C'),
+        _menuItem('paste', 'Paste', '${mod}V', enabled: hasClipboard),
         const PopupMenuDivider(),
-        const PopupMenuItem(
-            value: 'split_right', child: Text('Split Right')),
-        const PopupMenuItem(
-            value: 'split_down', child: Text('Split Down')),
+        _menuItem('split_right', 'Split Right', '${mod}D'),
+        _menuItem('split_down', 'Split Down', '$mod${shift}D'),
         if (!widget.isSinglePane) ...[
           const PopupMenuDivider(),
-          const PopupMenuItem(value: 'close', child: Text('Close Pane')),
+          _menuItem('close', 'Close Pane', '$mod${shift}W'),
         ],
       ],
     );
