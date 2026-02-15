@@ -1,24 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/ai/api_key_storage.dart';
+import '../../core/ai/features/smart_history_search.dart';
+import '../../core/ai/gemini_provider.dart';
 import '../../core/theme/bolan_theme.dart';
 
 /// Inline history search popup triggered by Ctrl+R.
 ///
-/// Shows a search box with filtered history results. Selecting an entry
-/// populates the prompt input.
+/// Supports two modes:
+/// - Regular: simple string matching (instant)
+/// - Smart: AI-powered natural language search (when query looks like NL)
 class HistorySearch extends StatefulWidget {
   final List<String> Function(String query) onSearch;
+  final List<String> fullHistory;
   final ValueChanged<String> onSelect;
   final VoidCallback onDismiss;
   final double fontSize;
+  final String aiProvider;
+  final String geminiModel;
+  final String anthropicMode;
 
   const HistorySearch({
     super.key,
     required this.onSearch,
+    required this.fullHistory,
     required this.onSelect,
     required this.onDismiss,
     this.fontSize = 13,
+    this.aiProvider = 'gemini',
+    this.geminiModel = 'gemma-3-27b-it',
+    this.anthropicMode = 'claude-code',
   });
 
   @override
@@ -30,6 +42,8 @@ class _HistorySearchState extends State<HistorySearch> {
   late final FocusNode _focusNode;
   List<String> _results = [];
   int _selectedIndex = 0;
+  bool _aiSearching = false;
+  bool _isSmartMode = false;
 
   @override
   void initState() {
@@ -66,7 +80,6 @@ class _HistorySearchState extends State<HistorySearch> {
 
       case LogicalKeyboardKey.arrowUp:
       case LogicalKeyboardKey.keyR when ctrl:
-        // Ctrl+R again or Up arrow cycles through results
         if (_results.isNotEmpty) {
           setState(() {
             _selectedIndex = (_selectedIndex + 1) % _results.length;
@@ -89,10 +102,67 @@ class _HistorySearchState extends State<HistorySearch> {
   }
 
   void _onSearchChanged(String query) {
-    setState(() {
-      _results = widget.onSearch(query);
-      _selectedIndex = 0;
-    });
+    final isNL = SmartHistorySearch.isNaturalLanguage(query);
+
+    if (isNL && !_aiSearching) {
+      // Debounce AI search
+      setState(() => _isSmartMode = true);
+      _doSmartSearch(query);
+    } else if (!isNL) {
+      setState(() {
+        _isSmartMode = false;
+        _results = widget.onSearch(query);
+        _selectedIndex = 0;
+      });
+    }
+  }
+
+  Future<void> _doSmartSearch(String query) async {
+    setState(() => _aiSearching = true);
+
+    try {
+      final useClaudeCode = widget.aiProvider == 'anthropic' &&
+          widget.anthropicMode == 'claude-code';
+
+      GeminiProvider? geminiProvider;
+      if (!useClaudeCode) {
+        try {
+          final apiKey = await ApiKeyStorage.readKey(widget.aiProvider);
+          if (apiKey != null && apiKey.isNotEmpty) {
+            geminiProvider = GeminiProvider(
+                apiKey: apiKey, model: widget.geminiModel);
+          }
+        } on Exception {
+          // Keychain error
+        }
+      }
+
+      final searcher = SmartHistorySearch(
+        geminiProvider: geminiProvider,
+        useClaudeCode: useClaudeCode,
+      );
+
+      final results = await searcher.search(
+        query: query,
+        history: widget.fullHistory,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _results = results;
+        _selectedIndex = 0;
+      });
+    } on Exception {
+      // Fall back to regular search
+      if (mounted) {
+        setState(() {
+          _results = widget.onSearch(query);
+          _selectedIndex = 0;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _aiSearching = false);
+    }
   }
 
   @override
@@ -118,16 +188,36 @@ class _HistorySearchState extends State<HistorySearch> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                Text(
-                  'history: ',
-                  style: TextStyle(
-                    color: theme.statusShellFg,
-                    fontFamily: 'Operator Mono',
-                    fontSize: widget.fontSize,
-                    fontWeight: FontWeight.w600,
-                    decoration: TextDecoration.none,
+                // Mode indicator
+                if (_isSmartMode || _aiSearching)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _aiSearching
+                        ? SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: theme.ansiMagenta,
+                            ),
+                          )
+                        : Icon(Icons.auto_awesome,
+                            size: 14, color: theme.ansiMagenta),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      'history:',
+                      style: TextStyle(
+                        color: theme.statusShellFg,
+                        fontFamily: 'Operator Mono',
+                        fontSize: widget.fontSize,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
                   ),
-                ),
                 Expanded(
                   child: Material(
                     color: Colors.transparent,
@@ -144,7 +234,9 @@ class _HistorySearchState extends State<HistorySearch> {
                       cursorColor: theme.cursor,
                       cursorWidth: 2,
                       decoration: InputDecoration(
-                        hintText: 'search...',
+                        hintText: _isSmartMode
+                            ? 'Ask in plain English...'
+                            : 'search...',
                         hintStyle: TextStyle(
                           color: theme.dimForeground,
                           fontFamily: 'Operator Mono',
@@ -158,9 +250,11 @@ class _HistorySearchState extends State<HistorySearch> {
                   ),
                 ),
                 Text(
-                  'esc to close',
+                  _isSmartMode ? 'AI search' : 'esc to close',
                   style: TextStyle(
-                    color: theme.dimForeground,
+                    color: _isSmartMode
+                        ? theme.ansiMagenta
+                        : theme.dimForeground,
                     fontFamily: 'Operator Mono',
                     fontSize: widget.fontSize - 2,
                     decoration: TextDecoration.none,

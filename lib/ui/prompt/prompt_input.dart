@@ -185,8 +185,12 @@ class PromptInputState extends State<PromptInput> {
             HistorySearch(
               fontSize: widget.fontSize,
               onSearch: widget.session.history.search,
+              fullHistory: widget.session.history.entries,
               onSelect: _acceptHistorySearch,
               onDismiss: _dismissHistorySearch,
+              aiProvider: widget.aiProvider,
+              geminiModel: widget.geminiModel,
+              anthropicMode: widget.anthropicMode,
             ),
 
           // Completion popup
