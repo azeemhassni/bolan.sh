@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -153,8 +154,13 @@ class _PromptAreaState extends State<PromptArea> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.description_outlined,
-                                size: 14, color: theme.foreground),
+                            SvgPicture.asset(
+                              'assets/icons/ic_diff.svg',
+                              width: 14,
+                              height: 14,
+                              colorFilter: ColorFilter.mode(
+                                  theme.foreground, BlendMode.srcIn),
+                            ),
                             const SizedBox(width: 5),
                             Text(
                               '${widget.session.gitFilesChanged}',

@@ -4,7 +4,7 @@ KNOWN ISSUES & WORKAROUNDS — Bolan Terminal
 Last updated: 2026-04-02
 
 
-1. xterm.dart misinterprets private CSI sequences as SGR
+1. xterm.dart misinterprets private CSI sequences as SGR.
 ------------------------------------------------------------------------
 Problem:  Programs like Claude Code send \e[>4m (XTMODKEYS — key modifier
           options) and \e[<u (kitty keyboard protocol). xterm.dart v4.0.0
