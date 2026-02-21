@@ -3,10 +3,12 @@ import 'dart:ui';
 import 'bolan_theme.dart';
 
 /// The compiled-in default dark theme for Bolan.
-///
-/// Applied on first launch with no user config. Designed for comfortable
-/// long-session terminal use with high contrast readability.
 const bolonDefaultDark = BolonTheme(
+  name: 'default-dark',
+  displayName: 'Default Dark',
+  brightness: Brightness.dark,
+  isBuiltIn: true,
+
   // Window
   background: Color(0xFF0D0E12),
   tabBarBackground: Color(0xFF0A0B0F),
@@ -31,6 +33,11 @@ const bolonDefaultDark = BolonTheme(
   foreground: Color(0xFFDCE1F0),
   cursor: Color(0xFF78B4FF),
   selectionColor: Color(0x4050A0FF),
+
+  // Search highlights
+  searchHitBackground: Color(0xFF50A0FF),
+  searchHitBackgroundCurrent: Color(0xFF78B4FF),
+  searchHitForeground: Color(0xFF0D0E12),
 
   // ANSI 16 colors
   ansiBlack: Color(0xFF1E2028),

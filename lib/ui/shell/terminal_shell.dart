@@ -5,10 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/pane/pane_node.dart';
 import '../../core/theme/bolan_theme.dart';
-import '../../core/theme/default_dark.dart';
 import '../../providers/config_provider.dart';
 import '../../providers/font_size_provider.dart';
 import '../../providers/session_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../settings/settings_screen.dart';
 import 'pane_focus_registry.dart';
 import 'pane_tree_widget.dart';
@@ -54,6 +54,11 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
     if (config.editor.fontSize != currentFontSize) {
       ref.read(fontSizeProvider.notifier).setSize(config.editor.fontSize);
     }
+    // Sync active theme
+    final currentTheme = ref.read(activeThemeNameProvider);
+    if (config.activeTheme != currentTheme) {
+      ref.read(activeThemeNameProvider.notifier).state = config.activeTheme;
+    }
   }
 
   /// Global key handler: forwards printable key presses to the focused pane's
@@ -93,10 +98,11 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
   }
 
   void _openSettings() {
+    final currentTheme = ref.read(activeThemeProvider);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => BolonThemeProvider(
-          theme: bolonDefaultDark,
+          theme: currentTheme,
           child: SettingsScreen(configLoader: _configLoader),
         ),
       ),
@@ -106,9 +112,10 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
   @override
   Widget build(BuildContext context) {
     final sessionState = ref.watch(sessionProvider);
+    final theme = ref.watch(activeThemeProvider);
 
     return BolonThemeProvider(
-      theme: bolonDefaultDark,
+      theme: theme,
       child: CallbackShortcuts(
         bindings: {
           const SingleActivator(LogicalKeyboardKey.comma, meta: true):
@@ -163,7 +170,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
         child: Focus(
           autofocus: true,
           child: Container(
-            color: bolonDefaultDark.background,
+            color: theme.background,
             child: Column(
               children: [
                 BolonTabBar(onSettings: _openSettings),

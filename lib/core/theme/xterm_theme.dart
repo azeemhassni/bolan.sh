@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:xterm/xterm.dart';
 
 import 'bolan_theme.dart';
@@ -26,7 +24,7 @@ TerminalTheme bolonToXtermTheme(BolonTheme t) => TerminalTheme(
       brightMagenta: t.ansiBrightMagenta,
       brightCyan: t.ansiBrightCyan,
       brightWhite: t.ansiBrightWhite,
-      searchHitBackground: const Color(0xFF50A0FF),
-      searchHitBackgroundCurrent: const Color(0xFF78B4FF),
-      searchHitForeground: const Color(0xFF0D0E12),
+      searchHitBackground: t.searchHitBackground,
+      searchHitBackgroundCurrent: t.searchHitBackgroundCurrent,
+      searchHitForeground: t.searchHitForeground,
     );
