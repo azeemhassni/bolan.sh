@@ -7,6 +7,7 @@ import '../../core/ai/gemini_provider.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/theme/bolan_theme.dart';
+import '../../core/theme/theme_registry.dart';
 
 /// Settings screen with sidebar tab navigation.
 class SettingsScreen extends StatefulWidget {
@@ -22,8 +23,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late AppConfig _config;
   int _selectedTab = 0;
 
-  static const _tabs = ['General', 'Editor', 'AI'];
+  static const _tabs = ['Appearance', 'General', 'Editor', 'AI'];
   static const _tabIcons = [
+    Icons.palette_outlined,
     Icons.settings_outlined,
     Icons.edit_outlined,
     Icons.auto_awesome_outlined,
@@ -140,11 +142,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   List<Widget> _buildTabContent(BolonTheme theme) {
     return switch (_selectedTab) {
-      0 => _buildGeneralTab(theme),
-      1 => _buildEditorTab(theme),
-      2 => _buildAiTab(theme),
+      0 => _buildAppearanceTab(theme),
+      1 => _buildGeneralTab(theme),
+      2 => _buildEditorTab(theme),
+      3 => _buildAiTab(theme),
       _ => [],
     };
+  }
+
+  // ---- Appearance Tab ----
+
+  List<Widget> _buildAppearanceTab(BolonTheme theme) {
+    final registry = ThemeRegistry();
+    final themes = registry.allThemes;
+
+    return [
+      Text(
+        'Theme',
+        style: TextStyle(
+          color: theme.foreground,
+          fontFamily: 'Operator Mono',
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          decoration: TextDecoration.none,
+        ),
+      ),
+      const SizedBox(height: 12),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final t in themes)
+            _ThemeCard(
+              theme: t,
+              isActive: _config.activeTheme == t.name,
+              currentTheme: theme,
+              onTap: () {
+                setState(() {
+                  _config = AppConfig(
+                    general: _config.general,
+                    editor: _config.editor,
+                    ai: _config.ai,
+                    activeTheme: t.name,
+                  );
+                });
+                widget.configLoader.save(_config);
+              },
+            ),
+        ],
+      ),
+    ];
   }
 
   // ---- General Tab ----
@@ -1156,5 +1203,99 @@ class _TestConnectionButtonState extends State<_TestConnectionButton> {
     } finally {
       if (mounted) setState(() => _testing = false);
     }
+  }
+}
+
+class _ThemeCard extends StatelessWidget {
+  final BolonTheme theme;
+  final bool isActive;
+  final BolonTheme currentTheme;
+  final VoidCallback onTap;
+
+  const _ThemeCard({
+    required this.theme,
+    required this.isActive,
+    required this.currentTheme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          width: 120,
+          height: 80,
+          decoration: BoxDecoration(
+            color: theme.background,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isActive
+                  ? currentTheme.cursor
+                  : currentTheme.blockBorder,
+              width: isActive ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              // Mini preview
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _previewLine('ls -la', theme.ansiGreen, theme),
+                      _previewLine('git status', theme.ansiBlue, theme),
+                      _previewLine('npm install', theme.ansiYellow, theme),
+                    ],
+                  ),
+                ),
+              ),
+              // Name
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.tabBarBackground,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(7),
+                    bottomRight: Radius.circular(7),
+                  ),
+                ),
+                child: Text(
+                  theme.displayName,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: theme.foreground,
+                    fontFamily: 'Operator Mono',
+                    fontSize: 10,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _previewLine(String text, Color color, BolonTheme t) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: color,
+        fontFamily: 'Operator Mono',
+        fontSize: 8,
+        height: 1.3,
+        decoration: TextDecoration.none,
+      ),
+    );
   }
 }

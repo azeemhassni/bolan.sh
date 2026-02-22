@@ -2,6 +2,15 @@ import 'package:flutter/foundation.dart';
 
 import 'bolan_theme.dart';
 import 'default_dark.dart';
+import 'themes/default_light.dart';
+import 'themes/dracula.dart';
+import 'themes/gruvbox_dark.dart';
+import 'themes/monokai.dart';
+import 'themes/nord.dart';
+import 'themes/one_dark.dart';
+import 'themes/solarized_dark.dart';
+import 'themes/solarized_light.dart';
+import 'themes/tokyo_night.dart';
 
 /// Registry of all available themes (built-in + custom).
 ///
@@ -10,8 +19,16 @@ class ThemeRegistry extends ChangeNotifier {
   final Map<String, BolonTheme> _themes = {};
 
   ThemeRegistry() {
-    // Register built-in themes
     _register(bolonDefaultDark);
+    _register(bolonDefaultLight);
+    _register(draculaTheme);
+    _register(oneDarkTheme);
+    _register(nordTheme);
+    _register(monokaiTheme);
+    _register(solarizedDarkTheme);
+    _register(solarizedLightTheme);
+    _register(gruvboxDarkTheme);
+    _register(tokyoNightTheme);
   }
 
   /// All available themes sorted: built-ins first, then custom alphabetically.
