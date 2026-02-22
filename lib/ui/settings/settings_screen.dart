@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -152,9 +154,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ---- Appearance Tab ----
 
+  late final ThemeRegistry _registry = ThemeRegistry()
+    ..loadCustomThemes();
+
   List<Widget> _buildAppearanceTab(BolonTheme theme) {
-    final registry = ThemeRegistry();
-    final themes = registry.allThemes;
+    final themes = _registry.allThemes;
+    final activeTheme = _registry.getTheme(_config.activeTheme);
 
     return [
       Text(
@@ -191,7 +196,117 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
         ],
       ),
+      const SizedBox(height: 20),
+
+      // Theme actions
+      Row(
+        children: [
+          _ActionButton(
+            label: 'Duplicate',
+            color: theme.cursor,
+            theme: theme,
+            onTap: () => _duplicateTheme(activeTheme),
+          ),
+          const SizedBox(width: 12),
+          _ActionButton(
+            label: 'Export',
+            color: theme.cursor,
+            theme: theme,
+            onTap: () => _exportTheme(activeTheme),
+          ),
+          const SizedBox(width: 12),
+          _ActionButton(
+            label: 'Import',
+            color: theme.cursor,
+            theme: theme,
+            onTap: _importTheme,
+          ),
+          if (!activeTheme.isBuiltIn) ...[
+            const SizedBox(width: 12),
+            _ActionButton(
+              label: 'Delete',
+              color: theme.exitFailureFg,
+              theme: theme,
+              onTap: () => _deleteTheme(activeTheme),
+            ),
+          ],
+        ],
+      ),
     ];
+  }
+
+  Future<void> _duplicateTheme(BolonTheme source) async {
+    final newName = '${source.name}-copy';
+    final displayName = '${source.displayName} Copy';
+    final copy = await _registry.duplicateTheme(source, newName, displayName);
+    if (!mounted) return;
+    setState(() {
+      _config = AppConfig(
+        general: _config.general,
+        editor: _config.editor,
+        ai: _config.ai,
+        activeTheme: copy.name,
+      );
+    });
+    await widget.configLoader.save(_config);
+  }
+
+  Future<void> _exportTheme(BolonTheme theme) async {
+    final home = Platform.environment['HOME'] ?? '';
+    final path = '$home/Desktop/${theme.name}.toml';
+    await _registry.exportTheme(theme, path);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Exported to $path')),
+      );
+    }
+  }
+
+  Future<void> _importTheme() async {
+    // Simple import from ~/Desktop for now
+    // A proper file picker would be added later
+    final home = Platform.environment['HOME'] ?? '';
+    final dir = Directory('$home/Desktop');
+    final files = await dir
+        .list()
+        .where((e) => e.path.endsWith('.toml'))
+        .toList();
+
+    if (files.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No .toml files found on Desktop')),
+        );
+      }
+      return;
+    }
+
+    final theme = await _registry.importTheme(files.first.path);
+    if (theme != null && mounted) {
+      setState(() {
+        _config = AppConfig(
+          general: _config.general,
+          editor: _config.editor,
+          ai: _config.ai,
+          activeTheme: theme.name,
+        );
+      });
+      await widget.configLoader.save(_config);
+    }
+  }
+
+  Future<void> _deleteTheme(BolonTheme theme) async {
+    await _registry.removeCustomTheme(theme.name);
+    if (!mounted) return;
+    setState(() {
+      _config = AppConfig(
+        general: _config.general,
+        editor: _config.editor,
+        ai: _config.ai,
+        activeTheme: 'default-dark',
+      );
+    });
+    await widget.configLoader.save(_config);
   }
 
   // ---- General Tab ----

@@ -5,7 +5,11 @@ import '../core/theme/theme_registry.dart';
 
 /// The global theme registry — holds all built-in and custom themes.
 final themeRegistryProvider = Provider<ThemeRegistry>((ref) {
-  return ThemeRegistry();
+  final registry = ThemeRegistry();
+  registry.loadCustomThemes();
+  registry.startWatching();
+  ref.onDispose(registry.dispose);
+  return registry;
 });
 
 /// The currently active theme name — synced with config.
