@@ -8,6 +8,7 @@ import 'themes/gruvbox_dark.dart';
 import 'themes/monokai.dart';
 import 'themes/nord.dart';
 import 'themes/one_dark.dart';
+import 'themes/raskoh.dart';
 import 'themes/solarized_dark.dart';
 import 'themes/solarized_light.dart';
 import 'themes/tokyo_night.dart';
@@ -29,6 +30,7 @@ class ThemeRegistry extends ChangeNotifier {
     _register(solarizedLightTheme);
     _register(gruvboxDarkTheme);
     _register(tokyoNightTheme);
+    _register(raskohTheme);
   }
 
   /// All available themes sorted: built-ins first, then custom alphabetically.
