@@ -41,6 +41,9 @@ dependencies:
   # SVG rendering
   flutter_svg: ^2.0.0
 
+  # File picker
+  file_selector: ^1.0.0
+
   # Utilities
   uuid: ^4.5.0
   intl: ^0.20.0

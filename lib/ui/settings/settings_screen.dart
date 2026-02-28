@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -252,36 +251,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _exportTheme(BolonTheme theme) async {
-    final home = Platform.environment['HOME'] ?? '';
-    final path = '$home/Desktop/${theme.name}.toml';
-    await _registry.exportTheme(theme, path);
+    final location = await getSaveLocation(
+      suggestedName: '${theme.name}.toml',
+      acceptedTypeGroups: [
+        const XTypeGroup(label: 'TOML', extensions: ['toml']),
+      ],
+    );
+    if (location == null) return;
+    await _registry.exportTheme(theme, location.path);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Exported to $path')),
+        SnackBar(content: Text('Exported to ${location.path}')),
       );
     }
   }
 
   Future<void> _importTheme() async {
-    // Simple import from ~/Desktop for now
-    // A proper file picker would be added later
-    final home = Platform.environment['HOME'] ?? '';
-    final dir = Directory('$home/Desktop');
-    final files = await dir
-        .list()
-        .where((e) => e.path.endsWith('.toml'))
-        .toList();
+    final file = await openFile(
+      acceptedTypeGroups: [
+        const XTypeGroup(label: 'TOML', extensions: ['toml']),
+      ],
+    );
+    if (file == null) return;
 
-    if (files.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No .toml files found on Desktop')),
-        );
-      }
-      return;
-    }
-
-    final theme = await _registry.importTheme(files.first.path);
+    final theme = await _registry.importTheme(file.path);
     if (theme != null && mounted) {
       setState(() {
         _config = AppConfig(
