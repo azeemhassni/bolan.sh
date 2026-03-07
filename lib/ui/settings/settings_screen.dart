@@ -9,6 +9,7 @@ import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/theme_registry.dart';
+import 'theme_editor.dart';
 
 /// Settings screen with sidebar tab navigation.
 class SettingsScreen extends StatefulWidget {
@@ -230,6 +231,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ],
+      ),
+      const SizedBox(height: 24),
+
+      // Color editor
+      ThemeEditor(
+        theme: activeTheme,
+        editable: !activeTheme.isBuiltIn,
+        onChanged: (updated) async {
+          await _registry.saveCustomTheme(updated);
+          setState(() {});
+        },
       ),
     ];
   }
