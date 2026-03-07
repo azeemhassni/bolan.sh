@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/config_loader.dart';
@@ -114,6 +117,14 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
     final sessionState = ref.watch(sessionProvider);
     final theme = ref.watch(activeThemeProvider);
 
+    // Update macOS window chrome to match theme brightness
+    if (Platform.isMacOS) {
+      Window.setEffect(
+        effect: WindowEffect.sidebar,
+        dark: theme.brightness == Brightness.dark,
+      );
+    }
+
     return BolonThemeProvider(
       theme: theme,
       child: CallbackShortcuts(
@@ -169,7 +180,8 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
         },
         child: Focus(
           autofocus: true,
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
             color: theme.background,
             child: Column(
               children: [

@@ -224,6 +224,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (!activeTheme.isBuiltIn) ...[
             const SizedBox(width: 12),
             _ActionButton(
+              label: 'Rename',
+              color: theme.cursor,
+              theme: theme,
+              onTap: () => _renameTheme(activeTheme),
+            ),
+            const SizedBox(width: 12),
+            _ActionButton(
               label: 'Delete',
               color: theme.exitFailureFg,
               theme: theme,
@@ -298,6 +305,99 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
       await widget.configLoader.save(_config);
     }
+  }
+
+  Future<void> _renameTheme(BolonTheme theme) async {
+    final controller = TextEditingController(text: theme.displayName);
+    final t = BolonTheme.of(context);
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: t.blockBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        child: Container(
+          width: 300,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Rename Theme',
+                style: TextStyle(
+                  color: t.foreground,
+                  fontFamily: 'Operator Mono',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Material(
+                color: t.statusChipBg,
+                borderRadius: BorderRadius.circular(6),
+                child: TextField(
+                  controller: controller,
+                  autofocus: true,
+                  style: TextStyle(
+                    color: t.foreground,
+                    fontFamily: 'Operator Mono',
+                    fontSize: 13,
+                  ),
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: t.blockBorder),
+                    ),
+                    isDense: true,
+                  ),
+                  onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text('Cancel',
+                        style: TextStyle(color: t.dimForeground)),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.of(ctx).pop(controller.text.trim()),
+                    child: Text('Rename',
+                        style: TextStyle(color: t.cursor)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    controller.dispose();
+    if (newName == null || newName.isEmpty || newName == theme.displayName) {
+      return;
+    }
+
+    final slug = newName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    await _registry.removeCustomTheme(theme.name);
+    final renamed = theme.copyWith(name: slug, displayName: newName);
+    await _registry.saveCustomTheme(renamed);
+    if (!mounted) return;
+    setState(() {
+      _config = AppConfig(
+        general: _config.general,
+        editor: _config.editor,
+        ai: _config.ai,
+        activeTheme: slug,
+      );
+    });
+    await widget.configLoader.save(_config);
   }
 
   Future<void> _deleteTheme(BolonTheme theme) async {
@@ -1367,9 +1467,10 @@ class _ThemeCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _previewLine('ls -la', theme.ansiGreen, theme),
-                      _previewLine('git status', theme.ansiBlue, theme),
-                      _previewLine('npm install', theme.ansiYellow, theme),
+                      _previewLine('\$ ', theme.dimForeground, 'ls -la', theme.ansiGreen),
+                      _previewLine('  ', theme.foreground, 'src/ lib/', theme.foreground),
+                      _previewLine('\$ ', theme.dimForeground, 'git push', theme.ansiBlue),
+                      _previewLine('  ', theme.exitSuccessFg, '✓ done', theme.exitSuccessFg),
                     ],
                   ),
                 ),
@@ -1406,15 +1507,19 @@ class _ThemeCard extends StatelessWidget {
     );
   }
 
-  Widget _previewLine(String text, Color color, BolonTheme t) {
-    return Text(
-      text,
-      style: TextStyle(
-        color: color,
-        fontFamily: 'Operator Mono',
-        fontSize: 8,
-        height: 1.3,
-        decoration: TextDecoration.none,
+  Widget _previewLine(String prefix, Color prefixColor, String text, Color textColor) {
+    return RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: prefix,
+            style: TextStyle(color: prefixColor, fontFamily: 'Operator Mono', fontSize: 7, height: 1.4),
+          ),
+          TextSpan(
+            text: text,
+            style: TextStyle(color: textColor, fontFamily: 'Operator Mono', fontSize: 7, height: 1.4),
+          ),
+        ],
       ),
     );
   }
