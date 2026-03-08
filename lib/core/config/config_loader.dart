@@ -103,6 +103,7 @@ class ConfigLoader extends ChangeNotifier {
       sb.writeln('working_directory = "${c.general.workingDirectory}"');
     }
     sb.writeln('restore_sessions = ${c.general.restoreSessions}');
+    sb.writeln('prompt_chips = [${c.general.promptChips.map((e) => '"$e"').join(', ')}]');
     sb.writeln();
 
     sb.writeln('[editor]');

@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
 
+import '../../core/config/prompt_config.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../shared/status_chip.dart';
@@ -21,6 +25,7 @@ class PromptArea extends StatefulWidget {
   final bool commandSuggestions;
   final bool smartHistorySearch;
   final bool shareHistory;
+  final List<String> promptChips;
   final GlobalKey<PromptInputState>? promptInputKey;
 
   const PromptArea({
@@ -33,6 +38,7 @@ class PromptArea extends StatefulWidget {
     this.commandSuggestions = true,
     this.smartHistorySearch = true,
     this.shareHistory = false,
+    this.promptChips = const ['shell', 'cwd', 'gitBranch', 'gitChanges'],
     this.promptInputKey,
   });
 
@@ -76,6 +82,141 @@ class _PromptAreaState extends State<PromptArea> {
     }
   }
 
+  List<Widget> _buildChip(String chipId, BolonTheme theme) {
+    final type = PromptChipMeta.fromId(chipId);
+    if (type == null) return [];
+
+    switch (type) {
+      case PromptChipType.shell:
+        return [
+          StatusChip(
+            text: widget.session.shellName,
+            fg: theme.statusShellFg,
+            bg: theme.statusChipBg,
+            svgIcon: 'assets/icons/ic_terminal.svg',
+          ),
+        ];
+
+      case PromptChipType.cwd:
+        if (widget.session.abbreviatedCwd.isEmpty) return [];
+        return [
+          StatusChip(
+            text: widget.session.abbreviatedCwd,
+            fg: theme.statusCwdFg,
+            bg: theme.statusChipBg,
+            svgIcon: 'assets/icons/ic_folder_code.svg',
+          ),
+        ];
+
+      case PromptChipType.gitBranch:
+        if (widget.session.gitBranch.isEmpty) return [];
+        return [
+          StatusChip(
+            text: '${widget.session.gitBranch}${widget.session.gitDirty ? " !" : ""}',
+            fg: theme.statusGitFg,
+            bg: theme.statusChipBg,
+            svgIcon: 'assets/icons/ic_git.svg',
+          ),
+        ];
+
+      case PromptChipType.gitChanges:
+        if (!widget.session.hasGitStats) return [];
+        return [
+          GestureDetector(
+            onTap: () => setState(() => _showDiffPanel = !_showDiffPanel),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.statusChipBg,
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(
+                    color: _showDiffPanel
+                        ? theme.cursor.withAlpha(80)
+                        : theme.foreground.withAlpha(40),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SvgPicture.asset(
+                      'assets/icons/ic_diff.svg',
+                      width: 14, height: 14,
+                      colorFilter: ColorFilter.mode(theme.foreground, BlendMode.srcIn),
+                    ),
+                    const SizedBox(width: 5),
+                    Text('${widget.session.gitFilesChanged}',
+                      style: TextStyle(color: theme.foreground, fontFamily: 'Operator Mono',
+                        fontSize: 13, fontWeight: FontWeight.w500, decoration: TextDecoration.none)),
+                    const SizedBox(width: 6),
+                    Text('+${widget.session.gitInsertions}',
+                      style: TextStyle(color: theme.exitSuccessFg, fontFamily: 'Operator Mono',
+                        fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
+                    const SizedBox(width: 4),
+                    Text('-${widget.session.gitDeletions}',
+                      style: TextStyle(color: theme.exitFailureFg, fontFamily: 'Operator Mono',
+                        fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ];
+
+      case PromptChipType.username:
+        return [
+          StatusChip(
+            text: Platform.environment['USER'] ?? 'user',
+            fg: theme.ansiYellow,
+            bg: theme.statusChipBg,
+            icon: Icons.person_outline,
+          ),
+        ];
+
+      case PromptChipType.hostname:
+        return [
+          StatusChip(
+            text: Platform.localHostname,
+            fg: theme.ansiCyan,
+            bg: theme.statusChipBg,
+            icon: Icons.computer,
+          ),
+        ];
+
+      case PromptChipType.time12h:
+        return [
+          StatusChip(
+            text: DateFormat('hh:mm a').format(DateTime.now()),
+            fg: theme.ansiRed,
+            bg: theme.statusChipBg,
+            icon: Icons.schedule,
+          ),
+        ];
+
+      case PromptChipType.time24h:
+        return [
+          StatusChip(
+            text: DateFormat('HH:mm').format(DateTime.now()),
+            fg: theme.ansiRed,
+            bg: theme.statusChipBg,
+            icon: Icons.schedule,
+          ),
+        ];
+
+      case PromptChipType.date:
+        return [
+          StatusChip(
+            text: DateFormat('MMM d, y').format(DateTime.now()),
+            fg: theme.ansiGreen,
+            bg: theme.statusChipBg,
+            icon: Icons.calendar_today,
+          ),
+        ];
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
@@ -93,112 +234,17 @@ class _PromptAreaState extends State<PromptArea> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status chips row
+          // Status chips row — built dynamically from config
           Padding(
             padding: const EdgeInsets.only(
               left: 12, right: 12, top: 10, bottom: 12,
             ),
-            child: Row(
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
               children: [
-                // Shell chip with terminal icon
-                StatusChip(
-                  text: widget.session.shellName,
-                  fg: theme.statusShellFg,
-                  bg: theme.statusChipBg,
-                  svgIcon: 'assets/icons/ic_terminal.svg',
-                ),
-                const SizedBox(width: 6),
-
-                // CWD chip with folder icon
-                if (widget.session.abbreviatedCwd.isNotEmpty) ...[
-                  StatusChip(
-                    text: widget.session.abbreviatedCwd,
-                    fg: theme.statusCwdFg,
-                    bg: theme.statusChipBg,
-                    svgIcon: 'assets/icons/ic_folder_code.svg',
-                  ),
-                  const SizedBox(width: 6),
-                ],
-
-                // Git branch chip
-                if (widget.session.gitBranch.isNotEmpty) ...[
-                  StatusChip(
-                    text: '${widget.session.gitBranch}${widget.session.gitDirty ? " !" : ""}',
-                    fg: theme.statusGitFg,
-                    bg: theme.statusChipBg,
-                    svgIcon: 'assets/icons/ic_git.svg',
-                  ),
-                  const SizedBox(width: 6),
-                ],
-
-                // Git changes chip — clickable to show diff
-                if (widget.session.hasGitStats)
-                  GestureDetector(
-                    onTap: () =>
-                        setState(() => _showDiffPanel = !_showDiffPanel),
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: theme.statusChipBg,
-                          borderRadius: BorderRadius.circular(5),
-                          border: Border.all(
-                            color: _showDiffPanel
-                                ? theme.cursor.withAlpha(80)
-                                : theme.foreground.withAlpha(40),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SvgPicture.asset(
-                              'assets/icons/ic_diff.svg',
-                              width: 14,
-                              height: 14,
-                              colorFilter: ColorFilter.mode(
-                                  theme.foreground, BlendMode.srcIn),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              '${widget.session.gitFilesChanged}',
-                              style: TextStyle(
-                                color: theme.foreground,
-                                fontFamily: 'Operator Mono',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                decoration: TextDecoration.none,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '+${widget.session.gitInsertions}',
-                              style: TextStyle(
-                                color: theme.exitSuccessFg,
-                                fontFamily: 'Operator Mono',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                decoration: TextDecoration.none,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '-${widget.session.gitDeletions}',
-                              style: TextStyle(
-                                color: theme.exitFailureFg,
-                                fontFamily: 'Operator Mono',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                decoration: TextDecoration.none,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                for (final chipId in widget.promptChips)
+                  ..._buildChip(chipId, theme),
               ],
             ),
           ),

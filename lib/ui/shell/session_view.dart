@@ -211,6 +211,8 @@ class _SessionViewState extends ConsumerState<SessionView> {
                   commandSuggestions: configLoader?.config.ai.commandSuggestions ?? true,
                   smartHistorySearch: configLoader?.config.ai.smartHistorySearch ?? true,
                   shareHistory: configLoader?.config.ai.shareHistory ?? false,
+                  promptChips: configLoader?.config.general.promptChips ??
+                      const ['shell', 'cwd', 'gitBranch', 'gitChanges'],
                   promptInputKey: _promptKey,
                 ),
               ],

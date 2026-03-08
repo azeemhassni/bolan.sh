@@ -1,3 +1,7 @@
+import 'package:flutter/material.dart';
+
+import '../theme/bolan_theme.dart';
+
 /// Available chip types for the prompt bar.
 enum PromptChipType {
   shell,
@@ -38,6 +42,38 @@ extension PromptChipMeta on PromptChipType {
       };
 
   String get id => name;
+
+  /// SVG icon asset path for this chip type, if available.
+  String? get svgIcon => switch (this) {
+        PromptChipType.shell => 'assets/icons/ic_terminal.svg',
+        PromptChipType.cwd => 'assets/icons/ic_folder_code.svg',
+        PromptChipType.gitBranch => 'assets/icons/ic_git.svg',
+        PromptChipType.gitChanges => 'assets/icons/ic_diff.svg',
+        _ => null,
+      };
+
+  /// Returns the themed foreground color for this chip.
+  Color fg(BolonTheme theme) => switch (this) {
+        PromptChipType.shell => theme.statusShellFg,
+        PromptChipType.cwd => theme.statusCwdFg,
+        PromptChipType.gitBranch => theme.statusGitFg,
+        PromptChipType.gitChanges => theme.foreground,
+        PromptChipType.username => theme.ansiYellow,
+        PromptChipType.hostname => theme.ansiCyan,
+        PromptChipType.time12h => theme.ansiRed,
+        PromptChipType.time24h => theme.ansiRed,
+        PromptChipType.date => theme.ansiGreen,
+      };
+
+  /// Material icon fallback for chip types without SVG.
+  IconData? get materialIcon => switch (this) {
+        PromptChipType.username => Icons.person_outline,
+        PromptChipType.hostname => Icons.computer,
+        PromptChipType.time12h => Icons.schedule,
+        PromptChipType.time24h => Icons.schedule,
+        PromptChipType.date => Icons.calendar_today,
+        _ => null,
+      };
 
   static PromptChipType? fromId(String id) {
     for (final type in PromptChipType.values) {

@@ -20,6 +20,8 @@ class ConfigValidator {
       shell: _string(raw['shell'], ''),
       workingDirectory: _string(raw['working_directory'], ''),
       restoreSessions: _bool(raw['restore_sessions'], false),
+      promptChips: _stringList(raw['prompt_chips'],
+          const ['shell', 'cwd', 'gitBranch', 'gitChanges']),
     );
   }
 
@@ -72,6 +74,13 @@ class ConfigValidator {
     if (min != null && v < min) v = min;
     if (max != null && v > max) v = max;
     return v;
+  }
+
+  List<String> _stringList(Object? value, List<String> fallback) {
+    if (value is List) {
+      return value.whereType<String>().toList();
+    }
+    return fallback;
   }
 
   bool _bool(Object? value, bool fallback) {
