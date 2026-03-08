@@ -20,11 +20,13 @@ class GeneralConfig {
   final String shell;
   final String workingDirectory;
   final bool restoreSessions;
+  final List<String> promptChips;
 
   const GeneralConfig({
     this.shell = '',
     this.workingDirectory = '',
     this.restoreSessions = false,
+    this.promptChips = const ['shell', 'cwd', 'gitBranch', 'gitChanges'],
   });
 }
 

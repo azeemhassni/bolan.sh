@@ -9,6 +9,7 @@ import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/theme_registry.dart';
+import 'prompt_editor.dart';
 import 'theme_editor.dart';
 
 /// Settings screen with sidebar tab navigation.
@@ -25,14 +26,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late AppConfig _config;
   int _selectedTab = 0;
 
-  static const _tabs = ['Appearance', 'General', 'Editor', 'AI'];
+  static const _tabs = ['Appearance', 'Prompt', 'General', 'Editor', 'AI'];
   static const _tabIcons = [
     Icons.palette_outlined,
+    Icons.terminal_outlined,
     Icons.settings_outlined,
     Icons.edit_outlined,
     Icons.auto_awesome_outlined,
   ];
-  static const _maxContentWidth = 560.0;
+  static const _maxContentWidth = 860.0;
 
   @override
   void initState() {
@@ -145,9 +147,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<Widget> _buildTabContent(BolonTheme theme) {
     return switch (_selectedTab) {
       0 => _buildAppearanceTab(theme),
-      1 => _buildGeneralTab(theme),
-      2 => _buildEditorTab(theme),
-      3 => _buildAiTab(theme),
+      1 => _buildPromptTab(theme),
+      2 => _buildGeneralTab(theme),
+      3 => _buildEditorTab(theme),
+      4 => _buildAiTab(theme),
       _ => [],
     };
   }
@@ -412,6 +415,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     });
     await widget.configLoader.save(_config);
+  }
+
+  // ---- Prompt Tab ----
+
+  List<Widget> _buildPromptTab(BolonTheme theme) {
+    return [
+      PromptEditor(
+        activeChipIds: _config.general.promptChips,
+        onChanged: (chips) {
+          setState(() {
+            _config = AppConfig(
+              general: GeneralConfig(
+                shell: _config.general.shell,
+                workingDirectory: _config.general.workingDirectory,
+                restoreSessions: _config.general.restoreSessions,
+                promptChips: chips,
+              ),
+              editor: _config.editor,
+              ai: _config.ai,
+              activeTheme: _config.activeTheme,
+            );
+          });
+          widget.configLoader.save(_config);
+        },
+      ),
+    ];
   }
 
   // ---- General Tab ----
@@ -1447,7 +1476,8 @@ class _ThemeCard extends StatelessWidget {
         cursor: SystemMouseCursors.click,
         child: Container(
           width: 120,
-          height: 80,
+          height: 90,
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: theme.background,
             borderRadius: BorderRadius.circular(8),
