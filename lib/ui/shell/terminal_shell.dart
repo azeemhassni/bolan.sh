@@ -127,7 +127,9 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
 
     return BolonThemeProvider(
       theme: theme,
-      child: CallbackShortcuts(
+      child: Focus(
+        autofocus: true,
+        child: CallbackShortcuts(
         bindings: {
           const SingleActivator(LogicalKeyboardKey.comma, meta: true):
               _openSettings,
@@ -178,9 +180,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
                   .read(sessionProvider.notifier)
                   .navigatePane(AxisDirection.down),
         },
-        child: Focus(
-          autofocus: true,
-          child: AnimatedContainer(
+        child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             color: theme.background,
             child: Column(
