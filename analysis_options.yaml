@@ -15,7 +15,6 @@ linter:
   rules:
     # Errors
     - avoid_dynamic_calls
-    - avoid_returning_null_for_future
     - cancel_subscriptions
     - close_sinks
     - literal_only_boolean_expressions
