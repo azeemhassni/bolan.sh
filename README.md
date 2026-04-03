@@ -1,4 +1,6 @@
-# Bolan
+<p align="center">
+  <img src="assets/banner.png" alt="Bolan — Terminal that you own!" width="100%" />
+</p>
 
 Open-source, AI-powered terminal emulator for macOS and Linux. Built with Flutter — no Electron, no web tech.
 
