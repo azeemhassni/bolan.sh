@@ -61,6 +61,8 @@ class PromptInputState extends State<PromptInput> {
   int _completionIndex = 0;
   CompletionResult? _activeResult;
   bool _completionLoading = false;
+  final _completionLayerLink = LayerLink();
+  OverlayEntry? _completionOverlay;
 
   // History search state
   bool _showHistorySearch = false;
@@ -122,12 +124,88 @@ class PromptInputState extends State<PromptInput> {
 
   @override
   void dispose() {
+    _removeCompletionOverlay();
     widget.session.removeListener(_onSessionChanged);
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _focusNode.dispose();
     aiModeNotifier.dispose();
     super.dispose();
+  }
+
+  void _updateCompletionOverlay() {
+    if (_completions.length > 1) {
+      if (_completionOverlay != null) {
+        _completionOverlay!.markNeedsBuild();
+      } else {
+        _completionOverlay = OverlayEntry(
+          builder: (_) => _buildCompletionOverlay(),
+        );
+        Overlay.of(context).insert(_completionOverlay!);
+      }
+    } else {
+      _removeCompletionOverlay();
+    }
+  }
+
+  void _removeCompletionOverlay() {
+    _completionOverlay?.remove();
+    _completionOverlay = null;
+  }
+
+  Widget _buildCompletionOverlay() {
+    final theme = BolonTheme.of(context);
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return const SizedBox.shrink();
+
+    final position = box.localToGlobal(Offset.zero);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final spaceBelow = screenHeight - position.dy - box.size.height;
+    final itemHeight = widget.fontSize * 1.8;
+    final popupHeight = _completions.length.clamp(1, 8) * itemHeight + 8;
+
+    // Show below if there's room, otherwise above
+    final showBelow = spaceBelow >= popupHeight;
+
+    // Calculate cursor x position
+    final cursorOffset = _controller.selection.baseOffset;
+    final textBeforeCursor = _controller.text.substring(0, cursorOffset);
+    final tp = TextPainter(
+      text: TextSpan(
+        text: textBeforeCursor,
+        style: TextStyle(
+          fontFamily: 'Operator Mono',
+          fontSize: widget.fontSize,
+          height: 1.4,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final cursorX = tp.width;
+
+    return CompositedTransformFollower(
+      link: _completionLayerLink,
+      showWhenUnlinked: false,
+      targetAnchor: showBelow ? Alignment.bottomLeft : Alignment.topLeft,
+      followerAnchor: showBelow ? Alignment.topLeft : Alignment.bottomLeft,
+      offset: Offset(cursorX, showBelow ? 4 : -4),
+      child: Align(
+        alignment: showBelow ? Alignment.topLeft : Alignment.bottomLeft,
+        child: BolonThemeProvider(
+          theme: theme,
+          child: Material(
+            color: Colors.transparent,
+            child: CompletionPopup(
+              items: _completions,
+              selectedIndex: _completionIndex,
+              prefix: _activeResult?.prefix ?? '',
+              fontSize: widget.fontSize,
+              onSelect: _acceptCompletion,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _onSessionChanged() {
@@ -154,6 +232,7 @@ class PromptInputState extends State<PromptInput> {
         _completionIndex = 0;
         _isAiMode = aiMode;
       });
+      _removeCompletionOverlay();
     } else {
       setState(() {
         _isAiMode = aiMode;
@@ -197,99 +276,89 @@ class PromptInputState extends State<PromptInput> {
               anthropicMode: widget.anthropicMode,
             ),
 
-          // Completion popup
-          if (_completions.length > 1)
-            Padding(
-              padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
-              child: CompletionPopup(
-                items: _completions,
-                selectedIndex: _completionIndex,
-                prefix: _activeResult?.prefix ?? '',
-                fontSize: widget.fontSize,
-                onSelect: _acceptCompletion,
-              ),
-            ),
-
-          // Input with ghost text overlay
-          Padding(
-            padding: const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      // Ghost text
-                      if (ghost.isNotEmpty)
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: _GhostTextOverlay(
-                              controller: _controller,
-                              ghostText: ghost,
-                              style: TextStyle(
-                                color: theme.dimForeground,
-                                fontFamily: 'Operator Mono',
-                                fontSize: widget.fontSize,
-                                height: 1.4,
-                                decoration: TextDecoration.none,
-                              ),
-                              realStyle: TextStyle(
-                                color: Colors.transparent,
-                                fontFamily: 'Operator Mono',
-                                fontSize: widget.fontSize,
-                                height: 1.4,
-                                decoration: TextDecoration.none,
+          // Input with ghost text overlay + completion popup
+          CompositedTransformTarget(
+            link: _completionLayerLink,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        // Ghost text
+                        if (ghost.isNotEmpty)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: _GhostTextOverlay(
+                                controller: _controller,
+                                ghostText: ghost,
+                                style: TextStyle(
+                                  color: theme.dimForeground,
+                                  fontFamily: 'Operator Mono',
+                                  fontSize: widget.fontSize,
+                                  height: 1.4,
+                                  decoration: TextDecoration.none,
+                                ),
+                                realStyle: TextStyle(
+                                  color: Colors.transparent,
+                                  fontFamily: 'Operator Mono',
+                                  fontSize: widget.fontSize,
+                                  height: 1.4,
+                                  decoration: TextDecoration.none,
+                                ),
                               ),
                             ),
                           ),
-                        ),
 
-                      // Real input
-                      TextField(
-                        controller: _controller,
-                        focusNode: _focusNode,
-                        autofocus: true,
-                        maxLines: null,
-                        minLines: 1,
-                        contextMenuBuilder: (_, __) => const SizedBox.shrink(),
-                        style: TextStyle(
-                          color: theme.foreground,
-                          fontFamily: 'Operator Mono',
-                          fontSize: widget.fontSize,
-                          height: 1.4,
-                          decoration: TextDecoration.none,
+                        // Real input
+                        TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          autofocus: true,
+                          maxLines: null,
+                          minLines: 1,
+                          contextMenuBuilder: (_, __) => const SizedBox.shrink(),
+                          style: TextStyle(
+                            color: theme.foreground,
+                            fontFamily: 'Operator Mono',
+                            fontSize: widget.fontSize,
+                            height: 1.4,
+                            decoration: TextDecoration.none,
+                          ),
+                          cursorColor: _isAiMode ? theme.ansiMagenta : theme.cursor,
+                          cursorWidth: 2,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
                         ),
-                        cursorColor: _isAiMode ? theme.ansiMagenta : theme.cursor,
-                        cursorWidth: 2,
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                          isDense: true,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
 
-                // AI mode indicator icon
-                if (_isAiMode || _aiLoading)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: _aiLoading
-                        ? SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.5,
+                  // AI mode indicator icon
+                  if (_isAiMode || _aiLoading)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: _aiLoading
+                          ? SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: theme.ansiMagenta,
+                              ),
+                            )
+                          : Icon(
+                              Icons.auto_awesome,
+                              size: 16,
                               color: theme.ansiMagenta,
                             ),
-                          )
-                        : Icon(
-                            Icons.auto_awesome,
-                            size: 16,
-                            color: theme.ansiMagenta,
-                          ),
-                  ),
-              ],
+                    ),
+                ],
+              ),
             ),
           ),
         ],
@@ -313,6 +382,7 @@ class PromptInputState extends State<PromptInput> {
             _completionIndex =
                 (_completionIndex + 1) % _completions.length;
           });
+          _updateCompletionOverlay();
           return KeyEventResult.handled;
 
         case LogicalKeyboardKey.arrowUp:
@@ -321,6 +391,7 @@ class PromptInputState extends State<PromptInput> {
                 (_completionIndex - 1 + _completions.length) %
                     _completions.length;
           });
+          _updateCompletionOverlay();
           return KeyEventResult.handled;
 
         case LogicalKeyboardKey.enter:
@@ -332,6 +403,7 @@ class PromptInputState extends State<PromptInput> {
             _completions = [];
             _activeResult = null;
           });
+          _removeCompletionOverlay();
           return KeyEventResult.handled;
 
         default:
@@ -368,6 +440,7 @@ class PromptInputState extends State<PromptInput> {
             _completions = [];
             _activeResult = null;
           });
+          _removeCompletionOverlay();
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
@@ -559,6 +632,7 @@ class PromptInputState extends State<PromptInput> {
           _completionIndex = 0;
           _activeResult = result;
         });
+        _updateCompletionOverlay();
       }
     } finally {
       _completionLoading = false;
@@ -572,6 +646,7 @@ class PromptInputState extends State<PromptInput> {
       _completions = [];
       _activeResult = null;
     });
+    _removeCompletionOverlay();
   }
 
   void _applyCompletion(String completion, CompletionResult result) {
@@ -590,6 +665,7 @@ class PromptInputState extends State<PromptInput> {
       _completions = [];
       _activeResult = null;
     });
+    _removeCompletionOverlay();
   }
 
   // --- Submit ---
