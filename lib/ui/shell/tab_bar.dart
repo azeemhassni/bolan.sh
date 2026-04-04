@@ -12,83 +12,99 @@ import '../../providers/session_provider.dart';
 ///
 /// Matches Warp's tab style: compact height, tight spacing, gradient-fade
 /// only on overflow, status icons, hover close button.
-class BolonTabBar extends ConsumerWidget {
+class BolonTabBar extends ConsumerStatefulWidget {
   final VoidCallback? onSettings;
 
   const BolonTabBar({super.key, this.onSettings});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BolonTabBar> createState() => _BolonTabBarState();
+}
+
+class _BolonTabBarState extends ConsumerState<BolonTabBar> {
+  DateTime? _lastTapDown;
+
+  void _handlePointerDown() {
+    if (!Platform.isMacOS) return;
+    final now = DateTime.now();
+    if (_lastTapDown != null &&
+        now.difference(_lastTapDown!).inMilliseconds < 300) {
+      WindowManipulator.isWindowZoomed().then((zoomed) {
+        if (zoomed) {
+          WindowManipulator.unzoomWindow();
+        } else {
+          WindowManipulator.zoomWindow();
+        }
+      });
+      _lastTapDown = null;
+    } else {
+      _lastTapDown = now;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
     final sessionState = ref.watch(sessionProvider);
 
-    return Container(
-      height: 36,
-      color: theme.tabBarBackground,
-      child: Stack(
-        children: [
-          // Double-tap on empty area to zoom (macOS native behavior)
-          if (Platform.isMacOS)
-            Positioned.fill(
-              child: GestureDetector(
-                onDoubleTap: () => WindowManipulator.zoomWindow(),
-                behavior: HitTestBehavior.translucent,
+    return Listener(
+      onPointerDown: (_) => _handlePointerDown(),
+      child: Container(
+        height: 36,
+        color: theme.tabBarBackground,
+        child: Row(
+          children: [
+            // Tabs
+            Expanded(
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: sessionState.tabs.length,
+                padding: EdgeInsets.only(
+                  left: Platform.isMacOS ? 78 : 8,
+                ),
+                itemBuilder: (context, index) {
+                  final tab = sessionState.tabs[index];
+                  final session = tab.focusedSession;
+                  final isActive = index == sessionState.activeTabIndex;
+                  return _Tab(
+                    title: session?.tabTitle ?? 'zsh',
+                    fullTitle: session?.fullTabTitle ?? 'zsh',
+                    status: session?.tabStatus ?? TabStatus.idle,
+                    isActive: isActive,
+                    theme: theme,
+                    onTap: () =>
+                        ref.read(sessionProvider.notifier).switchTab(index),
+                    onClose: () =>
+                        ref.read(sessionProvider.notifier).closeTab(index),
+                  );
+                },
               ),
             ),
-          Row(
-            children: [
-              // Tabs
-              Expanded(
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: sessionState.tabs.length,
-                  padding: EdgeInsets.only(
-                    left: Platform.isMacOS ? 78 : 8,
+            // + button
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _IconButton(
+                    icon: Icons.add,
+                    theme: theme,
+                    onTap: () =>
+                        ref.read(sessionProvider.notifier).createTab(),
                   ),
-                  itemBuilder: (context, index) {
-                    final tab = sessionState.tabs[index];
-                    final session = tab.focusedSession;
-                    final isActive = index == sessionState.activeTabIndex;
-                    return _Tab(
-                      title: session?.tabTitle ?? 'zsh',
-                      fullTitle: session?.fullTabTitle ?? 'zsh',
-                      status: session?.tabStatus ?? TabStatus.idle,
-                      isActive: isActive,
-                      theme: theme,
-                      onTap: () =>
-                          ref.read(sessionProvider.notifier).switchTab(index),
-                      onClose: () =>
-                          ref.read(sessionProvider.notifier).closeTab(index),
-                    );
-                  },
-                ),
-              ),
-              // + button
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+                  if (widget.onSettings != null) ...[
+                    const SizedBox(width: 2),
                     _IconButton(
-                      icon: Icons.add,
+                      icon: Icons.settings_outlined,
                       theme: theme,
-                      onTap: () =>
-                          ref.read(sessionProvider.notifier).createTab(),
+                      onTap: widget.onSettings!,
                     ),
-                    if (onSettings != null) ...[
-                      const SizedBox(width: 2),
-                      _IconButton(
-                        icon: Icons.settings_outlined,
-                        theme: theme,
-                        onTap: onSettings!,
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
