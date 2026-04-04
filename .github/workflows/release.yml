@@ -35,13 +35,20 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
+      - name: Install provisioning profile
+        env:
+          MACOS_PROVISIONING_PROFILE: ${{ secrets.MACOS_PROVISIONING_PROFILE }}
+          MACOS_PP_UUID: ${{ secrets.MACOS_PP_UUID }}
+        run: |
+          PP_PATH=$HOME/Library/MobileDevice/Provisioning\ Profiles
+          mkdir -p "$PP_PATH"
+          echo -n "$MACOS_PROVISIONING_PROFILE" | base64 --decode -o "$PP_PATH/$MACOS_PP_UUID.provisionprofile"
+
       - name: Install dependencies
         run: flutter pub get
 
       - name: Build macOS
         run: flutter build macos --release
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Package macOS app
         run: |
