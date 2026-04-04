@@ -370,7 +370,7 @@ class TerminalSession extends ChangeNotifier {
     // Clean up the captured output.
     // rawOutput preserves SGR color codes for colored rendering.
     // output is fully stripped for plain-text copy.
-    final captured = _outputCapture.toString();
+    final captured = _stripPartialLineMarker(_outputCapture.toString());
     final cleanOutput = _expandTabs(_stripAnsiEscapes(captured)).trim();
     final colorOutput = _expandTabs(_stripNonSgrEscapes(captured)).trim();
 
@@ -410,6 +410,18 @@ class TerminalSession extends ChangeNotifier {
   }
 
   /// Strips ANSI escape sequences from terminal output for clean text display.
+  /// Strips zsh's PROMPT_EOL_MARK — the inverse-video % (or #) followed by
+  /// spaces and a carriage return that zsh prints when output doesn't end
+  /// with a newline.
+  static String _stripPartialLineMarker(String input) {
+    // zsh wraps it with bold + inverse: \e[1m\e[7m%\e[27m\e[1m\e[0m + spaces + \r
+    // Require inverse video (\e[7m) before the marker to avoid false matches.
+    return input.replaceAll(
+      RegExp(r'(?:\x1B\[[0-9;]*m)*\x1B\[7m[%#](?:\x1B\[[0-9;]*m)+ *\r'),
+      '',
+    );
+  }
+
   static String _stripAnsiEscapes(String input) {
     return input.replaceAll(
       RegExp(r'\x1B\[[0-9;?]*[a-zA-Z]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)|\x1B[()][0-9A-Z]|\x1B[>=<]'),
