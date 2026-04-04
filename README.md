@@ -1,94 +1,89 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Bolan — Terminal that you own!" width="100%" />
+  <img src="assets/banner.svg" alt="bolan.sh — Terminal that you own!" width="100%" />
 </p>
 
-Open-source, AI-powered terminal emulator for macOS and Linux. Built with Flutter — no Electron, no web tech.
+<p align="center">
+  An open-source terminal for macOS and Linux with AI baked in.
+</p>
 
-## Features
+---
 
-- **Block model** — command outputs captured as styled, copyable blocks with colored ANSI rendering
-- **Split panes** — Cmd+D vertical, Cmd+Shift+D horizontal, drag to resize and reorder
-- **AI commands** — type `# describe what you want` to generate shell commands with AI
-- **AI commit messages** — `git commit` generates a message from your staged diff
-- **Error explanation** — failed commands show an "Explain Error" button powered by AI
-- **Command suggestions** — AI suggests the next command as ghost text after each execution
-- **Smart history search** — Ctrl+R with natural language search ("the deploy command I used")
-- **Tab completion** — file paths and commands with inline ghost text
-- **Themeable** — 11 built-in themes (Dracula, Nord, Tokyo Night, etc.) + custom TOML themes
-- **Customizable prompt bar** — drag-and-drop chip editor for shell, CWD, git, time, etc.
-- **Git integration** — branch, dirty status, file changes with diff viewer
-- **Find** — Cmd+F search across block output with regex and case sensitivity
-- **Settings** — sidebar UI for appearance, prompt, editor, and AI configuration
+Bolan groups your command output into clean, copyable blocks instead of dumping everything into an endless scroll. It can also talk to AI — describe what you want in plain English and it turns that into a shell command for you.
 
-## Prerequisites
+## What it does
 
-**macOS:**
-- Xcode 15+
-- CocoaPods
-- Flutter 3.28+ (stable)
+- **Output blocks** — each command's output is its own block with colored ANSI rendering, selectable text, and copy support
+- **AI commands** — type `# find large files over 1GB` and it gives you the right command
+- **AI commit messages** — run `git commit` and it writes the message from your staged diff
+- **Error explanation** — failed commands get an "Explain Error" button
+- **Split panes** — split horizontally, vertically, drag to resize, reorder with drag and drop
+- **Tabs** — multiple sessions, instant switching
+- **Themes** — 11 built-in (Dracula, Nord, Tokyo Night, Gruvbox, etc.) plus custom themes via TOML files
+- **Smart history** — Ctrl+R with natural language search, ghost text suggestions
+- **Tab completion** — files and commands with inline preview
+- **Git in the prompt** — branch, dirty status, file changes with a diff viewer
+- **Find** — search across output with regex support
+- **Customizable prompt bar** — drag-and-drop editor for status chips (shell, CWD, git, time)
 
-**Linux:**
-- clang, cmake, ninja-build
-- libgtk-3-dev, pkg-config
-- Flutter 3.28+ (stable)
+## Get started
 
-## Setup
+**macOS** requires Xcode 15+ and CocoaPods. **Linux** needs clang, cmake, ninja-build, libgtk-3-dev, and pkg-config.
+
+Both need [Flutter](https://flutter.dev) 3.28+ (stable).
 
 ```bash
 git clone https://github.com/AzeemHassni/bolan.sh
 cd bolan.sh
-
 flutter pub get
 flutter run -d macos    # or: flutter run -d linux
 ```
 
-## Build
+To build a release:
 
 ```bash
 flutter build macos     # → build/macos/Build/Products/Release/bolan.app
 flutter build linux     # → build/linux/x64/release/bundle/
 ```
 
+## AI providers
+
+Bolan works with several AI backends. Pick one (or more) in Settings:
+
+| Provider | How to set up |
+|---|---|
+| **Claude Code** | Needs a Pro/Max subscription, no API key |
+| **Gemini** | Free API key from Google AI Studio |
+| **OpenAI** | API key |
+| **Anthropic** | API key |
+| **Ollama** | Runs locally, no key needed |
+
 ## Configuration
 
-Config file: `~/.config/bolan/config.toml`
+Everything lives in `~/.config/bolan/`:
 
-Custom themes: `~/.config/bolan/themes/*.toml`
+- `config.toml` — settings
+- `themes/*.toml` — custom themes
+- `history` — command history
 
-Command history: `~/.config/bolan/history`
+Or just use the settings UI (Cmd+, on macOS, Ctrl+, on Linux).
 
-## AI Providers
-
-Bolan supports multiple AI backends:
-
-| Provider | Auth | Use for |
-|---|---|---|
-| **Claude Code CLI** | Pro/Max subscription | Best quality, no API key needed |
-| **Gemini** | Free API key from Google AI Studio | Default, free tier |
-| **OpenAI** | API key | GPT-4o |
-| **Anthropic API** | API key | Claude via API |
-| **Ollama** | Local, no key | Privacy-first, localhost |
-
-Configure in Settings (Cmd+,) → AI.
-
-## Keyboard Shortcuts
+## Keyboard shortcuts
 
 | Shortcut | Action |
 |---|---|
-| Cmd+T | New tab |
-| Cmd+W | Close tab |
-| Cmd+Shift+{ / } | Switch tabs |
-| Cmd+D | Split pane right |
-| Cmd+Shift+D | Split pane down |
-| Cmd+Shift+W | Close pane |
-| Cmd+Option+Arrows | Navigate panes |
-| Cmd+K | Clear screen + scrollback |
+| Cmd/Ctrl+T | New tab |
+| Cmd/Ctrl+W | Close tab |
+| Cmd/Ctrl+Shift+{ / } | Switch tabs |
+| Cmd/Ctrl+D | Split right |
+| Cmd/Ctrl+Shift+D | Split down |
+| Cmd/Ctrl+Shift+W | Close pane |
+| Cmd/Ctrl+Option+Arrows | Navigate panes |
+| Cmd/Ctrl+K | Clear everything |
 | Ctrl+L | Clear screen |
-| Cmd+F | Find in output |
-| Cmd+, | Settings |
-| Cmd++/- | Font size |
+| Cmd/Ctrl+F | Find |
+| Cmd/Ctrl++/- | Font size |
 | Ctrl+R | History search |
-| # + Enter | AI command generation |
+| `# ` + Enter | AI command |
 
 ## License
 
