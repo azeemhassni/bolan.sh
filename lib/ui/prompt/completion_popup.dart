@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/bolan_theme.dart';
 
-/// Floating completion list shown above the prompt input.
+/// Floating completion list shown near the prompt input.
 ///
 /// Displays completion candidates in a scrollable list. Supports
 /// keyboard navigation (up/down) and mouse click to select.
-class CompletionPopup extends StatelessWidget {
+class CompletionPopup extends StatefulWidget {
   final List<String> items;
   final int selectedIndex;
   final String prefix;
@@ -23,10 +23,44 @@ class CompletionPopup extends StatelessWidget {
   });
 
   @override
+  State<CompletionPopup> createState() => _CompletionPopupState();
+}
+
+class _CompletionPopupState extends State<CompletionPopup> {
+  final _scrollController = ScrollController();
+
+  @override
+  void didUpdateWidget(CompletionPopup oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIndex != widget.selectedIndex) {
+      _scrollToSelected();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToSelected() {
+    final itemHeight = widget.fontSize * 1.8;
+    final target = widget.selectedIndex * itemHeight;
+    final viewport = _scrollController.position.viewportDimension;
+    final current = _scrollController.offset;
+
+    if (target < current) {
+      _scrollController.jumpTo(target);
+    } else if (target + itemHeight > current + viewport) {
+      _scrollController.jumpTo(target + itemHeight - viewport);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
-    final maxVisible = items.length.clamp(1, 8);
-    final itemHeight = fontSize * 1.8;
+    final maxVisible = widget.items.length.clamp(1, 8);
+    final itemHeight = widget.fontSize * 1.8;
 
     return Container(
       constraints: BoxConstraints(
@@ -46,16 +80,17 @@ class CompletionPopup extends StatelessWidget {
         ],
       ),
       child: ListView.builder(
+        controller: _scrollController,
         padding: const EdgeInsets.symmetric(vertical: 4),
         shrinkWrap: true,
-        itemCount: items.length,
+        itemCount: widget.items.length,
         itemExtent: itemHeight,
         itemBuilder: (context, index) {
-          final item = items[index];
-          final isSelected = index == selectedIndex;
+          final item = widget.items[index];
+          final isSelected = index == widget.selectedIndex;
 
           return GestureDetector(
-            onTap: () => onSelect(index),
+            onTap: () => widget.onSelect(index),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10),
               color: isSelected ? theme.statusChipBg : Colors.transparent,
@@ -66,7 +101,7 @@ class CompletionPopup extends StatelessWidget {
                 style: TextStyle(
                   color: isSelected ? theme.foreground : theme.blockHeaderFg,
                   fontFamily: 'Operator Mono',
-                  fontSize: fontSize,
+                  fontSize: widget.fontSize,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   decoration: TextDecoration.none,
                 ),
