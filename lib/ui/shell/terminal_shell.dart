@@ -74,12 +74,19 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
     final tab = s.activeTab;
     if (tab == null) return false;
 
+    final promptState = PaneFocusRegistry.get(tab.focusedPaneId);
+    if (promptState == null) return false;
+
+    // Cmd+L (macOS) / Ctrl+L (Linux) — focus prompt and select all
+    if (event.logicalKey == LogicalKeyboardKey.keyL && isPrimaryModifierPressed) {
+      promptState.requestFocus();
+      promptState.selectAll();
+      return true;
+    }
+
     // Don't interfere during command execution
     final session = tab.focusedSession;
     if (session != null && session.isCommandRunning) return false;
-
-    final promptState = PaneFocusRegistry.get(tab.focusedPaneId);
-    if (promptState == null) return false;
     if (promptState.isHistorySearchOpen) return false;
 
     final isPrintable = event.character != null &&

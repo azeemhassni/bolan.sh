@@ -119,6 +119,13 @@ class PromptInputState extends State<PromptInput> {
 
   void requestFocus() => _focusNode.requestFocus();
 
+  void selectAll() {
+    _controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _controller.text.length,
+    );
+  }
+
   bool get isHistorySearchOpen => _showHistorySearch;
   bool get isAiMode => _isAiMode || _aiLoading;
 
