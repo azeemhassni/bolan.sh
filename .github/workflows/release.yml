@@ -6,73 +6,6 @@ on:
       - 'v*'
 
 jobs:
-  build-macos:
-    name: Build macOS
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - name: Install Apple certificate
-        env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: |
-          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-
-          echo -n "$MACOS_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-
-          security import $CERTIFICATE_PATH -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
-
-      - name: Install provisioning profile
-        env:
-          MACOS_PROVISIONING_PROFILE: ${{ secrets.MACOS_PROVISIONING_PROFILE }}
-          MACOS_PP_UUID: ${{ secrets.MACOS_PP_UUID }}
-        run: |
-          PP_PATH=$HOME/Library/MobileDevice/Provisioning\ Profiles
-          mkdir -p "$PP_PATH"
-          echo -n "$MACOS_PROVISIONING_PROFILE" | base64 --decode -o "$PP_PATH/$MACOS_PP_UUID.provisionprofile"
-
-      - name: Configure code signing
-        env:
-          MACOS_PP_UUID: ${{ secrets.MACOS_PP_UUID }}
-        run: |
-          cat > macos/Runner/release-signing.xcconfig <<XCCONFIG
-          CODE_SIGN_STYLE = Manual
-          CODE_SIGN_IDENTITY = Developer ID Application
-          DEVELOPMENT_TEAM = SM26HBBKRL
-          PROVISIONING_PROFILE_SPECIFIER = ${MACOS_PP_UUID}
-          XCCONFIG
-          echo '#include "Runner/release-signing.xcconfig"' >> macos/Flutter/Flutter-Release.xcconfig
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Build macOS
-        run: flutter build macos --release
-
-      - name: Package macOS app
-        run: |
-          cd build/macos/Build/Products/Release
-          tar -czf bolan-macos-${{ github.ref_name }}.tar.gz bolan.app
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bolan-macos
-          path: build/macos/Build/Products/Release/bolan-macos-${{ github.ref_name }}.tar.gz
-
   build-linux:
     name: Build Linux
     runs-on: ubuntu-latest
@@ -108,17 +41,11 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-macos, build-linux]
+    needs: build-linux
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download macOS artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: bolan-macos
-          path: artifacts/
 
       - name: Download Linux artifact
         uses: actions/download-artifact@v4

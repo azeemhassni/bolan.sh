@@ -97,6 +97,11 @@ class TerminalSession extends ChangeNotifier {
       history: history,
     );
 
+    // Initialize CWD so completions work before the first OSC 7
+    session._cwd = workingDirectory ??
+        Platform.environment['HOME'] ??
+        Directory.current.path;
+
     session._connect();
     session._injectShellIntegration();
     return session;

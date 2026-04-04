@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:macos_window_utils/window_manipulator.dart';
 
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -24,56 +25,68 @@ class BolonTabBar extends ConsumerWidget {
     return Container(
       height: 36,
       color: theme.tabBarBackground,
-      child: Row(
+      child: Stack(
         children: [
-          // Tabs
-          Expanded(
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: sessionState.tabs.length,
-              padding: EdgeInsets.only(
-                left: Platform.isMacOS ? 78 : 8,
+          // Double-tap on empty area to zoom (macOS native behavior)
+          if (Platform.isMacOS)
+            Positioned.fill(
+              child: GestureDetector(
+                onDoubleTap: () => WindowManipulator.zoomWindow(),
+                behavior: HitTestBehavior.translucent,
               ),
-              itemBuilder: (context, index) {
-                final tab = sessionState.tabs[index];
-                final session = tab.focusedSession;
-                final isActive = index == sessionState.activeTabIndex;
-                return _Tab(
-                  title: session?.tabTitle ?? 'zsh',
-                  fullTitle: session?.fullTabTitle ?? 'zsh',
-                  status: session?.tabStatus ?? TabStatus.idle,
-                  isActive: isActive,
-                  theme: theme,
-                  onTap: () =>
-                      ref.read(sessionProvider.notifier).switchTab(index),
-                  onClose: () =>
-                      ref.read(sessionProvider.notifier).closeTab(index),
-                );
-              },
             ),
-          ),
-          // + button
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _IconButton(
-                  icon: Icons.add,
-                  theme: theme,
-                  onTap: () =>
-                      ref.read(sessionProvider.notifier).createTab(),
-                ),
-                if (onSettings != null) ...[
-                  const SizedBox(width: 2),
-                  _IconButton(
-                    icon: Icons.settings_outlined,
-                    theme: theme,
-                    onTap: onSettings!,
+          Row(
+            children: [
+              // Tabs
+              Expanded(
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: sessionState.tabs.length,
+                  padding: EdgeInsets.only(
+                    left: Platform.isMacOS ? 78 : 8,
                   ),
-                ],
-              ],
-            ),
+                  itemBuilder: (context, index) {
+                    final tab = sessionState.tabs[index];
+                    final session = tab.focusedSession;
+                    final isActive = index == sessionState.activeTabIndex;
+                    return _Tab(
+                      title: session?.tabTitle ?? 'zsh',
+                      fullTitle: session?.fullTabTitle ?? 'zsh',
+                      status: session?.tabStatus ?? TabStatus.idle,
+                      isActive: isActive,
+                      theme: theme,
+                      onTap: () =>
+                          ref.read(sessionProvider.notifier).switchTab(index),
+                      onClose: () =>
+                          ref.read(sessionProvider.notifier).closeTab(index),
+                    );
+                  },
+                ),
+              ),
+              // + button
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _IconButton(
+                      icon: Icons.add,
+                      theme: theme,
+                      onTap: () =>
+                          ref.read(sessionProvider.notifier).createTab(),
+                    ),
+                    if (onSettings != null) ...[
+                      const SizedBox(width: 2),
+                      _IconButton(
+                        icon: Icons.settings_outlined,
+                        theme: theme,
+                        onTap: onSettings!,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
