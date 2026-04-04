@@ -44,6 +44,18 @@ jobs:
           mkdir -p "$PP_PATH"
           echo -n "$MACOS_PROVISIONING_PROFILE" | base64 --decode -o "$PP_PATH/$MACOS_PP_UUID.provisionprofile"
 
+      - name: Configure code signing
+        env:
+          MACOS_PP_UUID: ${{ secrets.MACOS_PP_UUID }}
+        run: |
+          cat > macos/Runner/release-signing.xcconfig <<XCCONFIG
+          CODE_SIGN_STYLE = Manual
+          CODE_SIGN_IDENTITY = Developer ID Application
+          DEVELOPMENT_TEAM = SM26HBBKRL
+          PROVISIONING_PROFILE_SPECIFIER = ${MACOS_PP_UUID}
+          XCCONFIG
+          echo '#include "Runner/release-signing.xcconfig"' >> macos/Flutter/Flutter-Release.xcconfig
+
       - name: Install dependencies
         run: flutter pub get
 
