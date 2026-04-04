@@ -41,8 +41,7 @@ class CompletionEngine {
     final words = textUpToCursor.split(RegExp(r'\s+'));
     final currentWord = words.isNotEmpty ? words.last : '';
     final replaceStart = cursorPos - currentWord.length;
-    final isFirstWord = words.length <= 1 ||
-        (words.length == 2 && textUpToCursor.endsWith(currentWord));
+    final isFirstWord = words.length <= 1;
 
     try {
       List<String> items;
