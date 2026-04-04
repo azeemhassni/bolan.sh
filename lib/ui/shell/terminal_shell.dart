@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/config_loader.dart';
 import '../../core/pane/pane_node.dart';
+import '../../core/platform_shortcuts.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/config_provider.dart';
 import '../../providers/font_size_provider.dart';
@@ -131,51 +132,45 @@ class _TerminalShellState extends ConsumerState<TerminalShell> {
         autofocus: true,
         child: CallbackShortcuts(
         bindings: {
-          const SingleActivator(LogicalKeyboardKey.comma, meta: true):
+          primaryActivator(LogicalKeyboardKey.comma):
               _openSettings,
-          const SingleActivator(LogicalKeyboardKey.keyT, meta: true):
+          primaryActivator(LogicalKeyboardKey.keyT):
               () => ref.read(sessionProvider.notifier).createTab(),
-          const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
+          primaryActivator(LogicalKeyboardKey.keyW):
               () => ref.read(sessionProvider.notifier).closeTab(
                     ref.read(sessionProvider).activeTabIndex,
                   ),
           // Tab switching
-          const SingleActivator(LogicalKeyboardKey.braceRight, meta: true):
+          primaryActivator(LogicalKeyboardKey.braceRight):
               () => _switchTab(1),
-          const SingleActivator(LogicalKeyboardKey.braceLeft, meta: true):
+          primaryActivator(LogicalKeyboardKey.braceLeft):
               () => _switchTab(-1),
           // Pane splitting
-          const SingleActivator(LogicalKeyboardKey.keyD, meta: true):
+          primaryActivator(LogicalKeyboardKey.keyD):
               () => ref
                   .read(sessionProvider.notifier)
                   .splitPane(Axis.horizontal),
-          const SingleActivator(LogicalKeyboardKey.keyD,
-                  meta: true, shift: true):
+          primaryActivator(LogicalKeyboardKey.keyD, shift: true):
               () => ref
                   .read(sessionProvider.notifier)
                   .splitPane(Axis.vertical),
           // Close pane
-          const SingleActivator(LogicalKeyboardKey.keyW,
-                  meta: true, shift: true):
+          primaryActivator(LogicalKeyboardKey.keyW, shift: true):
               () => ref.read(sessionProvider.notifier).closePane(),
           // Pane navigation
-          const SingleActivator(LogicalKeyboardKey.arrowLeft,
-                  meta: true, alt: true):
+          primaryActivator(LogicalKeyboardKey.arrowLeft, alt: true):
               () => ref
                   .read(sessionProvider.notifier)
                   .navigatePane(AxisDirection.left),
-          const SingleActivator(LogicalKeyboardKey.arrowRight,
-                  meta: true, alt: true):
+          primaryActivator(LogicalKeyboardKey.arrowRight, alt: true):
               () => ref
                   .read(sessionProvider.notifier)
                   .navigatePane(AxisDirection.right),
-          const SingleActivator(LogicalKeyboardKey.arrowUp,
-                  meta: true, alt: true):
+          primaryActivator(LogicalKeyboardKey.arrowUp, alt: true):
               () => ref
                   .read(sessionProvider.notifier)
                   .navigatePane(AxisDirection.up),
-          const SingleActivator(LogicalKeyboardKey.arrowDown,
-                  meta: true, alt: true):
+          primaryActivator(LogicalKeyboardKey.arrowDown, alt: true):
               () => ref
                   .read(sessionProvider.notifier)
                   .navigatePane(AxisDirection.down),

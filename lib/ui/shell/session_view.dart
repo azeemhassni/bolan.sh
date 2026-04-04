@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
 
+import '../../core/platform_shortcuts.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/xterm_theme.dart';
@@ -141,13 +142,13 @@ class _SessionViewState extends ConsumerState<SessionView> {
       },
       child: CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
+        primaryActivator(LogicalKeyboardKey.keyF):
             _toggleFindBar,
-        const SingleActivator(LogicalKeyboardKey.equal, meta: true):
+        primaryActivator(LogicalKeyboardKey.equal):
             _increaseFontSize,
-        const SingleActivator(LogicalKeyboardKey.minus, meta: true):
+        primaryActivator(LogicalKeyboardKey.minus):
             _decreaseFontSize,
-        const SingleActivator(LogicalKeyboardKey.digit0, meta: true):
+        primaryActivator(LogicalKeyboardKey.digit0):
             _resetFontSize,
       },
       child: Stack(

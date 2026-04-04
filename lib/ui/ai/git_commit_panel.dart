@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/platform_shortcuts.dart';
 import '../../core/theme/bolan_theme.dart';
 
 /// Bottom sheet editor for reviewing/editing an AI-generated commit message.
@@ -54,7 +55,7 @@ class _GitCommitPanelState extends State<GitCommitPanel> {
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
-    final meta = HardwareKeyboard.instance.isMetaPressed;
+    final meta = isPrimaryModifierPressed;
 
     if (event.logicalKey == LogicalKeyboardKey.escape) {
       widget.onCancel();

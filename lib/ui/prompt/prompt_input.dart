@@ -10,6 +10,7 @@ import '../../core/ai/features/nlp_to_command.dart';
 import '../../core/ai/gemini_provider.dart';
 import '../../core/ai/history_sanitizer.dart';
 import '../../core/completion/completion_engine.dart';
+import '../../core/platform_shortcuts.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../ai/git_commit_panel.dart';
@@ -301,7 +302,7 @@ class PromptInputState extends State<PromptInput> {
 
     final ctrl = HardwareKeyboard.instance.isControlPressed;
     final shift = HardwareKeyboard.instance.isShiftPressed;
-    final meta = HardwareKeyboard.instance.isMetaPressed;
+    final meta = isPrimaryModifierPressed;
 
     // Tab completion popup navigation
     if (_completions.length > 1) {
