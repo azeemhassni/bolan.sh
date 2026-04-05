@@ -33,6 +33,9 @@ class PaneManager {
       );
     });
 
+    // Equalize ratios so all panes on the same axis get equal space
+    _equalizeRatios(newRoot, axis);
+
     return (newRoot, newLeaf);
   }
 
@@ -43,7 +46,13 @@ class PaneManager {
       root.session.dispose();
       return null;
     }
-    return _removeNode(root, targetId);
+    final newRoot = _removeNode(root, targetId);
+    if (newRoot != null) {
+      // Re-equalize both axes after closing
+      _equalizeRatios(newRoot, Axis.horizontal);
+      _equalizeRatios(newRoot, Axis.vertical);
+    }
+    return newRoot;
   }
 
   /// Finds the [LeafPane] with [id], or null.
@@ -193,6 +202,31 @@ class PaneManager {
     for (final leaf in allLeaves(root)) {
       leaf.session.dispose();
     }
+  }
+
+  /// Counts the number of leaves in a subtree.
+  static int _leafCount(PaneNode node) {
+    return switch (node) {
+      LeafPane() => 1,
+      SplitPane() => _leafCount(node.first) + _leafCount(node.second),
+    };
+  }
+
+  /// Adjusts ratios on splits matching [axis] so each leaf gets equal space.
+  ///
+  /// For a split with the same axis: `ratio = firstLeaves / totalLeaves`.
+  /// For splits on a different axis, recurse into both children.
+  static void _equalizeRatios(PaneNode node, Axis axis) {
+    if (node is! SplitPane) return;
+
+    if (node.axis == axis) {
+      final firstLeaves = _leafCount(node.first);
+      final totalLeaves = firstLeaves + _leafCount(node.second);
+      node.ratio = firstLeaves / totalLeaves;
+    }
+
+    _equalizeRatios(node.first, axis);
+    _equalizeRatios(node.second, axis);
   }
 
   // --- Internal helpers ---
