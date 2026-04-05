@@ -106,6 +106,9 @@ class ConfigLoader extends ChangeNotifier {
     sb.writeln('notify_long_running = ${c.general.notifyLongRunning}');
     sb.writeln('long_running_threshold_seconds = ${c.general.longRunningThresholdSeconds}');
     sb.writeln('prompt_chips = [${c.general.promptChips.map((e) => '"$e"').join(', ')}]');
+    if (c.general.startupCommands.isNotEmpty) {
+      sb.writeln('startup_commands = [${c.general.startupCommands.map((e) => '"$e"').join(', ')}]');
+    }
     sb.writeln();
 
     sb.writeln('[editor]');

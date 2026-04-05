@@ -592,6 +592,24 @@ PROMPT_COMMAND="__bolan_precmd;${PROMPT_COMMAND}"
     });
   }
 
+  /// Runs startup commands after the shell is ready.
+  ///
+  /// Must be called after [_injectShellIntegration] has had time to complete.
+  /// Each command is written to the PTY with a newline appended.
+  void runStartupCommands(List<String> commands) {
+    if (commands.isEmpty) return;
+    // Wait for shell integration to finish (300ms + source + clear)
+    Future<void>.delayed(const Duration(milliseconds: 800), () {
+      if (_disposed) return;
+      for (final command in commands) {
+        final trimmed = command.trim();
+        if (trimmed.isNotEmpty) {
+          writeInput('$trimmed\n');
+        }
+      }
+    });
+  }
+
   /// Parses `git diff --shortstat` output like:
   /// "3 files changed, 218 insertions(+), 19 deletions(-)"
   void _parseShortstat(String output) {

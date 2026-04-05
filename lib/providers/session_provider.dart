@@ -191,6 +191,14 @@ class SessionNotifier extends Notifier<SessionState> {
     );
     final leaf = LeafPane(id: _uuid.v4(), session: session);
     _attachSessionListener(session);
+
+    // Run startup commands from config
+    final configLoader = ref.read(configLoaderProvider);
+    final startupCommands = configLoader?.config.general.startupCommands;
+    if (startupCommands != null && startupCommands.isNotEmpty) {
+      session.runStartupCommands(startupCommands);
+    }
+
     return TabState(rootPane: leaf, focusedPaneId: leaf.id);
   }
 

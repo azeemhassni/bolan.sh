@@ -27,6 +27,9 @@ class GeneralConfig {
   final bool notifyLongRunning;
   final int longRunningThresholdSeconds;
 
+  /// Commands to run automatically when a new session starts.
+  final List<String> startupCommands;
+
   const GeneralConfig({
     this.shell = '',
     this.workingDirectory = '',
@@ -34,6 +37,7 @@ class GeneralConfig {
     this.promptChips = const ['shell', 'cwd', 'gitBranch', 'gitChanges'],
     this.notifyLongRunning = true,
     this.longRunningThresholdSeconds = 10,
+    this.startupCommands = const [],
   });
 }
 
