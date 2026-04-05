@@ -14,8 +14,9 @@ import '../../providers/session_provider.dart';
 /// only on overflow, status icons, hover close button.
 class BolonTabBar extends ConsumerStatefulWidget {
   final VoidCallback? onSettings;
+  final void Function(int index)? onCloseTab;
 
-  const BolonTabBar({super.key, this.onSettings});
+  const BolonTabBar({super.key, this.onSettings, this.onCloseTab});
 
   @override
   ConsumerState<BolonTabBar> createState() => _BolonTabBarState();
@@ -74,8 +75,9 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                     theme: theme,
                     onTap: () =>
                         ref.read(sessionProvider.notifier).switchTab(index),
-                    onClose: () =>
-                        ref.read(sessionProvider.notifier).closeTab(index),
+                    onClose: () => widget.onCloseTab != null
+                        ? widget.onCloseTab!(index)
+                        : ref.read(sessionProvider.notifier).closeTab(index),
                   );
                 },
               ),

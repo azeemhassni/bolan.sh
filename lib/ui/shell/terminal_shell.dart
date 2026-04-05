@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/actions/app_action.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/notifications/notification_service.dart';
+import '../../core/pane/pane_manager.dart';
 import '../../core/pane/pane_node.dart';
 import '../../core/platform_shortcuts.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -17,6 +18,7 @@ import '../../providers/session_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../palette/command_palette.dart';
 import '../settings/settings_screen.dart';
+import '../shared/confirm_dialog.dart';
 import 'pane_focus_registry.dart';
 import 'pane_tree_widget.dart';
 import 'tab_bar.dart';
@@ -148,6 +150,111 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     );
   }
 
+  /// Checks if any session across all tabs has a running command.
+  bool _hasRunningCommands() {
+    return ref.read(sessionProvider).allSessions.any((s) => s.isCommandRunning);
+  }
+
+  /// Cmd+W — close tab with confirmation if needed.
+  Future<void> _closeTabWithConfirm() async {
+    final s = ref.read(sessionProvider);
+    final tab = s.activeTab;
+    if (tab == null) return;
+
+    final leaves = PaneManager.allLeaves(tab.rootPane);
+    final hasMultiplePanes = leaves.length > 1;
+    final hasRunning = leaves.any((l) => l.session.isCommandRunning);
+
+    if (hasRunning) {
+      final result = await showConfirmDialog(
+        context,
+        title: 'Kill running processes?',
+        message:
+            'This tab has running processes. Closing will terminate them.',
+        confirmLabel: 'Close Tab',
+        secondaryLabel: hasMultiplePanes ? 'Close Pane' : null,
+        isDangerous: true,
+      );
+      if (result == ConfirmResult.closeAll) {
+        ref.read(sessionProvider.notifier).closeTab(s.activeTabIndex);
+      } else if (result == ConfirmResult.closePane) {
+        ref.read(sessionProvider.notifier).closePane();
+      }
+      return;
+    }
+
+    if (hasMultiplePanes) {
+      final result = await showConfirmDialog(
+        context,
+        title: 'Close tab?',
+        message: 'This tab has ${leaves.length} panes. Close all or just the current pane?',
+        confirmLabel: 'Close Tab',
+        secondaryLabel: 'Close Pane',
+      );
+      if (result == ConfirmResult.closeAll) {
+        ref.read(sessionProvider.notifier).closeTab(s.activeTabIndex);
+      } else if (result == ConfirmResult.closePane) {
+        ref.read(sessionProvider.notifier).closePane();
+      }
+      return;
+    }
+
+    ref.read(sessionProvider.notifier).closeTab(s.activeTabIndex);
+  }
+
+  /// Cmd+Shift+W — close pane with confirmation if running.
+  Future<void> _closePaneWithConfirm() async {
+    final s = ref.read(sessionProvider);
+    final tab = s.activeTab;
+    if (tab == null) return;
+
+    final session = tab.focusedSession;
+    if (session != null && session.isCommandRunning) {
+      final result = await showConfirmDialog(
+        context,
+        title: 'Kill running process?',
+        message: 'This pane has a running process. Closing will terminate it.',
+        confirmLabel: 'Close Pane',
+        isDangerous: true,
+      );
+      if (result != ConfirmResult.closeAll) return;
+    }
+
+    ref.read(sessionProvider.notifier).closePane();
+  }
+
+  /// Cmd+Q — quit with confirmation.
+  Future<void> _quitWithConfirm() async {
+    if (_hasRunningCommands()) {
+      final result = await showConfirmDialog(
+        context,
+        title: 'Quit with running processes?',
+        message:
+            'There are running processes. Quitting will terminate them.',
+        confirmLabel: 'Quit',
+        isDangerous: true,
+      );
+      if (result != ConfirmResult.closeAll) return;
+      exit(0);
+    }
+
+    final configLoader = ref.read(configLoaderProvider);
+    final confirmOnQuit =
+        configLoader?.config.general.confirmOnQuit ?? true;
+
+    if (confirmOnQuit) {
+      final result = await showConfirmDialog(
+        context,
+        title: 'Quit Bolan?',
+        message: 'Are you sure you want to quit?',
+        confirmLabel: 'Quit',
+      );
+      if (result != ConfirmResult.closeAll) return;
+    }
+
+    exit(0);
+  }
+
   void _togglePalette() {
     setState(() => _showPalette = !_showPalette);
   }
@@ -169,9 +276,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         shortcut: '${mod}W',
         icon: Icons.close,
         keywords: const ['tab', 'close', 'remove'],
-        callback: () => ref.read(sessionProvider.notifier).closeTab(
-              ref.read(sessionProvider).activeTabIndex,
-            ),
+        callback: _closeTabWithConfirm,
       ),
       AppAction(
         id: 'split_right',
@@ -197,7 +302,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         shortcut: '$mod⇧W',
         icon: Icons.close_fullscreen,
         keywords: const ['pane', 'close'],
-        callback: () => ref.read(sessionProvider.notifier).closePane(),
+        callback: _closePaneWithConfirm,
       ),
       AppAction(
         id: 'settings',
@@ -287,9 +392,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
           primaryActivator(LogicalKeyboardKey.keyT):
               () => ref.read(sessionProvider.notifier).createTab(),
           primaryActivator(LogicalKeyboardKey.keyW):
-              () => ref.read(sessionProvider.notifier).closeTab(
-                    ref.read(sessionProvider).activeTabIndex,
-                  ),
+              _closeTabWithConfirm,
           // Tab switching
           primaryActivator(LogicalKeyboardKey.braceRight):
               () => _switchTab(1),
@@ -306,7 +409,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                   .splitPane(Axis.vertical),
           // Close pane
           primaryActivator(LogicalKeyboardKey.keyW, shift: true):
-              () => ref.read(sessionProvider.notifier).closePane(),
+              _closePaneWithConfirm,
           // Pane navigation
           primaryActivator(LogicalKeyboardKey.arrowLeft, alt: true):
               () => ref
@@ -324,6 +427,9 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
               () => ref
                   .read(sessionProvider.notifier)
                   .navigatePane(AxisDirection.down),
+          // Quit
+          primaryActivator(LogicalKeyboardKey.keyQ):
+              _quitWithConfirm,
           // Command palette
           primaryActivator(LogicalKeyboardKey.keyP, shift: true):
               _togglePalette,
@@ -335,7 +441,10 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
               color: theme.background,
               child: Column(
                 children: [
-                  BolonTabBar(onSettings: _openSettings),
+                  BolonTabBar(
+                    onSettings: _openSettings,
+                    onCloseTab: (_) => _closeTabWithConfirm(),
+                  ),
                   Expanded(
                     child: IndexedStack(
                       index: sessionState.activeTabIndex,

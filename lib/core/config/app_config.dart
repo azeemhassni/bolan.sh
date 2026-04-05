@@ -30,6 +30,9 @@ class GeneralConfig {
   /// Commands to run automatically when a new session starts.
   final List<String> startupCommands;
 
+  /// Whether to show a confirmation dialog before quitting the app.
+  final bool confirmOnQuit;
+
   const GeneralConfig({
     this.shell = '',
     this.workingDirectory = '',
@@ -38,6 +41,7 @@ class GeneralConfig {
     this.notifyLongRunning = true,
     this.longRunningThresholdSeconds = 10,
     this.startupCommands = const [],
+    this.confirmOnQuit = true,
   });
 }
 
