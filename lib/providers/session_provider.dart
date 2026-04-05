@@ -194,9 +194,7 @@ class SessionNotifier extends Notifier<SessionState> {
     final tabs = [...state.tabs]..removeAt(index);
 
     if (tabs.isEmpty) {
-      final tab = _createTab();
-      _attachTabListeners(tab);
-      state = SessionState(tabs: [tab], activeTabIndex: 0);
+      state = const SessionState(tabs: [], activeTabIndex: -1);
       return;
     }
 
@@ -217,10 +215,10 @@ class SessionNotifier extends Notifier<SessionState> {
         PaneManager.split(tab.rootPane, currentFocusId, axis, history);
     _attachSessionListener(newLeaf.session);
 
-    // Keep focus on the original pane, not the new one
+    // Focus the newly created pane
     _updateActiveTab(TabState(
       rootPane: newRoot,
-      focusedPaneId: currentFocusId,
+      focusedPaneId: newLeaf.id,
     ));
   }
 

@@ -19,6 +19,7 @@ import '../../providers/theme_provider.dart';
 import '../palette/command_palette.dart';
 import '../settings/settings_screen.dart';
 import '../shared/confirm_dialog.dart';
+import 'empty_state.dart';
 import 'pane_focus_registry.dart';
 import 'pane_tree_widget.dart';
 import 'tab_bar.dart';
@@ -94,6 +95,12 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         isPrimaryModifierPressed &&
         HardwareKeyboard.instance.isShiftPressed) {
       _togglePalette();
+      return true;
+    }
+
+    // Cmd+Q — quit (works regardless of focus)
+    if (event.logicalKey == LogicalKeyboardKey.keyQ && isPrimaryModifierPressed) {
+      _quitWithConfirm();
       return true;
     }
 
@@ -376,10 +383,53 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     ];
   }
 
+  String? _lastFocusedPaneId;
+  int? _lastActiveTabIndex;
+
+  /// Ensures the focused pane's prompt input has keyboard focus whenever
+  /// the active tab or focused pane changes.
+  void _syncPromptFocus(SessionState sessionState) {
+    final tab = sessionState.activeTab;
+    if (tab == null) return;
+
+    final paneChanged = tab.focusedPaneId != _lastFocusedPaneId;
+    final tabChanged = sessionState.activeTabIndex != _lastActiveTabIndex;
+
+    if (paneChanged || tabChanged) {
+      _lastFocusedPaneId = tab.focusedPaneId;
+      _lastActiveTabIndex = sessionState.activeTabIndex;
+
+      // Don't steal focus from running commands
+      final session = tab.focusedSession;
+      if (session != null && session.isCommandRunning) return;
+
+      _requestFocusOnPane(tab.focusedPaneId);
+    }
+  }
+
+  /// Requests focus on a pane's prompt, retrying if the pane hasn't
+  /// registered yet (happens with newly created panes).
+  void _requestFocusOnPane(String paneId, [int attempt = 0]) {
+    if (attempt > 3 || !mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final prompt = PaneFocusRegistry.get(paneId);
+      if (prompt != null) {
+        prompt.requestFocus();
+      } else {
+        // Pane not registered yet — retry next frame
+        _requestFocusOnPane(paneId, attempt + 1);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final sessionState = ref.watch(sessionProvider);
     final theme = ref.watch(activeThemeProvider);
+
+    // Auto-focus the active pane's prompt on tab/pane changes
+    _syncPromptFocus(sessionState);
 
     // Update macOS window chrome to match theme brightness
     if (Platform.isMacOS) {
@@ -454,18 +504,26 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                     onCloseTab: (_) => _closeTabWithConfirm(),
                   ),
                   Expanded(
-                    child: IndexedStack(
-                      index: sessionState.activeTabIndex,
-                      children: [
-                        for (var i = 0; i < sessionState.tabs.length; i++)
-                          PaneTreeWidget(
-                            node: sessionState.tabs[i].rootPane,
-                            focusedPaneId: sessionState.tabs[i].focusedPaneId,
-                            isSinglePane:
-                                sessionState.tabs[i].rootPane is LeafPane,
+                    child: sessionState.tabs.isEmpty
+                        ? EmptyState(
+                            onNewSession: () =>
+                                ref.read(sessionProvider.notifier).createTab(),
+                          )
+                        : IndexedStack(
+                            index: sessionState.activeTabIndex,
+                            children: [
+                              for (var i = 0;
+                                  i < sessionState.tabs.length;
+                                  i++)
+                                PaneTreeWidget(
+                                  node: sessionState.tabs[i].rootPane,
+                                  focusedPaneId:
+                                      sessionState.tabs[i].focusedPaneId,
+                                  isSinglePane: sessionState.tabs[i].rootPane
+                                      is LeafPane,
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
                   ),
                 ],
               ),
