@@ -95,6 +95,9 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       return true;
     }
 
+    // Don't forward keys when palette is open
+    if (_showPalette) return false;
+
     final s = ref.read(sessionProvider);
     final tab = s.activeTab;
     if (tab == null) return false;
