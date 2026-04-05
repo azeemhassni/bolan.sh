@@ -23,6 +23,7 @@ class CommandBlockWidget extends StatefulWidget {
   final String aiProvider;
   final String geminiModel;
   final String anthropicMode;
+  final bool ligatures;
   final RegExp? searchHighlight;
   final int currentMatchIndex;
   final int blockMatchStartIndex;
@@ -39,6 +40,7 @@ class CommandBlockWidget extends StatefulWidget {
     this.aiProvider = 'gemini',
     this.geminiModel = 'gemma-3-27b-it',
     this.anthropicMode = 'claude-code',
+    this.ligatures = false,
     this.searchHighlight,
     this.currentMatchIndex = -1,
     this.blockMatchStartIndex = 0,
@@ -264,7 +266,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
     // Use colored output if available
     List<TextSpan> spans;
     if (block.rawOutput.isNotEmpty) {
-      final parser = AnsiTextParser(theme);
+      final parser = AnsiTextParser(theme, ligatures: widget.ligatures);
       spans = parser.parse(block.rawOutput, baseStyle: baseStyle);
     } else {
       spans = [TextSpan(text: block.output, style: baseStyle)];
@@ -355,7 +357,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
 
     Widget textWidget;
     if (block.rawOutput.isNotEmpty) {
-      final parser = AnsiTextParser(theme);
+      final parser = AnsiTextParser(theme, ligatures: widget.ligatures);
       final spans = parser.parse(block.rawOutput, baseStyle: baseStyle);
       textWidget = SelectableText.rich(
         TextSpan(children: spans),

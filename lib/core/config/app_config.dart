@@ -40,6 +40,11 @@ class EditorConfig {
   final bool blockMode;
   final bool scrollableBlocks;
 
+  /// Whether to enable OpenType ligatures in block output and prompt.
+  /// Only works with ligature-supporting fonts (JetBrains Mono, Fira Code).
+  /// Does not apply to the live terminal view (xterm.dart limitation).
+  final bool ligatures;
+
   const EditorConfig({
     this.fontFamily = 'Operator Mono',
     this.fontSize = 13.0,
@@ -49,6 +54,7 @@ class EditorConfig {
     this.scrollbackLines = 10000,
     this.blockMode = false,
     this.scrollableBlocks = false,
+    this.ligatures = false,
   });
 }
 

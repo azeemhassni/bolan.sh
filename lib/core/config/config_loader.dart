@@ -114,6 +114,7 @@ class ConfigLoader extends ChangeNotifier {
     sb.writeln('cursor_blink = ${c.editor.cursorBlink}');
     sb.writeln('scrollback_lines = ${c.editor.scrollbackLines}');
     sb.writeln('block_mode = ${c.editor.blockMode}');
+    sb.writeln('ligatures = ${c.editor.ligatures}');
     sb.writeln();
 
     sb.writeln('[ai]');

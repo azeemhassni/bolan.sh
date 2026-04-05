@@ -198,6 +198,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
                     aiProvider: configLoader?.config.ai.provider ?? 'gemini',
                     geminiModel: configLoader?.config.ai.geminiModel ?? 'gemma-3-27b-it',
                     anthropicMode: configLoader?.config.ai.anthropicMode ?? 'claude-code',
+                    ligatures: configLoader?.config.editor.ligatures ?? false,
                     searchHighlight: _buildSearchRegex(),
                     currentMatchIndex: _findCurrentMatch,
                     blockMatchStartIndex: _matchStartIndexForBlock(i),

@@ -14,8 +14,9 @@ import '../../core/theme/bolan_theme.dart';
 /// - Reset (0)
 class AnsiTextParser {
   final BolonTheme theme;
+  final bool ligatures;
 
-  const AnsiTextParser(this.theme);
+  const AnsiTextParser(this.theme, {this.ligatures = false});
 
   /// Parses [input] containing ANSI escape sequences and returns
   /// a list of styled [TextSpan]s.
@@ -233,6 +234,9 @@ class AnsiTextParser {
         if (underline) TextDecoration.underline,
         if (strikethrough) TextDecoration.lineThrough,
       ]),
+      fontFeatures: ligatures
+          ? const [FontFeature.enable('liga'), FontFeature.enable('calt')]
+          : const [FontFeature.disable('liga'), FontFeature.disable('calt')],
     );
   }
 

@@ -35,6 +35,7 @@ class ConfigValidator {
       cursorBlink: _bool(raw['cursor_blink'], true),
       scrollbackLines: _int(raw['scrollback_lines'], 10000, min: 100, max: 100000),
       blockMode: _bool(raw['block_mode'], false),
+      ligatures: _bool(raw['ligatures'], false),
     );
   }
 
