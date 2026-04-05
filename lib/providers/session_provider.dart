@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/pane/pane_manager.dart';
 import '../core/pane/pane_node.dart';
+import '../core/session/session_persistence.dart';
 import '../core/terminal/command_history.dart';
 import '../core/terminal/session.dart';
 import 'config_provider.dart';
@@ -58,13 +60,117 @@ class SessionNotifier extends Notifier<SessionState> {
   @override
   SessionState build() {
     history.load();
-    final tab = _createTab();
+
     ref.onDispose(() {
+      _saveLayout();
       for (final t in state.tabs) {
         PaneManager.disposeAll(t.rootPane);
       }
     });
+
+    // Try to restore previous session layout
+    final restored = _tryRestore();
+    if (restored != null) return restored;
+
+    final tab = _createTab();
     return SessionState(tabs: [tab], activeTabIndex: 0);
+  }
+
+  SessionState? _tryRestore() {
+    final configLoader = ref.read(configLoaderProvider);
+    if (configLoader == null) return null;
+    if (!configLoader.config.general.restoreSessions) return null;
+
+    final layout = SessionPersistence.load();
+    if (layout == null || layout.tabs.isEmpty) return null;
+
+    final tabs = <TabState>[];
+    for (final tabLayout in layout.tabs) {
+      final tab = _restoreTabFromLayout(tabLayout);
+      if (tab != null) tabs.add(tab);
+    }
+    if (tabs.isEmpty) return null;
+
+    final activeIndex = layout.activeTabIndex.clamp(0, tabs.length - 1);
+    return SessionState(tabs: tabs, activeTabIndex: activeIndex);
+  }
+
+  TabState? _restoreTabFromLayout(TabLayout tabLayout) {
+    final rootPane = _restorePaneFromLayout(tabLayout.rootPane);
+    if (rootPane == null) return null;
+    final focusedId = tabLayout.focusedPaneId ??
+        PaneManager.allLeaves(rootPane).first.id;
+    return TabState(rootPane: rootPane, focusedPaneId: focusedId);
+  }
+
+  PaneNode? _restorePaneFromLayout(PaneLayout layout) {
+    switch (layout) {
+      case LeafLayout():
+        final cwd = layout.cwd.isNotEmpty &&
+                Directory(layout.cwd).existsSync()
+            ? layout.cwd
+            : null;
+        final session = TerminalSession.start(
+          id: _uuid.v4(),
+          history: history,
+          workingDirectory: cwd,
+        );
+        final leaf = LeafPane(id: _uuid.v4(), session: session);
+        _attachSessionListener(session);
+
+        final configLoader = ref.read(configLoaderProvider);
+        final startupCommands =
+            configLoader?.config.general.startupCommands;
+        if (startupCommands != null && startupCommands.isNotEmpty) {
+          session.runStartupCommands(startupCommands);
+        }
+
+        return leaf;
+
+      case SplitLayout():
+        final first = _restorePaneFromLayout(layout.first);
+        final second = _restorePaneFromLayout(layout.second);
+        if (first == null || second == null) return first ?? second;
+        return SplitPane(
+          id: _uuid.v4(),
+          first: first,
+          second: second,
+          axis: layout.axis,
+          ratio: layout.ratio,
+        );
+    }
+  }
+
+  void _saveLayout() {
+    final configLoader = ref.read(configLoaderProvider);
+    if (configLoader == null) return;
+    if (!configLoader.config.general.restoreSessions) return;
+
+    final tabs = state.tabs.map((tab) {
+      return TabLayout(
+        rootPane: _serializePane(tab.rootPane),
+        focusedPaneId: tab.focusedPaneId,
+      );
+    }).toList();
+
+    SessionPersistence.save(SessionLayout(
+      tabs: tabs,
+      activeTabIndex: state.activeTabIndex,
+    ));
+  }
+
+  PaneLayout _serializePane(PaneNode node) {
+    switch (node) {
+      case LeafPane():
+        return LeafLayout(cwd: node.session.cwd);
+      case SplitPane():
+        return SplitLayout(
+          first: _serializePane(node.first),
+          second: _serializePane(node.second),
+          axis: node.axis,
+          ratio: node.ratio,
+        );
+    }
   }
 
   // --- Tab operations ---
