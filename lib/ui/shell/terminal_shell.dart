@@ -6,6 +6,7 @@ import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/config_loader.dart';
+import '../../core/notifications/notification_service.dart';
 import '../../core/pane/pane_node.dart';
 import '../../core/platform_shortcuts.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -29,27 +30,40 @@ class TerminalShell extends ConsumerStatefulWidget {
   ConsumerState<TerminalShell> createState() => _TerminalShellState();
 }
 
-class _TerminalShellState extends ConsumerState<TerminalShell> {
+class _TerminalShellState extends ConsumerState<TerminalShell>
+    with WidgetsBindingObserver {
   final _configLoader = ConfigLoader();
+  final _notificationService = NotificationService();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _configLoader.addListener(_onConfigChanged);
     _configLoader.load();
     _configLoader.startWatching();
     HardwareKeyboard.instance.addHandler(_globalKeyHandler);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(configLoaderProvider.notifier).state = _configLoader;
+      ref.read(notificationServiceProvider.notifier).state =
+          _notificationService;
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(_globalKeyHandler);
     _configLoader.removeListener(_onConfigChanged);
     _configLoader.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _notificationService.setAppFocused(
+      state == AppLifecycleState.resumed,
+    );
   }
 
   void _onConfigChanged() {

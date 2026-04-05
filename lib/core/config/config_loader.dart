@@ -103,6 +103,8 @@ class ConfigLoader extends ChangeNotifier {
       sb.writeln('working_directory = "${c.general.workingDirectory}"');
     }
     sb.writeln('restore_sessions = ${c.general.restoreSessions}');
+    sb.writeln('notify_long_running = ${c.general.notifyLongRunning}');
+    sb.writeln('long_running_threshold_seconds = ${c.general.longRunningThresholdSeconds}');
     sb.writeln('prompt_chips = [${c.general.promptChips.map((e) => '"$e"').join(', ')}]');
     sb.writeln();
 

@@ -22,11 +22,18 @@ class GeneralConfig {
   final bool restoreSessions;
   final List<String> promptChips;
 
+  /// Send a system notification when a command runs longer than this
+  /// many seconds and the app is not focused.
+  final bool notifyLongRunning;
+  final int longRunningThresholdSeconds;
+
   const GeneralConfig({
     this.shell = '',
     this.workingDirectory = '',
     this.restoreSessions = false,
     this.promptChips = const ['shell', 'cwd', 'gitBranch', 'gitChanges'],
+    this.notifyLongRunning = true,
+    this.longRunningThresholdSeconds = 10,
   });
 }
 

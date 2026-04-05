@@ -22,6 +22,9 @@ class ConfigValidator {
       restoreSessions: _bool(raw['restore_sessions'], false),
       promptChips: _stringList(raw['prompt_chips'],
           const ['shell', 'cwd', 'gitBranch', 'gitChanges']),
+      notifyLongRunning: _bool(raw['notify_long_running'], true),
+      longRunningThresholdSeconds: _int(
+          raw['long_running_threshold_seconds'], 10, min: 1, max: 3600),
     );
   }
 

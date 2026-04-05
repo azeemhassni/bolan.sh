@@ -38,6 +38,11 @@ class TerminalSession extends ChangeNotifier {
   int _cursorUpCount = 0; // tracks TUI-style cursor movement
   String _oscTitle = ''; // title set by program via OSC 0
 
+  /// Callback invoked when a command finishes. Used by SessionNotifier
+  /// to send long-running command notifications.
+  void Function(String command, Duration duration, int exitCode)?
+      onCommandFinished;
+
   // Status bar state
   String _cwd = '';
   String _gitBranch = '';
@@ -381,9 +386,21 @@ class TerminalSession extends ChangeNotifier {
       finishedAt: DateTime.now(),
       isRunning: false,
     ));
+    final finishedBlock = _blocks.last;
     _activeBlock = null;
     _commandRunning = false;
     _outputCapture.clear();
+
+    // Notify about finished command for long-running notifications
+    if (finishedBlock.finishedAt != null) {
+      final duration =
+          finishedBlock.finishedAt!.difference(finishedBlock.startedAt);
+      onCommandFinished?.call(
+        finishedBlock.command,
+        duration,
+        finishedBlock.exitCode ?? -1,
+      );
+    }
 
     notifyListeners();
   }

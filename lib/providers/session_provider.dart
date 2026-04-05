@@ -8,6 +8,7 @@ import '../core/pane/pane_manager.dart';
 import '../core/pane/pane_node.dart';
 import '../core/terminal/command_history.dart';
 import '../core/terminal/session.dart';
+import 'config_provider.dart';
 
 export '../core/pane/pane_node.dart' show DropPosition;
 
@@ -201,6 +202,29 @@ class SessionNotifier extends Notifier<SessionState> {
 
   void _attachSessionListener(TerminalSession session) {
     session.addListener(_onSessionChanged);
+    session.onCommandFinished = _handleCommandFinished;
+  }
+
+  void _handleCommandFinished(
+      String command, Duration duration, int exitCode) {
+    final configLoader = ref.read(configLoaderProvider);
+    final config = configLoader?.config.general;
+    if (config == null || !config.notifyLongRunning) return;
+
+    final threshold = Duration(seconds: config.longRunningThresholdSeconds);
+    if (duration < threshold) return;
+
+    final notifier = ref.read(notificationServiceProvider);
+    if (notifier == null) return;
+
+    final seconds = duration.inSeconds;
+    final status = exitCode == 0 ? 'succeeded' : 'failed ($exitCode)';
+    final cmd =
+        command.length > 40 ? '${command.substring(0, 40)}...' : command;
+    notifier.notifyIfUnfocused(
+      title: 'Command $status',
+      body: '`$cmd` finished in ${seconds}s',
+    );
   }
 
   Timer? _debounceTimer;
