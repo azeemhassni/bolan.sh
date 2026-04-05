@@ -61,7 +61,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
   bool _showTopArrow = false;
   bool _showBottomArrow = false;
 
-  static const _maxOutputHeight = 400.0;
+  static const _fallbackMaxHeight = 500.0;
 
   @override
   void initState() {
@@ -168,9 +168,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
               if (block.hasOutput)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: widget.scrollable
-                      ? _buildScrollableOutput(block, theme)
-                      : _buildPlainOutput(block, theme),
+                  child: _buildScrollableOutput(block, theme),
                 ),
 
               // Error explanation
@@ -385,15 +383,23 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
       );
     }
 
+    // Use the window height minus some room for header/prompt
+    final maxHeight = MediaQuery.of(context).size.height - 120;
+
     return Stack(
       children: [
         ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: _maxOutputHeight),
-          child: GestureDetector(
-            onSecondaryTapDown: widget.onSecondaryTap,
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              child: textWidget,
+          constraints: BoxConstraints(
+            maxHeight: maxHeight > 0 ? maxHeight : _fallbackMaxHeight,
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: GestureDetector(
+              onSecondaryTapDown: widget.onSecondaryTap,
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                child: textWidget,
+              ),
             ),
           ),
         ),
