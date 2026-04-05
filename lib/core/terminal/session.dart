@@ -87,7 +87,8 @@ class TerminalSession extends ChangeNotifier {
       shell,
       columns: columns,
       rows: rows,
-      workingDirectory: workingDirectory,
+      workingDirectory:
+          workingDirectory ?? Platform.environment['HOME'],
       environment: {
         'TERM': 'xterm-256color',
         'TERM_PROGRAM': 'Bolan',
