@@ -7,6 +7,7 @@ import '../../core/ai/gemini_provider.dart';
 import '../../core/terminal/command_block.dart';
 import '../../core/theme/bolan_theme.dart';
 import 'ansi_text_parser.dart';
+import 'linkified_text.dart';
 
 /// Renders a completed command as a Warp-style block.
 ///
@@ -272,17 +273,30 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
       spans = [TextSpan(text: block.output, style: baseStyle)];
     }
 
+    // Make URLs clickable (Cmd+click / Ctrl+click)
+    final linkedSpans = LinkifiedText.linkify(
+      spans,
+      linkColor: theme.ansiCyan,
+    );
+
     // Apply search highlights if active
     if (widget.searchHighlight != null) {
       spans = _applySearchHighlights(
         block.output, spans, baseStyle, theme,
+      );
+      return GestureDetector(
+        onSecondaryTapDown: widget.onSecondaryTap,
+        child: SelectableText.rich(
+          TextSpan(children: spans),
+          contextMenuBuilder: (_, __) => const SizedBox.shrink(),
+        ),
       );
     }
 
     return GestureDetector(
       onSecondaryTapDown: widget.onSecondaryTap,
       child: SelectableText.rich(
-        TextSpan(children: spans),
+        TextSpan(children: linkedSpans),
         contextMenuBuilder: (_, __) => const SizedBox.shrink(),
       ),
     );
