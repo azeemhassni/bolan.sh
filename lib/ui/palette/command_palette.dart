@@ -101,7 +101,9 @@ class _CommandPaletteState extends State<CommandPalette> {
         child: Center(
           child: GestureDetector(
             onTap: () {}, // prevent dismiss when clicking the palette
-            child: Container(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
               width: 500,
               constraints: const BoxConstraints(maxHeight: 400),
               margin: const EdgeInsets.only(bottom: 100),
@@ -126,6 +128,7 @@ class _CommandPaletteState extends State<CommandPalette> {
                     _buildEmpty(theme),
                 ],
               ),
+            ),
             ),
           ),
         ),
