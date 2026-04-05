@@ -167,7 +167,11 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     final currentTheme = ref.read(activeThemeProvider);
     final s = ref.read(sessionProvider);
     final tab = s.activeTab;
-    if (tab == null) return;
+    if (tab == null) {
+      // No tabs open — treat as quit
+      await _quitWithConfirm();
+      return;
+    }
 
     final leaves = PaneManager.allLeaves(tab.rootPane);
     final hasMultiplePanes = leaves.length > 1;

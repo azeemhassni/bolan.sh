@@ -66,6 +66,7 @@ flutter:
     - assets/shell-integration/
     - assets/fonts/JetBrainsMono/
     - assets/icons/
+    - assets/logo-text.svg
 
   fonts:
     - family: JetBrainsMono
