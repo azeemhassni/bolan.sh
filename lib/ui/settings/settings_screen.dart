@@ -10,6 +10,7 @@ import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/theme_registry.dart';
+import 'font_picker.dart';
 import 'prompt_editor.dart';
 import 'theme_editor.dart';
 
@@ -513,11 +514,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _Field(
         label: 'Font Family',
         theme: theme,
-        child: _Input(
-          value: _config.editor.fontFamily,
-          hint: 'Operator Mono',
+        child: FontPicker(
+          selectedFont: _config.editor.fontFamily,
           theme: theme,
-          onChanged: (v) => _updateEditor(fontFamily: v),
+          onSelected: (v) => _updateEditor(fontFamily: v),
         ),
       ),
       _Field(
