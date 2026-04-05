@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/ai/api_key_storage.dart';
+import '../../core/app_version.dart';
 import '../../core/ai/claude_provider.dart';
 import '../../core/ai/gemini_provider.dart';
 import '../../core/config/app_config.dart';
@@ -92,7 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: Text(
-                        'Bolan v0.1.0',
+                        'Bolan v$appVersion',
                         style: TextStyle(
                           color: theme.dimForeground,
                           fontFamily: 'Operator Mono',

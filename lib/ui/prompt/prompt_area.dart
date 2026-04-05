@@ -19,6 +19,7 @@ import 'prompt_input.dart';
 class PromptArea extends StatefulWidget {
   final TerminalSession session;
   final double fontSize;
+  final bool aiEnabled;
   final String aiProvider;
   final String geminiModel;
   final String anthropicMode;
@@ -32,6 +33,7 @@ class PromptArea extends StatefulWidget {
     super.key,
     required this.session,
     this.fontSize = 13.0,
+    this.aiEnabled = false,
     this.aiProvider = 'gemini',
     this.geminiModel = 'gemma-3-27b-it',
     this.anthropicMode = 'claude-code',
@@ -261,12 +263,13 @@ class _PromptAreaState extends State<PromptArea> {
             key: widget.promptInputKey,
             session: widget.session,
             fontSize: widget.fontSize,
+            aiEnabled: widget.aiEnabled,
             aiProvider: widget.aiProvider,
             geminiModel: widget.geminiModel,
             anthropicMode: widget.anthropicMode,
-            commandSuggestions: widget.commandSuggestions,
-            smartHistorySearch: widget.smartHistorySearch,
-            shareHistory: widget.shareHistory,
+            commandSuggestions: widget.aiEnabled && widget.commandSuggestions,
+            smartHistorySearch: widget.aiEnabled && widget.smartHistorySearch,
+            shareHistory: widget.aiEnabled && widget.shareHistory,
           ),
         ],
       ),

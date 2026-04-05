@@ -195,6 +195,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
                     scrollable: configLoader?.config.editor.scrollableBlocks ?? false,
                     cwd: widget.session.cwd,
                     shellName: widget.session.shellName,
+                    aiEnabled: configLoader?.config.ai.enabled ?? false,
                     aiProvider: configLoader?.config.ai.provider ?? 'gemini',
                     geminiModel: configLoader?.config.ai.geminiModel ?? 'gemma-3-27b-it',
                     anthropicMode: configLoader?.config.ai.anthropicMode ?? 'claude-code',
@@ -207,6 +208,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
                 PromptArea(
                   session: widget.session,
                   fontSize: fontSize,
+                  aiEnabled: configLoader?.config.ai.enabled ?? false,
                   aiProvider: configLoader?.config.ai.provider ?? 'gemini',
                   geminiModel: configLoader?.config.ai.geminiModel ?? 'gemma-3-27b-it',
                   anthropicMode: configLoader?.config.ai.anthropicMode ?? 'claude-code',

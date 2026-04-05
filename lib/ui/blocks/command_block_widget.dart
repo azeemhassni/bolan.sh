@@ -21,6 +21,7 @@ class CommandBlockWidget extends StatefulWidget {
   final bool scrollable;
   final String cwd;
   final String shellName;
+  final bool aiEnabled;
   final String aiProvider;
   final String geminiModel;
   final String anthropicMode;
@@ -38,6 +39,7 @@ class CommandBlockWidget extends StatefulWidget {
     this.scrollable = false,
     this.cwd = '',
     this.shellName = 'zsh',
+    this.aiEnabled = false,
     this.aiProvider = 'gemini',
     this.geminiModel = 'gemma-3-27b-it',
     this.anthropicMode = 'claude-code',
@@ -208,8 +210,8 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                   ),
                 ),
 
-              // "Explain Error" button for failed commands — always visible
-              if (isFailed && _explanation == null)
+              // "Explain Error" button for failed commands
+              if (isFailed && _explanation == null && widget.aiEnabled)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: GestureDetector(

@@ -27,6 +27,7 @@ import 'history_search.dart';
 class PromptInput extends StatefulWidget {
   final TerminalSession session;
   final double fontSize;
+  final bool aiEnabled;
   final String aiProvider;
   final String geminiModel;
   final String anthropicMode;
@@ -38,6 +39,7 @@ class PromptInput extends StatefulWidget {
     super.key,
     required this.session,
     this.fontSize = 13.0,
+    this.aiEnabled = false,
     this.aiProvider = 'gemini',
     this.geminiModel = 'gemma-3-27b-it',
     this.anthropicMode = 'claude-code',
@@ -228,7 +230,8 @@ class PromptInputState extends State<PromptInput> {
   }
 
   void _onTextChanged() {
-    final aiMode = _controller.text.startsWith('#') &&
+    final aiMode = widget.aiEnabled &&
+        _controller.text.startsWith('#') &&
         _controller.text.length > 1;
 
     // Dismiss tab completions when typing
@@ -680,14 +683,14 @@ class PromptInputState extends State<PromptInput> {
   void _onSubmit(String text) {
     final command = text.trim();
 
-    // Git commit intercept: generate AI commit message
-    if (_isGitCommitWithoutMessage(command)) {
+    // Git commit intercept: generate AI commit message (only when enabled)
+    if (widget.aiEnabled && _isGitCommitWithoutMessage(command)) {
       _handleGitCommit();
       return;
     }
 
-    // NLP-to-command: # prefix triggers AI
-    if (command.startsWith('#') && command.length > 1) {
+    // NLP-to-command: # prefix triggers AI (only when enabled)
+    if (widget.aiEnabled && command.startsWith('#') && command.length > 1) {
       final query = command.substring(1).trim();
       if (query.isNotEmpty) {
         _handleNlpQuery(query);
