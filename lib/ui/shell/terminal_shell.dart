@@ -87,6 +87,14 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   bool _globalKeyHandler(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
 
+    // Cmd+Shift+P — command palette (works regardless of focus)
+    if (event.logicalKey == LogicalKeyboardKey.keyP &&
+        isPrimaryModifierPressed &&
+        HardwareKeyboard.instance.isShiftPressed) {
+      _togglePalette();
+      return true;
+    }
+
     final s = ref.read(sessionProvider);
     final tab = s.activeTab;
     if (tab == null) return false;
