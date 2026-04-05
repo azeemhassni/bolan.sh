@@ -157,6 +157,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
 
   /// Cmd+W — close tab with confirmation if needed.
   Future<void> _closeTabWithConfirm() async {
+    final currentTheme = ref.read(activeThemeProvider);
     final s = ref.read(sessionProvider);
     final tab = s.activeTab;
     if (tab == null) return;
@@ -168,6 +169,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     if (hasRunning) {
       final result = await showConfirmDialog(
         context,
+        theme: currentTheme,
         title: 'Kill running processes?',
         message:
             'This tab has running processes. Closing will terminate them.',
@@ -186,6 +188,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     if (hasMultiplePanes) {
       final result = await showConfirmDialog(
         context,
+        theme: currentTheme,
         title: 'Close tab?',
         message: 'This tab has ${leaves.length} panes. Close all or just the current pane?',
         confirmLabel: 'Close Tab',
@@ -204,6 +207,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
 
   /// Cmd+Shift+W — close pane with confirmation if running.
   Future<void> _closePaneWithConfirm() async {
+    final currentTheme = ref.read(activeThemeProvider);
     final s = ref.read(sessionProvider);
     final tab = s.activeTab;
     if (tab == null) return;
@@ -212,6 +216,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     if (session != null && session.isCommandRunning) {
       final result = await showConfirmDialog(
         context,
+        theme: currentTheme,
         title: 'Kill running process?',
         message: 'This pane has a running process. Closing will terminate it.',
         confirmLabel: 'Close Pane',
@@ -225,9 +230,11 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
 
   /// Cmd+Q — quit with confirmation.
   Future<void> _quitWithConfirm() async {
+    final currentTheme = ref.read(activeThemeProvider);
     if (_hasRunningCommands()) {
       final result = await showConfirmDialog(
         context,
+        theme: currentTheme,
         title: 'Quit with running processes?',
         message:
             'There are running processes. Quitting will terminate them.',
@@ -245,6 +252,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     if (confirmOnQuit) {
       final result = await showConfirmDialog(
         context,
+        theme: currentTheme,
         title: 'Quit Bolan?',
         message: 'Are you sure you want to quit?',
         confirmLabel: 'Quit',

@@ -24,14 +24,15 @@ Future<ConfirmResult?> showConfirmDialog(
   String confirmLabel = 'Close',
   String? secondaryLabel,
   bool isDangerous = false,
+  BolonTheme? theme,
 }) async {
-  final theme = BolonTheme.of(context);
+  final t = theme ?? BolonTheme.of(context);
 
   return showDialog<ConfirmResult>(
     context: context,
     barrierColor: Colors.black54,
     builder: (ctx) => Dialog(
-      backgroundColor: theme.blockBackground,
+      backgroundColor: t.blockBackground,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: Container(
         width: 380,
@@ -43,7 +44,7 @@ Future<ConfirmResult?> showConfirmDialog(
             Text(
               title,
               style: TextStyle(
-                color: theme.foreground,
+                color: t.foreground,
                 fontFamily: 'Operator Mono',
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -54,7 +55,7 @@ Future<ConfirmResult?> showConfirmDialog(
             Text(
               message,
               style: TextStyle(
-                color: theme.dimForeground,
+                color: t.dimForeground,
                 fontFamily: 'Operator Mono',
                 fontSize: 13,
                 height: 1.5,
@@ -67,14 +68,14 @@ Future<ConfirmResult?> showConfirmDialog(
               children: [
                 _DialogButton(
                   label: 'Cancel',
-                  theme: theme,
+                  theme: t,
                   onTap: () => Navigator.of(ctx).pop(ConfirmResult.cancel),
                 ),
                 if (secondaryLabel != null) ...[
                   const SizedBox(width: 8),
                   _DialogButton(
                     label: secondaryLabel,
-                    theme: theme,
+                    theme: t,
                     onTap: () =>
                         Navigator.of(ctx).pop(ConfirmResult.closePane),
                   ),
@@ -82,7 +83,7 @@ Future<ConfirmResult?> showConfirmDialog(
                 const SizedBox(width: 8),
                 _DialogButton(
                   label: confirmLabel,
-                  theme: theme,
+                  theme: t,
                   isPrimary: true,
                   isDangerous: isDangerous,
                   onTap: () =>

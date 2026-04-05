@@ -469,6 +469,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onChanged: (v) => _updateGeneral(workingDirectory: v),
         ),
       ),
+      _Toggle(
+        label: 'Confirm on Quit',
+        help: 'Ask before closing the app',
+        value: _config.general.confirmOnQuit,
+        theme: theme,
+        onChanged: (v) => _updateGeneral(confirmOnQuit: v),
+      ),
+      _Toggle(
+        label: 'Restore Sessions',
+        help: 'Reopen tabs and panes on startup',
+        value: _config.general.restoreSessions,
+        theme: theme,
+        onChanged: (v) => _updateGeneral(restoreSessions: v),
+      ),
+      _Toggle(
+        label: 'Long-Running Notifications',
+        help: 'Notify when commands take longer than ${_config.general.longRunningThresholdSeconds}s',
+        value: _config.general.notifyLongRunning,
+        theme: theme,
+        onChanged: (v) => _updateGeneral(notifyLongRunning: v),
+      ),
       Padding(
         padding: const EdgeInsets.only(top: 16),
         child: Text(
@@ -690,14 +711,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ---- Update methods ----
 
-  void _updateGeneral({String? shell, String? workingDirectory}) {
+  void _updateGeneral({
+    String? shell,
+    String? workingDirectory,
+    bool? confirmOnQuit,
+    bool? restoreSessions,
+    bool? notifyLongRunning,
+  }) {
     setState(() {
       _config = AppConfig(
         general: GeneralConfig(
           shell: shell ?? _config.general.shell,
           workingDirectory:
               workingDirectory ?? _config.general.workingDirectory,
-          restoreSessions: _config.general.restoreSessions,
+          restoreSessions:
+              restoreSessions ?? _config.general.restoreSessions,
+          confirmOnQuit: confirmOnQuit ?? _config.general.confirmOnQuit,
+          notifyLongRunning:
+              notifyLongRunning ?? _config.general.notifyLongRunning,
+          longRunningThresholdSeconds:
+              _config.general.longRunningThresholdSeconds,
+          promptChips: _config.general.promptChips,
+          startupCommands: _config.general.startupCommands,
         ),
         editor: _config.editor,
         ai: _config.ai,
