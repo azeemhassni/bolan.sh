@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'shell_history_importer.dart';
+
 /// Persisted command history with search.
 ///
 /// Stores commands in `~/.config/bolan/history` (one per line).
@@ -13,17 +15,37 @@ class CommandHistory {
   List<String> get entries => List.unmodifiable(_entries);
   int get length => _entries.length;
 
-  /// Loads history from disk.
+  /// Loads history from disk. On a fresh install (no Bolan history
+  /// file yet) this also seeds entries from the user's bash/zsh
+  /// history so completions and recall work immediately.
   Future<void> load() async {
     final file = await _historyFile();
     if (await file.exists()) {
       final lines = await file.readAsLines();
       _entries.addAll(lines.where((l) => l.isNotEmpty));
-      // Trim to max size
       if (_entries.length > _maxEntries) {
         _entries.removeRange(0, _entries.length - _maxEntries);
       }
+      return;
     }
+
+    // Fresh install — try to seed from the user's existing shell history.
+    await _bootstrapFromShellHistory();
+  }
+
+  Future<void> _bootstrapFromShellHistory() async {
+    final imported = await ShellHistoryImporter.autoDetect();
+    if (imported == null || imported.isEmpty) return;
+
+    final capped = imported.length > _maxEntries
+        ? imported.sublist(imported.length - _maxEntries)
+        : imported;
+    _entries.addAll(capped);
+
+    // Persist so subsequent launches use the Bolan-owned file.
+    final file = await _historyFile();
+    await file.parent.create(recursive: true);
+    await file.writeAsString('${capped.join('\n')}\n');
   }
 
   /// Adds a command to history and persists it.

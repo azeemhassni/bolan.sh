@@ -20,6 +20,15 @@ class BolonTheme {
   final Color statusBarBackground;
   final Color promptBackground;
 
+  /// Optional accent color for the active tab's top strip. Falls back
+  /// to [cursor] if not specified, so existing themes don't need to
+  /// declare it.
+  final Color? tabAccent;
+
+  /// The accent color actually used for tab UI — [tabAccent] if set,
+  /// otherwise [cursor].
+  Color get effectiveTabAccent => tabAccent ?? cursor;
+
   // Blocks
   final Color blockBackground;
   final Color blockBorder;
@@ -72,6 +81,7 @@ class BolonTheme {
     required this.tabBarBackground,
     required this.statusBarBackground,
     required this.promptBackground,
+    this.tabAccent,
     required this.blockBackground,
     required this.blockBorder,
     required this.blockHeaderFg,
@@ -125,6 +135,7 @@ class BolonTheme {
     Color? tabBarBackground,
     Color? statusBarBackground,
     Color? promptBackground,
+    Color? tabAccent,
     Color? blockBackground,
     Color? blockBorder,
     Color? blockHeaderFg,
@@ -168,6 +179,7 @@ class BolonTheme {
       tabBarBackground: tabBarBackground ?? this.tabBarBackground,
       statusBarBackground: statusBarBackground ?? this.statusBarBackground,
       promptBackground: promptBackground ?? this.promptBackground,
+      tabAccent: tabAccent ?? this.tabAccent,
       blockBackground: blockBackground ?? this.blockBackground,
       blockBorder: blockBorder ?? this.blockBorder,
       blockHeaderFg: blockHeaderFg ?? this.blockHeaderFg,

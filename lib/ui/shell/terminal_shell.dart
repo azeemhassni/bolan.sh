@@ -175,12 +175,11 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       _closeTabWithConfirm();
       return true;
     }
-    if (meta && key == LogicalKeyboardKey.braceRight) {
-      _switchTab(1);
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.braceLeft) {
-      _switchTab(-1);
+    // Ctrl+Tab / Ctrl+Shift+Tab — next/previous tab (browser convention,
+    // works the same way on macOS, Linux, and Windows).
+    final ctrl = HardwareKeyboard.instance.isControlPressed;
+    if (ctrl && key == LogicalKeyboardKey.tab) {
+      _switchTab(shift ? -1 : 1);
       return true;
     }
     if (meta && key == LogicalKeyboardKey.keyD && shift) {

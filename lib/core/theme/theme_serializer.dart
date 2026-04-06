@@ -39,6 +39,7 @@ class ThemeSerializer {
       tabBarBackground: _color(window, 'tab_bar_background', base.tabBarBackground),
       statusBarBackground: _color(window, 'status_bar_background', base.statusBarBackground),
       promptBackground: _color(window, 'prompt_background', base.promptBackground),
+      tabAccent: _colorOrNull(window, 'tab_accent'),
 
       blockBackground: _color(blocks, 'background', base.blockBackground),
       blockBorder: _color(blocks, 'border', base.blockBorder),
@@ -90,6 +91,9 @@ class ThemeSerializer {
     sb.writeln('tab_bar_background = "${_hex(t.tabBarBackground)}"');
     sb.writeln('status_bar_background = "${_hex(t.statusBarBackground)}"');
     sb.writeln('prompt_background = "${_hex(t.promptBackground)}"');
+    if (t.tabAccent != null) {
+      sb.writeln('tab_accent = "${_hex(t.tabAccent!)}"');
+    }
     sb.writeln();
     sb.writeln('[blocks]');
     sb.writeln('background = "${_hex(t.blockBackground)}"');
@@ -141,6 +145,12 @@ class ThemeSerializer {
     final value = map[key];
     if (value is! String) return fallback;
     return _parseHex(value) ?? fallback;
+  }
+
+  static Color? _colorOrNull(Map<String, dynamic> map, String key) {
+    final value = map[key];
+    if (value is! String) return null;
+    return _parseHex(value);
   }
 
   static Color? _parseHex(String hex) {

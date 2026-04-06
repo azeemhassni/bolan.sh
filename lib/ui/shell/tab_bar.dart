@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -158,10 +159,17 @@ class _TabState extends State<_Tab> {
   bool _editing = false;
   late TextEditingController _editController;
 
-  /// Whether the title needs gradient fade (exceeds available space).
-  /// We use a LayoutBuilder to detect this.
-  static const _maxTabWidth = 180.0;
+  /// True briefly after a running command finishes successfully so the
+  /// tab can flash a checkmark before settling back to idle.
+  bool _showSuccess = false;
+  Timer? _successFadeTimer;
+  static const _successFadeDelay = Duration(seconds: 3);
+
+  static const _maxTabWidth = 200.0;
+  static const _minTabWidth = 130.0;
   static const _fontSize = 11.0;
+  static const _accentHeight = 2.0;
+  static const _closeSlotWidth = 14.0;
 
   @override
   void initState() {
@@ -170,7 +178,27 @@ class _TabState extends State<_Tab> {
   }
 
   @override
+  void didUpdateWidget(_Tab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Detect running → idle transition (with no error). Briefly show
+    // a checkmark, then fade back to plain idle.
+    if (oldWidget.status == TabStatus.running &&
+        widget.status == TabStatus.idle) {
+      setState(() => _showSuccess = true);
+      _successFadeTimer?.cancel();
+      _successFadeTimer = Timer(_successFadeDelay, () {
+        if (mounted) setState(() => _showSuccess = false);
+      });
+    } else if (widget.status != TabStatus.idle && _showSuccess) {
+      // Any new activity supersedes the success fade.
+      _successFadeTimer?.cancel();
+      _showSuccess = false;
+    }
+  }
+
+  @override
   void dispose() {
+    _successFadeTimer?.cancel();
     _editController.dispose();
     super.dispose();
   }
@@ -261,15 +289,18 @@ class _TabState extends State<_Tab> {
 
   @override
   Widget build(BuildContext context) {
+    final t = widget.theme;
+    // Active tab matches the content area below — visually connecting
+    // the selected tab to the panel it controls. Inactive tabs blend
+    // into the bar; hover lifts them slightly.
     final bg = widget.isActive
-        ? widget.theme.tabBarBackground
+        ? t.background
         : _hovered
-            ? widget.theme.statusChipBg
-            : widget.theme.blockBackground;
-    final fg = widget.isActive
-        ? widget.theme.foreground
-        : widget.theme.dimForeground;
+            ? t.statusChipBg
+            : t.tabBarBackground;
+    final fg = widget.isActive ? t.foreground : t.dimForeground;
     final fontWeight = widget.isActive ? FontWeight.w500 : FontWeight.normal;
+    final showCloseButton = _hovered || widget.isActive;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -285,48 +316,78 @@ class _TabState extends State<_Tab> {
           message: widget.fullTitle,
           waitDuration: const Duration(milliseconds: 600),
           child: Container(
+            margin: const EdgeInsets.only(right: 2),
             constraints: const BoxConstraints(
               maxWidth: _maxTabWidth,
-              minWidth: 130,
+              minWidth: _minTabWidth,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
               color: bg,
-              border: Border(
-                right: BorderSide(
-                  color: widget.theme.blockBorder,
-                  width: 1,
-                ),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(6),
+                topRight: Radius.circular(6),
               ),
             ),
-            child: _editing
-                ? _buildEditField(fg)
-                : Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _StatusIcon(
-                              status: widget.status, theme: widget.theme),
-                          Flexible(child: _buildTitle(fg, fontWeight)),
-                        ],
-                      ),
-                      if (_hovered && !_editing)
-                        Positioned(
-                          right: 0,
-                          child: GestureDetector(
-                            onTap: widget.onClose,
-                            child: Icon(
-                              Icons.close,
-                              size: 11,
-                              color: widget.theme.dimForeground,
-                            ),
-                          ),
+            child: Stack(
+              children: [
+                // Accent strip on top of the active tab.
+                if (widget.isActive)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: _accentHeight,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: t.effectiveTabAccent,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(6),
+                          topRight: Radius.circular(6),
                         ),
-                    ],
+                      ),
+                    ),
                   ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: _editing
+                      ? _buildEditField(fg)
+                      : Row(
+                          mainAxisSize: MainAxisSize.max,
+                          children: [
+                            _StatusIcon(
+                              status: widget.status,
+                              showSuccess: _showSuccess,
+                              theme: t,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Center(
+                                child: _buildTitle(fg, fontWeight),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            SizedBox(
+                              width: _closeSlotWidth,
+                              height: _closeSlotWidth,
+                              child: showCloseButton
+                                  ? GestureDetector(
+                                      onTap: widget.onClose,
+                                      child: MouseRegion(
+                                        cursor: SystemMouseCursors.click,
+                                        child: Icon(
+                                          Icons.close,
+                                          size: 11,
+                                          color: t.dimForeground,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          ],
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -429,39 +490,116 @@ class _TabState extends State<_Tab> {
   }
 }
 
-class _StatusIcon extends StatelessWidget {
+/// Status indicator at the start of each tab. Reserves a fixed slot
+/// so the title doesn't shift as state changes.
+///
+/// - running: pulsing dot in `ansiGreen`
+/// - error: filled red circle
+/// - success (transient post-run): green checkmark
+/// - idle: empty slot (still reserves space)
+class _StatusIcon extends StatefulWidget {
   final TabStatus status;
+  final bool showSuccess;
   final BolonTheme theme;
 
-  const _StatusIcon({required this.status, required this.theme});
+  const _StatusIcon({
+    required this.status,
+    required this.showSuccess,
+    required this.theme,
+  });
+
+  @override
+  State<_StatusIcon> createState() => _StatusIconState();
+}
+
+class _StatusIconState extends State<_StatusIcon>
+    with SingleTickerProviderStateMixin {
+  static const double _slotSize = 11;
+
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
+    if (widget.status == TabStatus.running) {
+      _pulseController.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(_StatusIcon old) {
+    super.didUpdateWidget(old);
+    final wasRunning = old.status == TabStatus.running;
+    final isRunning = widget.status == TabStatus.running;
+    if (isRunning && !wasRunning) {
+      _pulseController.repeat(reverse: true);
+    } else if (!isRunning && wasRunning) {
+      _pulseController.stop();
+      _pulseController.value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    switch (status) {
+    final t = widget.theme;
+
+    Widget child;
+    switch (widget.status) {
       case TabStatus.running:
-        return Padding(
-          padding: const EdgeInsets.only(right: 5),
-          child: Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: theme.ansiGreen,
-              shape: BoxShape.circle,
-            ),
-          ),
+        child = AnimatedBuilder(
+          animation: _pulseController,
+          builder: (_, __) {
+            // Pulse opacity between 0.45 and 1.0.
+            final v = 0.45 + (_pulseController.value * 0.55);
+            return Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: t.ansiGreen.withValues(alpha: v),
+                shape: BoxShape.circle,
+              ),
+            );
+          },
         );
+        break;
       case TabStatus.error:
-        return Padding(
-          padding: const EdgeInsets.only(right: 5),
-          child: Icon(
-            Icons.error_outline,
-            size: 11,
-            color: theme.exitFailureFg,
+        child = Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: t.exitFailureFg,
+            shape: BoxShape.circle,
           ),
         );
+        break;
       case TabStatus.idle:
-        return const SizedBox.shrink();
+        if (widget.showSuccess) {
+          child = Icon(
+            Icons.check,
+            size: 10,
+            color: t.exitSuccessFg,
+          );
+        } else {
+          child = const SizedBox.shrink();
+        }
+        break;
     }
+
+    return SizedBox(
+      width: _slotSize,
+      height: _slotSize,
+      child: Center(child: child),
+    );
   }
 }
 
