@@ -58,7 +58,7 @@ class PromptInputState extends State<PromptInput> {
   String _savedInput = '';
 
   // Completion state
-  List<String> _completions = [];
+  List<CompletionItem> _completions = [];
   int _completionIndex = 0;
   CompletionResult? _activeResult;
   bool _completionLoading = false;
@@ -86,7 +86,7 @@ class PromptInputState extends State<PromptInput> {
 
     // Tab completion ghost takes priority
     if (_completions.isNotEmpty && _activeResult != null) {
-      final current = _completions[_completionIndex];
+      final current = _completions[_completionIndex].text;
       final prefix = _activeResult!.prefix;
       if (current.length > prefix.length) {
         return current.substring(prefix.length);
@@ -169,7 +169,7 @@ class PromptInputState extends State<PromptInput> {
     final position = box.localToGlobal(Offset.zero);
     final screenHeight = MediaQuery.of(context).size.height;
     final spaceBelow = screenHeight - position.dy - box.size.height;
-    final itemHeight = widget.fontSize * 1.8;
+    final itemHeight = widget.fontSize * 2.2;
     final popupHeight = _completions.length.clamp(1, 8) * itemHeight + 8;
 
     // Show below if there's room, otherwise above
@@ -630,9 +630,9 @@ class PromptInputState extends State<PromptInput> {
       if (!mounted) return;
 
       if (result.isSingle) {
-        _applyCompletion(result.items.first, result);
+        _applyCompletion(result.items.first.text, result);
       } else if (result.items.isNotEmpty) {
-        final lcp = longestCommonPrefix(result.items);
+        final lcp = longestCommonPrefix(result.texts);
         if (lcp.length > result.prefix.length) {
           _applyCompletion(lcp, result);
         }
@@ -650,7 +650,7 @@ class PromptInputState extends State<PromptInput> {
 
   void _acceptCompletion(int index) {
     if (_activeResult == null || index >= _completions.length) return;
-    _applyCompletion(_completions[index], _activeResult!);
+    _applyCompletion(_completions[index].text, _activeResult!);
     setState(() {
       _completions = [];
       _activeResult = null;

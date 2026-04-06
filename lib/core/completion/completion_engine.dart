@@ -1,8 +1,24 @@
 import 'dart:io';
 
+/// Type of a completion item.
+enum CompletionType { command, builtin, file, directory }
+
+/// A single completion candidate with metadata.
+class CompletionItem {
+  final String text;
+  final CompletionType type;
+  final String? description;
+
+  const CompletionItem({
+    required this.text,
+    this.type = CompletionType.command,
+    this.description,
+  });
+}
+
 /// Result of a tab completion request.
 class CompletionResult {
-  final List<String> items;
+  final List<CompletionItem> items;
   final String prefix;
   final int replaceStart;
   final int replaceEnd;
@@ -16,6 +32,9 @@ class CompletionResult {
 
   bool get isEmpty => items.isEmpty;
   bool get isSingle => items.length == 1;
+
+  /// Plain text list for backward compat.
+  List<String> get texts => items.map((i) => i.text).toList();
 }
 
 /// Generates shell completions using Dart's own filesystem APIs for
@@ -44,13 +63,11 @@ class CompletionEngine {
     final isFirstWord = words.length <= 1;
 
     try {
-      List<String> items;
+      List<CompletionItem> items;
 
       if (isFirstWord && !currentWord.contains('/')) {
-        // Command completion
         items = await _completeCommand(currentWord);
       } else {
-        // File/path completion
         items = await _completePath(currentWord, cwd);
       }
 
@@ -66,7 +83,7 @@ class CompletionEngine {
   }
 
   /// Completes file and directory paths using Dart IO.
-  Future<List<String>> _completePath(String partial, String cwd) async {
+  Future<List<CompletionItem>> _completePath(String partial, String cwd) async {
     // Expand ~ to home directory
     var expanded = partial;
     final home = Platform.environment['HOME'] ?? '';
@@ -95,14 +112,13 @@ class CompletionEngine {
     final dir = Directory(dirPath);
     if (!await dir.exists()) return [];
 
-    final items = <String>[];
+    final items = <CompletionItem>[];
     try {
       await for (final entity in dir.list()) {
         final name = entity.path.split('/').last;
         if (name.startsWith('.') && !namePrefix.startsWith('.')) continue;
         if (!name.toLowerCase().startsWith(namePrefix.toLowerCase())) continue;
 
-        // Build the completion string matching the user's input style
         String completion;
         if (partial.contains('/')) {
           final prefix = partial.substring(0, partial.lastIndexOf('/') + 1);
@@ -111,25 +127,28 @@ class CompletionEngine {
           completion = name;
         }
 
-        if (entity is Directory) {
-          completion = '$completion/';
-        }
+        final isDir = entity is Directory;
+        if (isDir) completion = '$completion/';
 
-        items.add(completion);
+        items.add(CompletionItem(
+          text: completion,
+          type: isDir ? CompletionType.directory : CompletionType.file,
+        ));
       }
     } on FileSystemException {
       return [];
     }
 
-    items.sort();
+    items.sort((a, b) => a.text.compareTo(b.text));
     return items;
   }
 
-  /// Completes command names from PATH.
-  Future<List<String>> _completeCommand(String partial) async {
+  /// Completes command names from PATH, identifies builtins.
+  Future<List<CompletionItem>> _completeCommand(String partial) async {
     if (partial.isEmpty) return [];
 
-    final items = <String>{};
+    final pathCommands = <String>{};
+    final builtins = <String>{};
     final pathDirs = Platform.environment['PATH']?.split(':') ?? [];
 
     for (final dirPath in pathDirs) {
@@ -139,21 +158,19 @@ class CompletionEngine {
         await for (final entity in dir.list()) {
           if (entity is! File) continue;
           final name = entity.path.split('/').last;
-          if (name.startsWith(partial)) {
-            items.add(name);
-          }
+          if (name.startsWith(partial)) pathCommands.add(name);
         }
       } on FileSystemException {
         continue;
       }
     }
 
-    // Also add shell builtins/aliases via the shell
+    // Get builtins separately so we can tag them
     try {
       final shellName = _shell.split('/').last;
       final script = shellName == 'zsh'
-          ? "print -l \${(k)commands} \${(k)aliases} \${(k)builtins} 2>/dev/null | grep '^$partial' | sort -u"
-          : "compgen -abc -- '$partial' 2>/dev/null | sort -u";
+          ? "print -l \${(k)builtins} 2>/dev/null | grep '^$partial' | sort -u"
+          : "compgen -b -- '$partial' 2>/dev/null | sort -u";
 
       final result = await Process.run(
         _shell,
@@ -164,15 +181,48 @@ class CompletionEngine {
       if (result.exitCode == 0) {
         for (final line in (result.stdout as String).split('\n')) {
           final trimmed = line.trim();
-          if (trimmed.isNotEmpty) items.add(trimmed);
+          if (trimmed.isNotEmpty) builtins.add(trimmed);
         }
       }
     } on Exception {
-      // Ignore — we already have PATH completions
+      // Ignore
     }
 
-    final sorted = items.toList()..sort();
-    return sorted;
+    // Also get aliases and other commands
+    try {
+      final shellName = _shell.split('/').last;
+      final script = shellName == 'zsh'
+          ? "print -l \${(k)commands} \${(k)aliases} 2>/dev/null | grep '^$partial' | sort -u"
+          : "compgen -ac -- '$partial' 2>/dev/null | sort -u";
+
+      final result = await Process.run(
+        _shell,
+        ['-c', script],
+        environment: Platform.environment,
+      ).timeout(const Duration(seconds: 2));
+
+      if (result.exitCode == 0) {
+        for (final line in (result.stdout as String).split('\n')) {
+          final trimmed = line.trim();
+          if (trimmed.isNotEmpty) pathCommands.add(trimmed);
+        }
+      }
+    } on Exception {
+      // Ignore
+    }
+
+    // Merge and sort — builtins first, then commands
+    final all = <String>{...builtins, ...pathCommands};
+    final sorted = all.toList()..sort();
+
+    return sorted.map((name) {
+      final isBuiltin = builtins.contains(name);
+      return CompletionItem(
+        text: name,
+        type: isBuiltin ? CompletionType.builtin : CompletionType.command,
+        description: isBuiltin ? 'Shell builtin' : null,
+      );
+    }).toList();
   }
 
   CompletionResult _empty(int cursorPos) {
