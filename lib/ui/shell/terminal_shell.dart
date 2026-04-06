@@ -6,6 +6,7 @@ import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/actions/app_action.dart';
+import '../../core/ai/ai_provider_helper.dart';
 import '../../core/ai/model_manager.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/notifications/notification_service.dart';
@@ -56,6 +57,8 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     _configLoader.addListener(_onConfigChanged);
     _configLoader.load();
     _configLoader.startWatching();
+    AiProviderHelper.configuredLocalModelSize =
+        _configLoader.config.ai.localModelSize;
     HardwareKeyboard.instance.addHandler(_globalKeyHandler);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(configLoaderProvider.notifier).state = _configLoader;
@@ -92,6 +95,8 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     if (config.activeTheme != currentTheme) {
       ref.read(activeThemeNameProvider.notifier).state = config.activeTheme;
     }
+    // Sync local model size for AI provider
+    AiProviderHelper.configuredLocalModelSize = config.ai.localModelSize;
   }
 
   /// Global key handler: forwards printable key presses to the focused pane's

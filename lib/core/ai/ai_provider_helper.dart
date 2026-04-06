@@ -17,17 +17,20 @@ class AiProviderHelper {
   /// Cached local provider instance (server lifecycle is shared).
   static LocalLlmProvider? _localProvider;
 
+  /// Set by TerminalShell when config loads/changes.
+  /// Used to read localModelSize without threading it through every widget.
+  static String configuredLocalModelSize = 'small';
+
   /// Creates an [AiProvider] from widget-level parameters.
   static Future<AiProvider?> create({
     required String providerName,
     String geminiModel = 'gemma-3-27b-it',
     String anthropicMode = 'claude-code',
-    String localModelSize = 'small',
   }) async {
     switch (providerName) {
       case 'local':
         final size = ModelSize.values.firstWhere(
-          (s) => s.name == localModelSize,
+          (s) => s.name == configuredLocalModelSize,
           orElse: () => ModelSize.small,
         );
         // Recreate if preferred size changed

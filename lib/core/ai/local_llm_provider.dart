@@ -37,6 +37,9 @@ class LocalLlmProvider implements AiProvider {
 
   @override
   Future<String> generateContent(String prompt) async {
+    // ignore: avoid_print
+    print('[AI] LocalLLM preferredSize=${_preferredSize.name} '
+        'activeSize=${ModelManager.downloadedSize()?.name}');
     await _ensureServerRunning();
     return _client!.generateContent(prompt);
   }

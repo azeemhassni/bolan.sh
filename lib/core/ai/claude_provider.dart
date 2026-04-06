@@ -22,6 +22,10 @@ class ClaudeProvider implements AiProvider {
 
   @override
   Future<String> generateContent(String prompt) async {
+    // ignore: avoid_print
+    print('[AI] provider=ClaudeCode');
+    // ignore: avoid_print
+    print('[AI] prompt:\n${prompt.length > 500 ? '${prompt.substring(0, 500)}...' : prompt}');
     final result = await Process.run(
       'claude',
       ['-p', prompt],

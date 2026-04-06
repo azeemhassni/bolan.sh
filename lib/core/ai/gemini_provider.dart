@@ -30,6 +30,10 @@ class GeminiProvider implements AiProvider {
 
   @override
   Future<String> generateContent(String prompt) async {
+    // ignore: avoid_print
+    print('[AI] provider=Gemini model=$_model');
+    // ignore: avoid_print
+    print('[AI] prompt:\n${prompt.length > 500 ? '${prompt.substring(0, 500)}...' : prompt}');
     final response = await _dio.post<Map<String, dynamic>>(
       '/models/$_model:generateContent',
       queryParameters: {'key': _apiKey},
