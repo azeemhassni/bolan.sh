@@ -3,11 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/ai/api_key_storage.dart';
+import '../../core/ai/ai_provider_helper.dart';
 import '../../core/ai/features/command_suggest.dart';
 import '../../core/ai/features/git_commit.dart';
 import '../../core/ai/features/nlp_to_command.dart';
-import '../../core/ai/gemini_provider.dart';
 import '../../core/ai/history_sanitizer.dart';
 import '../../core/completion/completion_engine.dart';
 import '../../core/platform_shortcuts.dart';
@@ -719,25 +718,16 @@ class PromptInputState extends State<PromptInput> {
     aiModeNotifier.value = true;
 
     try {
-      final useClaudeCode = widget.aiProvider == 'anthropic' &&
-          widget.anthropicMode == 'claude-code';
-
-      GeminiProvider? geminiProvider;
-      if (!useClaudeCode) {
-        try {
-          final apiKey = await ApiKeyStorage.readKey(widget.aiProvider);
-          if (apiKey != null && apiKey.isNotEmpty) {
-            geminiProvider = GeminiProvider(apiKey: apiKey, model: widget.geminiModel);
-          }
-        } on Exception {
-          // Keychain error
-        }
+      final provider = await AiProviderHelper.create(
+        providerName: widget.aiProvider,
+        geminiModel: widget.geminiModel,
+        anthropicMode: widget.anthropicMode,
+      );
+      if (provider == null) {
+        throw Exception('No AI provider available. Check Settings > AI.');
       }
 
-      final nlp = NlpToCommand(
-        geminiProvider: geminiProvider,
-        useClaudeCode: useClaudeCode,
-      );
+      final nlp = NlpToCommand(provider: provider);
 
       final recentCommands = HistorySanitizer.sanitize(
         widget.session.blocks
@@ -794,28 +784,14 @@ class PromptInputState extends State<PromptInput> {
     if (_aiLoading) return;
 
     try {
-      final useClaudeCode = widget.aiProvider == 'anthropic' &&
-          widget.anthropicMode == 'claude-code';
-
-      GeminiProvider? geminiProvider;
-      if (!useClaudeCode) {
-        try {
-          final apiKey = await ApiKeyStorage.readKey(widget.aiProvider);
-          if (apiKey != null && apiKey.isNotEmpty) {
-            geminiProvider = GeminiProvider(
-                apiKey: apiKey, model: widget.geminiModel);
-          }
-        } on Exception {
-          // Keychain error
-        }
-      }
-
-      if (geminiProvider == null && !useClaudeCode) return;
-
-      final suggestor = CommandSuggestor(
-        geminiProvider: geminiProvider,
-        useClaudeCode: useClaudeCode,
+      final provider = await AiProviderHelper.create(
+        providerName: widget.aiProvider,
+        geminiModel: widget.geminiModel,
+        anthropicMode: widget.anthropicMode,
       );
+      if (provider == null) return;
+
+      final suggestor = CommandSuggestor(provider: provider);
 
       // Build history list — only if user consented, always sanitized
       final rawHistory = widget.shareHistory
@@ -875,25 +851,17 @@ class PromptInputState extends State<PromptInput> {
     aiModeNotifier.value = true;
 
     try {
-      final useClaudeCode = widget.aiProvider == 'anthropic' &&
-          widget.anthropicMode == 'claude-code';
-
-      GeminiProvider? geminiProvider;
-      if (!useClaudeCode) {
-        try {
-          final apiKey = await ApiKeyStorage.readKey(widget.aiProvider);
-          if (apiKey != null && apiKey.isNotEmpty) {
-            geminiProvider = GeminiProvider(apiKey: apiKey, model: widget.geminiModel);
-          }
-        } on Exception {
-          // Keychain error
-        }
+      final provider = await AiProviderHelper.create(
+        providerName: widget.aiProvider,
+        geminiModel: widget.geminiModel,
+        anthropicMode: widget.anthropicMode,
+      );
+      if (provider == null) {
+        _showAiError('No AI provider available. Check Settings > AI.');
+        return;
       }
 
-      final generator = GitCommitGenerator(
-        geminiProvider: geminiProvider,
-        useClaudeCode: useClaudeCode,
-      );
+      final generator = GitCommitGenerator(provider: provider);
       final message = await generator.generate(widget.session.cwd);
 
       if (!mounted) return;

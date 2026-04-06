@@ -1,21 +1,14 @@
-import '../claude_provider.dart';
-import '../gemini_provider.dart';
+import '../ai_provider.dart';
 import '../history_sanitizer.dart';
 
 /// AI-powered history search that understands natural language queries.
 ///
-/// "the command I used to deploy" → finds `./deploy.sh production`
-/// "how did I install that package" → finds `npm install express`
+/// "the command I used to deploy" -> finds `./deploy.sh production`
+/// "how did I install that package" -> finds `npm install express`
 class SmartHistorySearch {
-  final GeminiProvider? _geminiProvider;
-  final bool _useClaudeCode;
-  final ClaudeProvider _claudeProvider = ClaudeProvider();
+  final AiProvider _provider;
 
-  SmartHistorySearch({
-    GeminiProvider? geminiProvider,
-    bool useClaudeCode = false,
-  })  : _geminiProvider = geminiProvider,
-        _useClaudeCode = useClaudeCode;
+  SmartHistorySearch({required AiProvider provider}) : _provider = provider;
 
   /// Searches history using AI to understand the intent.
   /// Returns matching commands ranked by relevance.
@@ -25,20 +18,9 @@ class SmartHistorySearch {
   }) async {
     if (history.isEmpty) return [];
 
-    // Sanitize before sending
     final sanitized = HistorySanitizer.sanitize(history);
     final prompt = _buildPrompt(query, sanitized);
-
-    String response;
-    if (_useClaudeCode) {
-      if (!await ClaudeProvider.isAvailable()) return [];
-      response = await _claudeProvider.generateContent(prompt);
-    } else if (_geminiProvider != null) {
-      response = await _geminiProvider.generateContent(prompt);
-    } else {
-      return [];
-    }
-
+    final response = await _provider.generateContent(prompt);
     return _parseResponse(response, history);
   }
 
@@ -85,10 +67,8 @@ Numbers:''';
   /// (worth sending to AI instead of simple string match).
   static bool isNaturalLanguage(String query) {
     if (query.length < 8) return false;
-    // Contains multiple words and doesn't look like a command
     final words = query.trim().split(RegExp(r'\s+'));
     if (words.length < 3) return false;
-    // Contains question-like words
     const nlWords = {
       'the', 'that', 'which', 'how', 'what', 'when', 'where',
       'find', 'show', 'used', 'did', 'was', 'command', 'last',

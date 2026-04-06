@@ -87,7 +87,7 @@ class AiConfig {
   final bool shareHistory; // consent to send history to AI for better suggestions
 
   const AiConfig({
-    this.provider = 'gemini',
+    this.provider = 'local',
     this.model = '',
     this.ollamaUrl = 'http://127.0.0.1:11434',
     this.geminiModel = 'gemma-3-27b-it',

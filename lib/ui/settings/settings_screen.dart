@@ -2,10 +2,9 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/ai/ai_provider_helper.dart';
 import '../../core/ai/api_key_storage.dart';
 import '../../core/app_version.dart';
-import '../../core/ai/claude_provider.dart';
-import '../../core/ai/gemini_provider.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -1438,48 +1437,33 @@ class _TestConnectionButtonState extends State<_TestConnectionButton> {
 
     try {
       final config = widget.config;
+      final provider = await AiProviderHelper.create(
+        providerName: config.provider,
+        geminiModel: config.geminiModel,
+        anthropicMode: config.anthropicMode,
+      );
 
-      if (config.provider == 'anthropic' &&
-          config.anthropicMode == 'claude-code') {
-        final available = await ClaudeProvider.isAvailable();
-        if (available) {
-          final provider = ClaudeProvider();
-          await provider.generateContent('Say "ok" and nothing else.');
-          setState(() {
-            _result = 'Claude Code connected';
-            _success = true;
-          });
-        } else {
-          setState(() {
-            _result = 'Claude Code not found in PATH';
-            _success = false;
-          });
-        }
-      } else {
-        String? apiKey;
-        try {
-          apiKey = await ApiKeyStorage.readKey(config.provider);
-        } on Exception {
-          // Keychain error
-        }
-        if (apiKey == null || apiKey.isEmpty) {
-          setState(() {
-            _result = 'No API key configured';
-            _success = false;
-          });
-          return;
-        }
-
-        final provider = GeminiProvider(
-          apiKey: apiKey,
-          model: config.geminiModel,
-        );
-        await provider.generateContent('Say "ok" and nothing else.');
+      if (provider == null) {
         setState(() {
-          _result = 'Connected to ${config.provider}';
-          _success = true;
+          _result = 'No API key configured';
+          _success = false;
         });
+        return;
       }
+
+      if (!await provider.isAvailable()) {
+        setState(() {
+          _result = '${provider.displayName} not available';
+          _success = false;
+        });
+        return;
+      }
+
+      await provider.generateContent('Say "ok" and nothing else.');
+      setState(() {
+        _result = 'Connected to ${provider.displayName}';
+        _success = true;
+      });
     } on Exception catch (e) {
       setState(() {
         _result = '$e';

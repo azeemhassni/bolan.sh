@@ -1,17 +1,12 @@
 import 'dart:io';
 
-import '../claude_provider.dart';
-import '../gemini_provider.dart';
+import '../ai_provider.dart';
 
 /// Explains command errors and suggests fixes using AI.
 class ErrorExplainer {
-  final GeminiProvider? _geminiProvider;
-  final bool _useClaudeCode;
-  final ClaudeProvider _claudeProvider = ClaudeProvider();
+  final AiProvider _provider;
 
-  ErrorExplainer({GeminiProvider? geminiProvider, bool useClaudeCode = false})
-      : _geminiProvider = geminiProvider,
-        _useClaudeCode = useClaudeCode;
+  ErrorExplainer({required AiProvider provider}) : _provider = provider;
 
   /// Explains why a command failed and suggests a fix.
   Future<String> explain({
@@ -22,18 +17,7 @@ class ErrorExplainer {
     required String shellName,
   }) async {
     final prompt = _buildPrompt(command, output, exitCode, cwd, shellName);
-
-    if (_useClaudeCode) {
-      if (await ClaudeProvider.isAvailable()) {
-        return _claudeProvider.generateContent(prompt);
-      }
-      throw Exception('Claude Code is not installed.');
-    }
-
-    if (_geminiProvider == null) {
-      throw Exception('No AI provider available.');
-    }
-    return _geminiProvider.generateContent(prompt);
+    return _provider.generateContent(prompt);
   }
 
   String _buildPrompt(
@@ -44,7 +28,6 @@ class ErrorExplainer {
     String shellName,
   ) {
     final os = Platform.operatingSystem;
-    // Limit output to avoid token overflow
     final trimmedOutput = output.length > 3000
         ? '${output.substring(0, 3000)}\n... (truncated)'
         : output;

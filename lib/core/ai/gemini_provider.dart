@@ -1,10 +1,12 @@
 import 'package:dio/dio.dart';
 
+import 'ai_provider.dart';
+
 /// HTTP client for Google's Gemini API (Google AI Studio).
 ///
 /// Uses the free-tier `generativelanguage.googleapis.com` endpoint.
 /// API key passed as a query parameter.
-class GeminiProvider {
+class GeminiProvider implements AiProvider {
   final Dio _dio;
   final String _apiKey;
   final String _model;
@@ -18,7 +20,15 @@ class GeminiProvider {
           receiveTimeout: const Duration(seconds: 30),
         ));
 
-  /// Sends a prompt to Gemini and returns the text response.
+  @override
+  String get displayName => 'Gemini';
+
+  @override
+  Future<bool> isAvailable() async {
+    return _apiKey.isNotEmpty;
+  }
+
+  @override
   Future<String> generateContent(String prompt) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/models/$_model:generateContent',

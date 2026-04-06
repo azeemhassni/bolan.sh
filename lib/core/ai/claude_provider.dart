@@ -1,12 +1,17 @@
 import 'dart:io';
 
+import 'ai_provider.dart';
+
 /// AI provider that uses the Claude Code CLI (`claude -p`) for responses.
 ///
 /// No API key needed — Claude Code handles its own authentication.
 /// Falls back gracefully if `claude` is not installed.
-class ClaudeProvider {
-  /// Checks if the `claude` CLI is available in PATH.
-  static Future<bool> isAvailable() async {
+class ClaudeProvider implements AiProvider {
+  @override
+  String get displayName => 'Claude Code';
+
+  @override
+  Future<bool> isAvailable() async {
     try {
       final result = await Process.run('which', ['claude']);
       return result.exitCode == 0;
@@ -15,9 +20,7 @@ class ClaudeProvider {
     }
   }
 
-  /// Sends a prompt to Claude Code and returns the response.
-  ///
-  /// Uses `claude -p` (print mode) for non-interactive single-shot queries.
+  @override
   Future<String> generateContent(String prompt) async {
     final result = await Process.run(
       'claude',

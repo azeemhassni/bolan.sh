@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/ai/api_key_storage.dart';
+import '../../core/ai/ai_provider_helper.dart';
 import '../../core/ai/features/smart_history_search.dart';
-import '../../core/ai/gemini_provider.dart';
 import '../../core/theme/bolan_theme.dart';
 
 /// Inline history search popup triggered by Ctrl+R.
@@ -124,26 +123,14 @@ class _HistorySearchState extends State<HistorySearch> {
     setState(() => _aiSearching = true);
 
     try {
-      final useClaudeCode = widget.aiProvider == 'anthropic' &&
-          widget.anthropicMode == 'claude-code';
-
-      GeminiProvider? geminiProvider;
-      if (!useClaudeCode) {
-        try {
-          final apiKey = await ApiKeyStorage.readKey(widget.aiProvider);
-          if (apiKey != null && apiKey.isNotEmpty) {
-            geminiProvider = GeminiProvider(
-                apiKey: apiKey, model: widget.geminiModel);
-          }
-        } on Exception {
-          // Keychain error
-        }
-      }
-
-      final searcher = SmartHistorySearch(
-        geminiProvider: geminiProvider,
-        useClaudeCode: useClaudeCode,
+      final provider = await AiProviderHelper.create(
+        providerName: widget.aiProvider,
+        geminiModel: widget.geminiModel,
+        anthropicMode: widget.anthropicMode,
       );
+      if (provider == null) return;
+
+      final searcher = SmartHistorySearch(provider: provider);
 
       final results = await searcher.search(
         query: query,

@@ -1,7 +1,6 @@
 import 'dart:io';
 
-import '../claude_provider.dart';
-import '../gemini_provider.dart';
+import '../ai_provider.dart';
 
 /// Suggests the next command based on context using AI.
 ///
@@ -9,13 +8,9 @@ import '../gemini_provider.dart';
 /// current directory, git status, and the last command's output to
 /// predict what the user likely wants to run next.
 class CommandSuggestor {
-  final GeminiProvider? _geminiProvider;
-  final bool _useClaudeCode;
-  final ClaudeProvider _claudeProvider = ClaudeProvider();
+  final AiProvider _provider;
 
-  CommandSuggestor({GeminiProvider? geminiProvider, bool useClaudeCode = false})
-      : _geminiProvider = geminiProvider,
-        _useClaudeCode = useClaudeCode;
+  CommandSuggestor({required AiProvider provider}) : _provider = provider;
 
   /// Suggests the next command based on context.
   /// Returns null if no suggestion is appropriate.
@@ -34,16 +29,7 @@ class CommandSuggestor {
       shellName, recentHistory, gitBranch, gitDirty,
     );
 
-    String response;
-    if (_useClaudeCode) {
-      if (!await ClaudeProvider.isAvailable()) return null;
-      response = await _claudeProvider.generateContent(prompt);
-    } else if (_geminiProvider != null) {
-      response = await _geminiProvider.generateContent(prompt);
-    } else {
-      return null;
-    }
-
+    final response = await _provider.generateContent(prompt);
     return _cleanResponse(response);
   }
 

@@ -1,19 +1,12 @@
 import 'dart:io';
 
-import '../claude_provider.dart';
-import '../gemini_provider.dart';
+import '../ai_provider.dart';
 
 /// Generates git commit messages from staged changes using AI.
-///
-/// Tries Claude Code CLI first, falls back to Gemini.
 class GitCommitGenerator {
-  final GeminiProvider? _geminiProvider;
-  final bool _useClaudeCode;
-  final ClaudeProvider _claudeProvider = ClaudeProvider();
+  final AiProvider _provider;
 
-  GitCommitGenerator({GeminiProvider? geminiProvider, bool useClaudeCode = false})
-      : _geminiProvider = geminiProvider,
-        _useClaudeCode = useClaudeCode;
+  GitCommitGenerator({required AiProvider provider}) : _provider = provider;
 
   /// Gets the staged diff and generates a commit message.
   /// Returns null if there are no staged changes.
@@ -22,21 +15,7 @@ class GitCommitGenerator {
     if (diff.isEmpty) return null;
 
     final prompt = _buildPrompt(diff);
-
-    // Use Claude Code if configured
-    if (_useClaudeCode) {
-      if (await ClaudeProvider.isAvailable()) {
-        final response = await _claudeProvider.generateContent(prompt);
-        return _cleanResponse(response);
-      }
-      throw Exception('Claude Code is not installed. Install it or switch to API mode in Settings.');
-    }
-
-    // Use Gemini/other API provider
-    if (_geminiProvider == null) {
-      throw Exception('No AI provider available. Install Claude Code or set a Gemini API key.');
-    }
-    final response = await _geminiProvider.generateContent(prompt);
+    final response = await _provider.generateContent(prompt);
     return _cleanResponse(response);
   }
 
@@ -82,9 +61,7 @@ $diff''';
           inFence = !inFence;
           continue;
         }
-        if (inFence) {
-          inner.add(line);
-        }
+        if (inFence) inner.add(line);
       }
       if (inner.isNotEmpty) msg = inner.join('\n').trim();
     }

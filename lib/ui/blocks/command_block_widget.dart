@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/ai/api_key_storage.dart';
+import '../../core/ai/ai_provider_helper.dart';
 import '../../core/ai/features/error_explain.dart';
-import '../../core/ai/gemini_provider.dart';
 import '../../core/terminal/command_block.dart';
 import '../../core/theme/bolan_theme.dart';
 import 'ansi_text_parser.dart';
@@ -442,28 +441,14 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
     setState(() => _explaining = true);
 
     try {
-      final useClaudeCode = widget.aiProvider == 'anthropic' &&
-          widget.anthropicMode == 'claude-code';
-
-      GeminiProvider? geminiProvider;
-      if (!useClaudeCode) {
-        try {
-          final apiKey = await ApiKeyStorage.readKey(widget.aiProvider);
-          if (apiKey != null && apiKey.isNotEmpty) {
-            geminiProvider = GeminiProvider(
-              apiKey: apiKey,
-              model: widget.geminiModel,
-            );
-          }
-        } on Exception {
-          // Keychain error
-        }
-      }
-
-      final explainer = ErrorExplainer(
-        geminiProvider: geminiProvider,
-        useClaudeCode: useClaudeCode,
+      final provider = await AiProviderHelper.create(
+        providerName: widget.aiProvider,
+        geminiModel: widget.geminiModel,
+        anthropicMode: widget.anthropicMode,
       );
+      if (provider == null) throw Exception('No AI provider available.');
+
+      final explainer = ErrorExplainer(provider: provider);
 
       final result = await explainer.explain(
         command: widget.block.command,
