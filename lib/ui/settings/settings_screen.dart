@@ -640,7 +640,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.only(top: 8),
             child: _LocalModelCard(
               theme: theme,
+              activeSize: _config.ai.localModelSize,
               onChanged: () => setState(() {}),
+              onSizeChanged: (size) =>
+                  _updateAi(localModelSize: size),
             ),
           ),
         ];
@@ -802,6 +805,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? commandSuggestions,
     bool? smartHistorySearch,
     bool? shareHistory,
+    String? localModelSize,
   }) {
     setState(() {
       _config = AppConfig(
@@ -809,6 +813,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         editor: _config.editor,
         ai: AiConfig(
           provider: provider ?? _config.ai.provider,
+          localModelSize: localModelSize ?? _config.ai.localModelSize,
           model: model ?? _config.ai.model,
           ollamaUrl: ollamaUrl ?? _config.ai.ollamaUrl,
           geminiModel: geminiModel ?? _config.ai.geminiModel,
@@ -1598,9 +1603,16 @@ class _ThemeCard extends StatelessWidget {
 /// Inline card for local model size selection, download, and status.
 class _LocalModelCard extends StatefulWidget {
   final BolonTheme theme;
+  final String activeSize;
   final VoidCallback onChanged;
+  final ValueChanged<String> onSizeChanged;
 
-  const _LocalModelCard({required this.theme, required this.onChanged});
+  const _LocalModelCard({
+    required this.theme,
+    required this.activeSize,
+    required this.onChanged,
+    required this.onSizeChanged,
+  });
 
   @override
   State<_LocalModelCard> createState() => _LocalModelCardState();
@@ -1618,7 +1630,10 @@ class _LocalModelCardState extends State<_LocalModelCard> {
   @override
   void initState() {
     super.initState();
-    _selectedSize = ModelManager.downloadedSize() ?? ModelSize.small;
+    _selectedSize = ModelSize.values.firstWhere(
+      (s) => s.name == widget.activeSize,
+      orElse: () => ModelManager.downloadedSize() ?? ModelSize.small,
+    );
   }
 
   bool get _isSelectedDownloaded =>
@@ -1663,6 +1678,8 @@ class _LocalModelCardState extends State<_LocalModelCard> {
           _downloading = false;
           _paused = false;
         });
+        // Auto-activate the newly downloaded model
+        widget.onSizeChanged(_selectedSize.name);
         widget.onChanged();
       },
       onError: (error) {
@@ -1717,7 +1734,10 @@ class _LocalModelCardState extends State<_LocalModelCard> {
   Widget build(BuildContext context) {
     final t = widget.theme;
     final info = modelInfoMap[_selectedSize]!;
-    final currentDownloaded = ModelManager.downloadedSize();
+    final configuredSize = ModelSize.values.firstWhere(
+      (s) => s.name == widget.activeSize,
+      orElse: () => ModelSize.small,
+    );
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1741,7 +1761,13 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                   theme: t,
                   onTap: _downloading
                       ? null
-                      : () => setState(() => _selectedSize = size),
+                      : () {
+                          setState(() => _selectedSize = size);
+                          // If this size is downloaded, make it the active model
+                          if (ModelManager.isModelDownloaded(size)) {
+                            widget.onSizeChanged(size.name);
+                          }
+                        },
                 ),
               ],
             ],
@@ -1773,7 +1799,7 @@ class _LocalModelCardState extends State<_LocalModelCard> {
           // Action row
           Row(
             children: [
-              if (_isSelectedDownloaded && currentDownloaded == _selectedSize)
+              if (_isSelectedDownloaded && configuredSize == _selectedSize)
                 Row(
                   children: [
                     const Icon(Icons.check_circle,

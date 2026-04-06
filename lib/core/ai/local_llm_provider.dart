@@ -16,9 +16,16 @@ class LocalLlmProvider implements AiProvider {
   static const _port = 8847;
   static const _baseUrl = 'http://127.0.0.1:$_port';
 
+  final ModelSize _preferredSize;
+
+  /// The model size this provider is configured to use.
+  ModelSize get preferredSize => _preferredSize;
   Process? _serverProcess;
   bool _starting = false;
   OpenAiCompatibleProvider? _client;
+
+  LocalLlmProvider({ModelSize preferredSize = ModelSize.small})
+      : _preferredSize = preferredSize;
 
   @override
   String get displayName => 'Local LLM';
@@ -48,7 +55,10 @@ class LocalLlmProvider implements AiProvider {
     _starting = true;
     try {
       final runtimePath = ModelManager.runtimePath();
-      final size = ModelManager.downloadedSize();
+      // Use preferred size if downloaded, fall back to any available
+      final size = ModelManager.isModelDownloaded(_preferredSize)
+          ? _preferredSize
+          : ModelManager.downloadedSize();
       if (size == null || !File(runtimePath).existsSync()) {
         throw Exception(
           'Local AI model not downloaded. Go to Settings > AI to download it.',

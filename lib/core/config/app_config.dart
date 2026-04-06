@@ -75,6 +75,7 @@ class EditorConfig {
 
 class AiConfig {
   final String provider;
+  final String localModelSize;
   final String model;
   final String ollamaUrl;
   final String geminiModel;
@@ -88,6 +89,7 @@ class AiConfig {
 
   const AiConfig({
     this.provider = 'local',
+    this.localModelSize = 'small',
     this.model = '',
     this.ollamaUrl = 'http://127.0.0.1:11434',
     this.geminiModel = 'gemma-3-27b-it',

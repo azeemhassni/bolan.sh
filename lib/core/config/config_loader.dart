@@ -125,6 +125,7 @@ class ConfigLoader extends ChangeNotifier {
 
     sb.writeln('[ai]');
     sb.writeln('provider = "${c.ai.provider}"');
+    sb.writeln('local_model_size = "${c.ai.localModelSize}"');
     if (c.ai.model.isNotEmpty) sb.writeln('model = "${c.ai.model}"');
     sb.writeln('ollama_url = "${c.ai.ollamaUrl}"');
     sb.writeln('gemini_model = "${c.ai.geminiModel}"');
