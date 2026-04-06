@@ -42,8 +42,9 @@ Context:
 $recent
 
 Rules:
-- Respond with ONLY the shell command, nothing else
-- No explanations, no markdown, no code fences, no comments
+- Respond with ONLY the raw shell command, nothing else
+- Do NOT wrap output in backticks, markdown, or code fences
+- Do NOT add explanations, comments, or formatting of any kind
 - If multiple commands are needed, chain them with && or ;
 - Use commands appropriate for the given OS and shell
 - Prefer common, portable commands when possible
@@ -72,6 +73,11 @@ Query: $query''';
       if (inner.isNotEmpty) {
         cmd = inner.join('\n').trim();
       }
+    }
+
+    // Strip inline backticks (e.g., `ls -la`)
+    if (cmd.startsWith('`') && cmd.endsWith('`')) {
+      cmd = cmd.substring(1, cmd.length - 1);
     }
 
     // Strip leading $ or > prompt characters (per line)

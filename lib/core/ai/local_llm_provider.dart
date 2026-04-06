@@ -47,8 +47,10 @@ class LocalLlmProvider implements AiProvider {
 
     _starting = true;
     try {
+      final runtimePath = ModelManager.runtimePath();
       final modelPath = ModelManager.modelPath();
-      if (!File(modelPath).existsSync()) {
+      if (!File(runtimePath).existsSync() ||
+          !File(modelPath).existsSync()) {
         throw Exception(
           'Local AI model not downloaded. Go to Settings > AI to download it.',
         );
@@ -58,14 +60,12 @@ class LocalLlmProvider implements AiProvider {
       await _killStaleServer();
 
       _serverProcess = await Process.start(
-        modelPath,
+        runtimePath,
         [
           '--server',
           '--port', '$_port',
           '--host', '127.0.0.1',
-          '--temp', '0',
-          '--ctx-size', '2048',
-          '--log-disable',
+          '-m', modelPath,
         ],
         mode: ProcessStartMode.detached,
       );

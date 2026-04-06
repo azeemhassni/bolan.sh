@@ -8,31 +8,47 @@ import 'dart:io';
 class ModelManager {
   ModelManager._();
 
-  static const _modelFileName = 'bolan-ai.llamafile';
-  static const defaultDownloadUrl =
+  static const _runtimeFileName = 'llamafile';
+  static const _modelFileName = 'bolan-ai.gguf';
+  static const defaultRuntimeUrl =
+      'https://github.com/azeemhassni/ai.bolan.sh/releases/latest/download/$_runtimeFileName';
+  static const defaultModelUrl =
       'https://github.com/azeemhassni/ai.bolan.sh/releases/latest/download/$_modelFileName';
 
-  /// Returns the full path to the model file.
-  static String modelPath() {
+  /// Returns the directory for model files.
+  static String modelsDir() {
     final home = Platform.environment['HOME'] ?? '';
-    return '$home/.config/bolan/models/$_modelFileName';
+    return '$home/.config/bolan/models';
   }
 
-  /// Whether the model file exists on disk.
+  /// Returns the full path to the llamafile runtime binary.
+  static String runtimePath() => '${modelsDir()}/$_runtimeFileName';
+
+  /// Returns the full path to the GGUF model weights.
+  static String modelPath() => '${modelsDir()}/$_modelFileName';
+
+  /// Whether both the runtime and model exist on disk.
   static bool isModelDownloaded() {
-    return File(modelPath()).existsSync();
+    return File(runtimePath()).existsSync() &&
+        File(modelPath()).existsSync();
   }
 
-  /// Returns the model file size in bytes, or 0 if not downloaded.
+  /// Returns the combined size of runtime + model in bytes.
   static int modelSize() {
-    final file = File(modelPath());
-    return file.existsSync() ? file.lengthSync() : 0;
+    var size = 0;
+    final runtime = File(runtimePath());
+    final model = File(modelPath());
+    if (runtime.existsSync()) size += runtime.lengthSync();
+    if (model.existsSync()) size += model.lengthSync();
+    return size;
   }
 
-  /// Deletes the downloaded model.
+  /// Deletes both the runtime and model files.
   static Future<void> deleteModel() async {
-    final file = File(modelPath());
-    if (file.existsSync()) await file.delete();
+    final runtime = File(runtimePath());
+    final model = File(modelPath());
+    if (runtime.existsSync()) await runtime.delete();
+    if (model.existsSync()) await model.delete();
   }
 
   /// Downloads the model from [url] with progress reporting.
@@ -42,7 +58,7 @@ class ModelManager {
   ///
   /// Returns a [ModelDownload] handle that can be used to cancel.
   static ModelDownload download({
-    String url = defaultDownloadUrl,
+    String url = defaultModelUrl,
     required void Function(int received, int total) onProgress,
     required void Function() onComplete,
     required void Function(String error) onError,
