@@ -25,7 +25,7 @@ class LocalLlmProvider implements AiProvider {
 
   @override
   Future<bool> isAvailable() async {
-    return ModelManager.isModelDownloaded();
+    return ModelManager.downloadedSize() != null;
   }
 
   @override
@@ -48,9 +48,8 @@ class LocalLlmProvider implements AiProvider {
     _starting = true;
     try {
       final runtimePath = ModelManager.runtimePath();
-      final modelPath = ModelManager.modelPath();
-      if (!File(runtimePath).existsSync() ||
-          !File(modelPath).existsSync()) {
+      final size = ModelManager.downloadedSize();
+      if (size == null || !File(runtimePath).existsSync()) {
         throw Exception(
           'Local AI model not downloaded. Go to Settings > AI to download it.',
         );
@@ -65,7 +64,7 @@ class LocalLlmProvider implements AiProvider {
           '--server',
           '--port', '$_port',
           '--host', '127.0.0.1',
-          '-m', modelPath,
+          '-m', ModelManager.modelPath(size),
         ],
         mode: ProcessStartMode.detached,
       );

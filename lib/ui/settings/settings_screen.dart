@@ -1586,7 +1586,7 @@ class _ThemeCard extends StatelessWidget {
   }
 }
 
-/// Inline card for local model status with download progress.
+/// Inline card for local model size selection, download, and status.
 class _LocalModelCard extends StatefulWidget {
   final BolonTheme theme;
   final VoidCallback onChanged;
@@ -1598,13 +1598,20 @@ class _LocalModelCard extends StatefulWidget {
 }
 
 class _LocalModelCardState extends State<_LocalModelCard> {
+  ModelSize _selectedSize = ModelSize.small;
   bool _downloading = false;
   int _received = 0;
   int _total = -1;
   String? _error;
   ModelDownload? _download;
 
-  bool get _downloaded => ModelManager.isModelDownloaded();
+  @override
+  void initState() {
+    super.initState();
+    _selectedSize = ModelManager.downloadedSize() ?? ModelSize.small;
+  }
+
+  bool get _isSelectedDownloaded => ModelManager.isModelDownloaded(_selectedSize);
 
   double get _progress =>
       _total > 0 ? (_received / _total).clamp(0.0, 1.0) : 0;
@@ -1626,6 +1633,7 @@ class _LocalModelCardState extends State<_LocalModelCard> {
     });
 
     _download = ModelManager.download(
+      size: _selectedSize,
       onProgress: (received, total) {
         if (!mounted) return;
         setState(() {
@@ -1662,6 +1670,8 @@ class _LocalModelCardState extends State<_LocalModelCard> {
   @override
   Widget build(BuildContext context) {
     final t = widget.theme;
+    final info = modelInfoMap[_selectedSize]!;
+    final currentDownloaded = ModelManager.downloadedSize();
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -1672,30 +1682,83 @@ class _LocalModelCardState extends State<_LocalModelCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Model size selector
           Row(
             children: [
-              Icon(
-                _downloaded ? Icons.check_circle : Icons.memory,
-                size: 16,
-                color:
-                    _downloaded ? const Color(0xFF00FF92) : t.dimForeground,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _downloaded ? 'Model downloaded' : 'Local AI Model',
+              for (final size in ModelSize.values) ...[
+                if (size != ModelSize.values.first)
+                  const SizedBox(width: 6),
+                _ModelSizeChip(
+                  size: size,
+                  isSelected: _selectedSize == size,
+                  isDownloaded: ModelManager.isModelDownloaded(size),
+                  theme: t,
+                  onTap: _downloading
+                      ? null
+                      : () => setState(() => _selectedSize = size),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Selected model info
+          Text(
+            info.description,
+            style: TextStyle(
+              color: t.foreground,
+              fontFamily: t.fontFamily,
+              fontSize: 12,
+              decoration: TextDecoration.none,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Download: ${info.downloadSize}  ·  RAM: ${info.ramRequired}',
+            style: TextStyle(
+              color: t.dimForeground,
+              fontFamily: t.fontFamily,
+              fontSize: 11,
+              decoration: TextDecoration.none,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Action row
+          Row(
+            children: [
+              if (_isSelectedDownloaded && currentDownloaded == _selectedSize)
+                Row(
+                  children: [
+                    const Icon(Icons.check_circle,
+                        size: 14, color: Color(0xFF00FF92)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Active  ·  ${_formatBytes(ModelManager.modelFileSize(_selectedSize))}',
+                      style: TextStyle(
+                        color: t.dimForeground,
+                        fontFamily: t.fontFamily,
+                        fontSize: 11,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ],
+                )
+              else if (_isSelectedDownloaded)
+                Text(
+                  'Downloaded  ·  ${_formatBytes(ModelManager.modelFileSize(_selectedSize))}',
                   style: TextStyle(
-                    color: t.foreground,
+                    color: t.dimForeground,
                     fontFamily: t.fontFamily,
-                    fontSize: 13,
+                    fontSize: 11,
                     decoration: TextDecoration.none,
                   ),
                 ),
-              ),
-              if (_downloaded)
+              const Spacer(),
+              if (_isSelectedDownloaded)
                 GestureDetector(
                   onTap: () async {
-                    await ModelManager.deleteModel();
+                    await ModelManager.deleteModel(_selectedSize);
                     setState(() {});
                     widget.onChanged();
                   },
@@ -1712,7 +1775,7 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                     ),
                   ),
                 ),
-              if (!_downloaded && !_downloading)
+              if (!_isSelectedDownloaded && !_downloading)
                 GestureDetector(
                   onTap: _startDownload,
                   child: MouseRegion(
@@ -1755,32 +1818,8 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                 ),
             ],
           ),
-          if (!_downloaded && !_downloading && _error == null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                'Runs locally — no data leaves your machine (~1.3 GB)',
-                style: TextStyle(
-                  color: t.dimForeground,
-                  fontFamily: t.fontFamily,
-                  fontSize: 11,
-                  decoration: TextDecoration.none,
-                ),
-              ),
-            ),
-          if (_downloaded)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                '${_formatBytes(ModelManager.modelSize())} on disk',
-                style: TextStyle(
-                  color: t.dimForeground,
-                  fontFamily: t.fontFamily,
-                  fontSize: 11,
-                  decoration: TextDecoration.none,
-                ),
-              ),
-            ),
+
+          // Download progress
           if (_downloading) ...[
             const SizedBox(height: 10),
             ClipRRect(
@@ -1804,6 +1843,8 @@ class _LocalModelCardState extends State<_LocalModelCard> {
               ),
             ),
           ],
+
+          // Error
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -1827,6 +1868,69 @@ class _LocalModelCardState extends State<_LocalModelCard> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _ModelSizeChip extends StatelessWidget {
+  final ModelSize size;
+  final bool isSelected;
+  final bool isDownloaded;
+  final BolonTheme theme;
+  final VoidCallback? onTap;
+
+  const _ModelSizeChip({
+    required this.size,
+    required this.isSelected,
+    required this.isDownloaded,
+    required this.theme,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final info = modelInfoMap[size]!;
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor:
+            onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? theme.blockBackground : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: isSelected
+                  ? const Color(0xFF00FF92)
+                  : theme.blockBorder,
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isDownloaded)
+                const Padding(
+                  padding: EdgeInsets.only(right: 4),
+                  child:
+                      Icon(Icons.check, size: 12, color: Color(0xFF00FF92)),
+                ),
+              Text(
+                info.label,
+                style: TextStyle(
+                  color: isSelected ? theme.foreground : theme.dimForeground,
+                  fontFamily: theme.fontFamily,
+                  fontSize: 12,
+                  fontWeight:
+                      isSelected ? FontWeight.w600 : FontWeight.normal,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
