@@ -28,13 +28,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late AppConfig _config;
   int _selectedTab = 0;
 
-  static const _tabs = ['Appearance', 'Prompt', 'General', 'Editor', 'AI'];
+  static const _tabs = ['General', 'Editor', 'Appearance', 'AI', 'Prompt'];
   static const _tabIcons = [
-    Icons.palette_outlined,
-    Icons.terminal_outlined,
     Icons.settings_outlined,
     Icons.edit_outlined,
+    Icons.palette_outlined,
     Icons.auto_awesome_outlined,
+    Icons.terminal_outlined,
   ];
   static const _maxContentWidth = 860.0;
 
@@ -148,11 +148,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   List<Widget> _buildTabContent(BolonTheme theme) {
     return switch (_selectedTab) {
-      0 => _buildAppearanceTab(theme),
-      1 => _buildPromptTab(theme),
-      2 => _buildGeneralTab(theme),
-      3 => _buildEditorTab(theme),
-      4 => _buildAiTab(theme),
+      0 => _buildGeneralTab(theme),
+      1 => _buildEditorTab(theme),
+      2 => _buildAppearanceTab(theme),
+      3 => _buildAiTab(theme),
+      4 => _buildPromptTab(theme),
       _ => [],
     };
   }
@@ -567,6 +567,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onChanged: (v) => _updateEditor(scrollbackLines: v.round()),
         ),
       ),
+      _Toggle(
+        label: 'Ligatures',
+        help: 'Enable font ligatures in block output (e.g., => != ->)',
+        value: _config.editor.ligatures,
+        theme: theme,
+        onChanged: (v) => _updateEditor(ligatures: v),
+      ),
     ];
   }
 
@@ -760,6 +767,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String? cursorStyle,
     bool? cursorBlink,
     int? scrollbackLines,
+    bool? ligatures,
   }) {
     setState(() {
       _config = AppConfig(
@@ -773,6 +781,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           scrollbackLines: scrollbackLines ?? _config.editor.scrollbackLines,
           blockMode: _config.editor.blockMode,
           scrollableBlocks: _config.editor.scrollableBlocks,
+          ligatures: ligatures ?? _config.editor.ligatures,
         ),
         ai: _config.ai,
         activeTheme: _config.activeTheme,
@@ -1755,7 +1764,7 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                   ),
                 ),
               const Spacer(),
-              if (_isSelectedDownloaded)
+              if (_isSelectedDownloaded && !_downloading)
                 GestureDetector(
                   onTap: () async {
                     await ModelManager.deleteModel(_selectedSize);
