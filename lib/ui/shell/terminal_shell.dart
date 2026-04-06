@@ -99,17 +99,83 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   bool _globalKeyHandler(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
 
-    // Cmd+Shift+P — command palette (works regardless of focus)
-    if (event.logicalKey == LogicalKeyboardKey.keyP &&
-        isPrimaryModifierPressed &&
-        HardwareKeyboard.instance.isShiftPressed) {
+    final meta = isPrimaryModifierPressed;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
+    final alt = HardwareKeyboard.instance.isAltPressed;
+    final key = event.logicalKey;
+
+    // ── Global shortcuts (always work, any focus state) ──
+
+    if (meta && shift && key == LogicalKeyboardKey.keyP) {
       _togglePalette();
       return true;
     }
-
-    // Cmd+Q — quit (works regardless of focus)
-    if (event.logicalKey == LogicalKeyboardKey.keyQ && isPrimaryModifierPressed) {
+    if (meta && key == LogicalKeyboardKey.keyQ) {
       _quitWithConfirm();
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.comma) {
+      _openSettings();
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.keyT) {
+      ref.read(sessionProvider.notifier).createTab();
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.keyW && shift) {
+      _closePaneWithConfirm();
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.keyW) {
+      _closeTabWithConfirm();
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.braceRight) {
+      _switchTab(1);
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.braceLeft) {
+      _switchTab(-1);
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.keyD && shift) {
+      ref.read(sessionProvider.notifier).splitPane(Axis.vertical);
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.keyD) {
+      ref.read(sessionProvider.notifier).splitPane(Axis.horizontal);
+      return true;
+    }
+    if (meta && alt && key == LogicalKeyboardKey.arrowLeft) {
+      ref.read(sessionProvider.notifier).navigatePane(AxisDirection.left);
+      return true;
+    }
+    if (meta && alt && key == LogicalKeyboardKey.arrowRight) {
+      ref.read(sessionProvider.notifier).navigatePane(AxisDirection.right);
+      return true;
+    }
+    if (meta && alt && key == LogicalKeyboardKey.arrowUp) {
+      ref.read(sessionProvider.notifier).navigatePane(AxisDirection.up);
+      return true;
+    }
+    if (meta && alt && key == LogicalKeyboardKey.arrowDown) {
+      ref.read(sessionProvider.notifier).navigatePane(AxisDirection.down);
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.keyF) {
+      // Handled by session_view — just consume to prevent DANG
+      return false;
+    }
+    if (meta && key == LogicalKeyboardKey.equal) {
+      ref.read(fontSizeProvider.notifier).increase();
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.minus) {
+      ref.read(fontSizeProvider.notifier).decrease();
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.digit0) {
+      ref.read(fontSizeProvider.notifier).reset();
       return true;
     }
 
@@ -123,8 +189,8 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     final promptState = PaneFocusRegistry.get(tab.focusedPaneId);
     if (promptState == null) return false;
 
-    // Cmd+L (macOS) / Ctrl+L (Linux) — focus prompt and select all
-    if (event.logicalKey == LogicalKeyboardKey.keyL && isPrimaryModifierPressed) {
+    // Cmd+L — focus prompt and select all
+    if (meta && key == LogicalKeyboardKey.keyL) {
       promptState.requestFocus();
       promptState.selectAll();
       return true;
@@ -486,55 +552,6 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       theme: theme,
       child: Focus(
         autofocus: true,
-        child: CallbackShortcuts(
-        bindings: {
-          primaryActivator(LogicalKeyboardKey.comma):
-              _openSettings,
-          primaryActivator(LogicalKeyboardKey.keyT):
-              () => ref.read(sessionProvider.notifier).createTab(),
-          primaryActivator(LogicalKeyboardKey.keyW):
-              _closeTabWithConfirm,
-          // Tab switching
-          primaryActivator(LogicalKeyboardKey.braceRight):
-              () => _switchTab(1),
-          primaryActivator(LogicalKeyboardKey.braceLeft):
-              () => _switchTab(-1),
-          // Pane splitting
-          primaryActivator(LogicalKeyboardKey.keyD):
-              () => ref
-                  .read(sessionProvider.notifier)
-                  .splitPane(Axis.horizontal),
-          primaryActivator(LogicalKeyboardKey.keyD, shift: true):
-              () => ref
-                  .read(sessionProvider.notifier)
-                  .splitPane(Axis.vertical),
-          // Close pane
-          primaryActivator(LogicalKeyboardKey.keyW, shift: true):
-              _closePaneWithConfirm,
-          // Pane navigation
-          primaryActivator(LogicalKeyboardKey.arrowLeft, alt: true):
-              () => ref
-                  .read(sessionProvider.notifier)
-                  .navigatePane(AxisDirection.left),
-          primaryActivator(LogicalKeyboardKey.arrowRight, alt: true):
-              () => ref
-                  .read(sessionProvider.notifier)
-                  .navigatePane(AxisDirection.right),
-          primaryActivator(LogicalKeyboardKey.arrowUp, alt: true):
-              () => ref
-                  .read(sessionProvider.notifier)
-                  .navigatePane(AxisDirection.up),
-          primaryActivator(LogicalKeyboardKey.arrowDown, alt: true):
-              () => ref
-                  .read(sessionProvider.notifier)
-                  .navigatePane(AxisDirection.down),
-          // Quit
-          primaryActivator(LogicalKeyboardKey.keyQ):
-              _quitWithConfirm,
-          // Command palette
-          primaryActivator(LogicalKeyboardKey.keyP, shift: true):
-              _togglePalette,
-        },
         child: Stack(
           children: [
             AnimatedContainer(
@@ -592,7 +609,6 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                 }),
               ),
           ],
-        ),
         ),
       ),
     );

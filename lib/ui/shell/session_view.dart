@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
 
-import '../../core/platform_shortcuts.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/xterm_theme.dart';
@@ -142,17 +140,6 @@ class _SessionViewState extends ConsumerState<SessionView> {
           ref.read(sessionProvider.notifier).setFocusedPane(widget.paneId!);
         }
       },
-      child: CallbackShortcuts(
-      bindings: {
-        primaryActivator(LogicalKeyboardKey.keyF):
-            _toggleFindBar,
-        primaryActivator(LogicalKeyboardKey.equal):
-            _increaseFontSize,
-        primaryActivator(LogicalKeyboardKey.minus):
-            _decreaseFontSize,
-        primaryActivator(LogicalKeyboardKey.digit0):
-            _resetFontSize,
-      },
       child: Stack(
         children: [
           // Two modes: full-screen terminal when running, blocks when idle
@@ -256,7 +243,6 @@ class _SessionViewState extends ConsumerState<SessionView> {
             ),
         ],
       ),
-    ),
     );
   }
 
