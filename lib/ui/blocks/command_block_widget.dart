@@ -153,75 +153,103 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
               if (isFailed && _explanation != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: theme.ansiMagenta.withAlpha(10),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: theme.ansiMagenta.withAlpha(40),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.auto_awesome,
-                            size: 14, color: theme.ansiMagenta),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: SelectableText(
-                            _explanation!,
-                            style: TextStyle(
-                              color: theme.foreground,
-                              fontFamily: theme.fontFamily,
-                              fontSize: widget.fontSize - 1,
-                              height: 1.4,
-                              decoration: TextDecoration.none,
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: theme.statusChipBg,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: theme.blockBorder,
+                              width: 1,
                             ),
                           ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Icon(Icons.auto_awesome,
+                                    size: 14, color: theme.ansiYellow),
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: SelectableText(
+                                  _explanation!,
+                                  style: TextStyle(
+                                    color: theme.foreground,
+                                    fontFamily: theme.fontFamily,
+                                    fontSize: widget.fontSize - 1,
+                                    height: 1.4,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
 
-              // "Explain Error" button for failed commands
+              // "Explain Error" chip for failed commands
               if (isFailed && _explanation == null && widget.aiEnabled)
                 Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: GestureDetector(
-                    onTap: _explaining ? null : _explainError,
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_explaining)
-                            SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 1.5,
-                                color: theme.ansiMagenta,
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _explaining ? null : _explainError,
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: theme.statusChipBg,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: theme.blockBorder,
+                                width: 1,
                               ),
-                            )
-                          else
-                            Icon(Icons.auto_awesome,
-                                size: 13, color: theme.ansiMagenta),
-                          const SizedBox(width: 6),
-                          Text(
-                            _explaining ? 'Explaining...' : 'Explain Error',
-                            style: TextStyle(
-                              color: theme.ansiMagenta,
-                              fontFamily: theme.fontFamily,
-                              fontSize: 12,
-                              decoration: TextDecoration.none,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_explaining)
+                                  SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.5,
+                                      color: theme.ansiYellow,
+                                    ),
+                                  )
+                                else
+                                  Icon(Icons.auto_awesome,
+                                      size: 14, color: theme.ansiYellow),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _explaining
+                                      ? 'Explaining...'
+                                      : 'Explain this error.',
+                                  style: TextStyle(
+                                    color: theme.foreground,
+                                    fontFamily: theme.fontFamily,
+                                    fontSize: 12,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
             ],

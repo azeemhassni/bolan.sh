@@ -62,21 +62,21 @@ class OpenAiCompatibleProvider implements AiProvider {
       final uri = Uri.parse('$_baseUrl/v1/chat/completions');
       final request = await client.postUrl(uri);
 
-      request.headers.set('Content-Type', 'application/json');
+      request.headers.set('Content-Type', 'application/json; charset=utf-8');
       if (_apiKey != null && _apiKey.isNotEmpty) {
         request.headers.set('Authorization', 'Bearer $_apiKey');
       }
 
-      final body = jsonEncode({
+      final body = utf8.encode(jsonEncode({
         'model': _model,
         'messages': [
           {'role': 'user', 'content': prompt},
         ],
         'temperature': _temperature,
         'max_tokens': _maxTokens,
-      });
+      }));
 
-      request.write(body);
+      request.add(body);
       final response = await request.close().timeout(_timeout);
       final responseBody = await response.transform(utf8.decoder).join();
 
