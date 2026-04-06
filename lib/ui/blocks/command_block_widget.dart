@@ -58,39 +58,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
   bool _copied = false;
   bool _explaining = false;
   String? _explanation;
-  final _scrollController = ScrollController();
-  bool _showTopArrow = false;
-  bool _showBottomArrow = false;
 
-  static const _fallbackMaxHeight = 500.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_updateArrows);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateArrows());
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _updateArrows() {
-    if (!_scrollController.hasClients) return;
-    final pos = _scrollController.position;
-    final atTop = pos.pixels <= 0;
-    final atBottom = pos.pixels >= pos.maxScrollExtent;
-    final needsScroll = pos.maxScrollExtent > 0;
-
-    if (mounted) {
-      setState(() {
-        _showTopArrow = needsScroll && !atTop;
-        _showBottomArrow = needsScroll && !atBottom;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -441,57 +409,12 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
       );
     }
 
-    // Use the window height minus room for tab bar, prompt context,
-    // command header, block padding, and prompt area
-    final maxHeight = MediaQuery.of(context).size.height - 200;
-
-    return Stack(
-      children: [
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: maxHeight > 0 ? maxHeight : _fallbackMaxHeight,
-          ),
-          child: SizedBox(
-            width: double.infinity,
-            child: GestureDetector(
-              onSecondaryTapDown: widget.onSecondaryTap,
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: textWidget,
-              ),
-            ),
-          ),
-        ),
-        if (_showTopArrow)
-          Positioned(
-            top: 0,
-            right: 0,
-            child: _ScrollArrow(
-              icon: Icons.keyboard_arrow_up,
-              theme: theme,
-              onTap: () => _scrollController.animateTo(
-                0,
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-              ),
-            ),
-          ),
-        if (_showBottomArrow)
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: _ScrollArrow(
-              icon: Icons.keyboard_arrow_down,
-              theme: theme,
-              onTap: () => _scrollController.animateTo(
-                _scrollController.position.maxScrollExtent,
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-              ),
-            ),
-          ),
-      ],
+    return GestureDetector(
+      onSecondaryTapDown: widget.onSecondaryTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: textWidget,
+      ),
     );
   }
 
@@ -546,33 +469,3 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
   }
 }
 
-class _ScrollArrow extends StatelessWidget {
-  final IconData icon;
-  final BolonTheme theme;
-  final VoidCallback onTap;
-
-  const _ScrollArrow({
-    required this.icon,
-    required this.theme,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          padding: const EdgeInsets.all(2),
-          decoration: BoxDecoration(
-            color: theme.blockBackground,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: theme.blockBorder, width: 1),
-          ),
-          child: Icon(icon, size: 16, color: theme.dimForeground),
-        ),
-      ),
-    );
-  }
-}

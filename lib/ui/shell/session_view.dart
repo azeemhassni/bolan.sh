@@ -109,14 +109,16 @@ class _SessionViewState extends ConsumerState<SessionView> {
         });
       }
 
-      // Command just finished → focus the prompt input
+      // Command just finished → scroll blocks to bottom, focus prompt
       if (!isRunning && _wasRunning) {
-        _promptKey.currentState?.requestFocus();
-      }
-
-      // Auto-scroll blocks list
-      if (!isRunning && _scrollController.hasClients) {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (_scrollController.hasClients) {
+            _scrollController
+                .jumpTo(_scrollController.position.maxScrollExtent);
+          }
+          _promptKey.currentState?.requestFocus();
+        });
       }
 
       _wasRunning = isRunning;
@@ -182,30 +184,29 @@ class _SessionViewState extends ConsumerState<SessionView> {
             GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTap: () => _promptKey.currentState?.requestFocus(),
-              child: ListView(
-              controller: _scrollController,
-              physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.only(top: 8),
-              children: [
-                for (var i = 0; i < blocks.length; i++)
-                  CommandBlockWidget(
-                    block: blocks[i],
-                    fontSize: fontSize,
-                    lineHeight: lineHeight,
-                    scrollable: configLoader?.config.editor.scrollableBlocks ?? false,
-                    cwd: widget.session.cwd,
-                    shellName: widget.session.shellName,
-                    aiEnabled: configLoader?.config.ai.enabled ?? false,
-                    aiProvider: configLoader?.config.ai.provider ?? 'gemini',
-                    geminiModel: configLoader?.config.ai.geminiModel ?? 'gemma-3-27b-it',
-                    anthropicMode: configLoader?.config.ai.anthropicMode ?? 'claude-code',
-                    ligatures: configLoader?.config.editor.ligatures ?? false,
-                    searchHighlight: _buildSearchRegex(),
-                    currentMatchIndex: _findCurrentMatch,
-                    blockMatchStartIndex: _matchStartIndexForBlock(i),
-                    onSecondaryTap: widget.onSecondaryTap,
-                  ),
-                PromptArea(
+              child: _BlocksWithStickyPrompt(
+                scrollController: _scrollController,
+                blocks: [
+                  for (var i = 0; i < blocks.length; i++)
+                    CommandBlockWidget(
+                      block: blocks[i],
+                      fontSize: fontSize,
+                      lineHeight: lineHeight,
+                      scrollable: configLoader?.config.editor.scrollableBlocks ?? false,
+                      cwd: widget.session.cwd,
+                      shellName: widget.session.shellName,
+                      aiEnabled: configLoader?.config.ai.enabled ?? false,
+                      aiProvider: configLoader?.config.ai.provider ?? 'gemini',
+                      geminiModel: configLoader?.config.ai.geminiModel ?? 'gemma-3-27b-it',
+                      anthropicMode: configLoader?.config.ai.anthropicMode ?? 'claude-code',
+                      ligatures: configLoader?.config.editor.ligatures ?? false,
+                      searchHighlight: _buildSearchRegex(),
+                      currentMatchIndex: _findCurrentMatch,
+                      blockMatchStartIndex: _matchStartIndexForBlock(i),
+                      onSecondaryTap: widget.onSecondaryTap,
+                    ),
+                ],
+                prompt: PromptArea(
                   session: widget.session,
                   fontSize: fontSize,
                   aiEnabled: configLoader?.config.ai.enabled ?? false,
@@ -219,8 +220,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
                       const ['shell', 'cwd', 'gitBranch', 'gitChanges'],
                   promptInputKey: _promptKey,
                 ),
-              ],
-            ),
+              ),
             ),
 
           // Font size toast
@@ -387,4 +387,85 @@ class _FindMatch {
     required this.end,
     this.inCommand = false,
   });
+}
+
+
+/// Renders blocks + prompt where the prompt flows inline after blocks
+/// until it reaches the viewport bottom, then sticks there.
+///
+/// Uses a Stack: the prompt is rendered both inline (inside the
+/// scrollable column) and pinned (at the bottom of the Stack).
+/// Only one is visible at a time based on whether content overflows.
+class _BlocksWithStickyPrompt extends StatefulWidget {
+  final ScrollController scrollController;
+  final List<Widget> blocks;
+  final Widget prompt;
+
+  const _BlocksWithStickyPrompt({
+    required this.scrollController,
+    required this.blocks,
+    required this.prompt,
+  });
+
+  @override
+  State<_BlocksWithStickyPrompt> createState() =>
+      _BlocksWithStickyPromptState();
+}
+
+class _BlocksWithStickyPromptState extends State<_BlocksWithStickyPrompt> {
+  bool _overflows = false;
+  final _contentKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkOverflow());
+  }
+
+  @override
+  void didUpdateWidget(_BlocksWithStickyPrompt oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkOverflow());
+  }
+
+  void _checkOverflow() {
+    if (!mounted) return;
+    final hasClients = widget.scrollController.hasClients;
+    if (!hasClients) return;
+    final maxExtent = widget.scrollController.position.maxScrollExtent;
+    final nowOverflows = maxExtent > 0;
+    if (nowOverflows != _overflows) {
+      setState(() => _overflows = nowOverflows);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Scrollable content: blocks + inline prompt (when not overflowing)
+        Positioned.fill(
+          bottom: _overflows ? 80 : 0, // leave room for pinned prompt
+          child: ListView(
+            key: _contentKey,
+            controller: widget.scrollController,
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.only(top: 8),
+            children: [
+              ...widget.blocks,
+              if (!_overflows) widget.prompt,
+            ],
+          ),
+        ),
+        // Pinned prompt at bottom (only when overflowing)
+        if (_overflows)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: widget.prompt,
+          ),
+      ],
+    );
+  }
 }
