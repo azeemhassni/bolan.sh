@@ -135,6 +135,9 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     if (session != null && session.isCommandRunning) return false;
     if (promptState.isHistorySearchOpen) return false;
 
+    // Don't forward keys during tab rename
+    if (tabRenameActive) return false;
+
     final isPrintable = event.character != null &&
         event.character!.isNotEmpty &&
         !HardwareKeyboard.instance.isControlPressed &&

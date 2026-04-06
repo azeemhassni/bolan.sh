@@ -1,12 +1,17 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_window_utils/window_manipulator.dart';
 
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/session_provider.dart';
+
+/// Whether a tab is currently being renamed. Checked by the global
+/// key handler to avoid stealing keystrokes.
+bool tabRenameActive = false;
 
 /// Compact tab bar rendered in the macOS title bar area.
 ///
@@ -67,17 +72,26 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                   final tab = sessionState.tabs[index];
                   final session = tab.focusedSession;
                   final isActive = index == sessionState.activeTabIndex;
+                  final title = tab.customTitle ??
+                      session?.tabTitle ??
+                      'zsh';
+                  final fullTitle = tab.customTitle ??
+                      session?.fullTabTitle ??
+                      'zsh';
                   return _Tab(
-                    title: session?.tabTitle ?? 'zsh',
-                    fullTitle: session?.fullTabTitle ?? 'zsh',
+                    title: title,
+                    fullTitle: fullTitle,
                     status: session?.tabStatus ?? TabStatus.idle,
                     isActive: isActive,
+                    isRenamed: tab.customTitle != null,
                     theme: theme,
                     onTap: () =>
                         ref.read(sessionProvider.notifier).switchTab(index),
                     onClose: () => widget.onCloseTab != null
                         ? widget.onCloseTab!(index)
                         : ref.read(sessionProvider.notifier).closeTab(index),
+                    onRename: (name) =>
+                        ref.read(sessionProvider.notifier).renameTab(index, name),
                   );
                 },
               ),
@@ -117,18 +131,22 @@ class _Tab extends StatefulWidget {
   final String fullTitle;
   final TabStatus status;
   final bool isActive;
+  final bool isRenamed;
   final BolonTheme theme;
   final VoidCallback onTap;
   final VoidCallback onClose;
+  final ValueChanged<String?> onRename;
 
   const _Tab({
     required this.title,
     required this.fullTitle,
     required this.status,
     required this.isActive,
+    this.isRenamed = false,
     required this.theme,
     required this.onTap,
     required this.onClose,
+    required this.onRename,
   });
 
   @override
@@ -137,11 +155,109 @@ class _Tab extends StatefulWidget {
 
 class _TabState extends State<_Tab> {
   bool _hovered = false;
+  bool _editing = false;
+  late TextEditingController _editController;
 
   /// Whether the title needs gradient fade (exceeds available space).
   /// We use a LayoutBuilder to detect this.
   static const _maxTabWidth = 180.0;
   static const _fontSize = 11.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _editController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _editController.dispose();
+    super.dispose();
+  }
+
+  void _startEditing() {
+    tabRenameActive = true;
+    setState(() {
+      _editing = true;
+      _editController.text = widget.title;
+      _editController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: widget.title.length,
+      );
+    });
+  }
+
+  void _submitRename() {
+    final name = _editController.text.trim();
+    widget.onRename(name.isEmpty ? null : name);
+    tabRenameActive = false;
+    setState(() => _editing = false);
+  }
+
+  void _cancelEditing() {
+    tabRenameActive = false;
+    setState(() => _editing = false);
+  }
+
+  void _showContextMenu(TapDownDetails details, BuildContext context) {
+    final theme = widget.theme;
+    final position = details.globalPosition;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx, position.dy, position.dx, position.dy,
+      ),
+      color: theme.blockBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+        side: BorderSide(color: theme.blockBorder, width: 1),
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'rename',
+          height: 32,
+          child: Text(
+            'Rename',
+            style: TextStyle(
+              color: theme.foreground,
+              fontFamily: theme.fontFamily,
+              fontSize: 12,
+            ),
+          ),
+        ),
+        if (widget.isRenamed)
+          PopupMenuItem(
+            value: 'reset',
+            height: 32,
+            child: Text(
+              'Reset Name',
+              style: TextStyle(
+                color: theme.dimForeground,
+                fontFamily: theme.fontFamily,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        PopupMenuItem(
+          value: 'close',
+          height: 32,
+          child: Text(
+            'Close Tab',
+            style: TextStyle(
+              color: theme.exitFailureFg,
+              fontFamily: theme.fontFamily,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'rename') _startEditing();
+      if (value == 'reset') widget.onRename(null);
+      if (value == 'close') widget.onClose();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +276,11 @@ class _TabState extends State<_Tab> {
       onExit: (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: widget.onTap,
+        onTap: _editing ? null : widget.onTap,
+        onDoubleTap: _editing ? null : _startEditing,
+        onSecondaryTapDown: _editing
+            ? null
+            : (details) => _showContextMenu(details, context),
         child: Tooltip(
           message: widget.fullTitle,
           waitDuration: const Duration(milliseconds: 600),
@@ -179,33 +299,78 @@ class _TabState extends State<_Tab> {
                 ),
               ),
             ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Centered title with status icon
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _StatusIcon(status: widget.status, theme: widget.theme),
-                    Flexible(child: _buildTitle(fg, fontWeight)),
-                  ],
-                ),
-
-                // Close button — pinned to right edge, hover only
-                if (_hovered)
-                  Positioned(
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: widget.onClose,
-                      child: Icon(
-                        Icons.close,
-                        size: 11,
-                        color: widget.theme.dimForeground,
+            child: _editing
+                ? _buildEditField(fg)
+                : Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _StatusIcon(
+                              status: widget.status, theme: widget.theme),
+                          Flexible(child: _buildTitle(fg, fontWeight)),
+                        ],
                       ),
-                    ),
+                      if (_hovered && !_editing)
+                        Positioned(
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: widget.onClose,
+                            child: Icon(
+                              Icons.close,
+                              size: 11,
+                              color: widget.theme.dimForeground,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEditField(Color fg) {
+    return Center(
+      child: SizedBox(
+        height: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: Focus(
+            onKeyEvent: (_, event) {
+              if (event is! KeyDownEvent) return KeyEventResult.ignored;
+              if (event.logicalKey == LogicalKeyboardKey.enter) {
+                _submitRename();
+                return KeyEventResult.handled;
+              }
+              if (event.logicalKey == LogicalKeyboardKey.escape) {
+                _cancelEditing();
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: TextField(
+              controller: _editController,
+              autofocus: true,
+              textAlignVertical: TextAlignVertical.center,
+              style: TextStyle(
+                color: fg,
+                fontSize: _fontSize,
+                fontFamily: widget.theme.fontFamily,
+                height: 1.0,
+              ),
+              cursorColor: widget.theme.cursor,
+              cursorHeight: 11,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+                isCollapsed: true,
+              ),
+              onSubmitted: (_) => _submitRename(),
             ),
           ),
         ),

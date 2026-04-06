@@ -20,13 +20,31 @@ const _uuid = Uuid();
 class TabState {
   final PaneNode rootPane;
   final String focusedPaneId;
+  final String? customTitle;
 
-  const TabState({required this.rootPane, required this.focusedPaneId});
+  const TabState({
+    required this.rootPane,
+    required this.focusedPaneId,
+    this.customTitle,
+  });
 
   LeafPane? get focusedLeaf =>
       PaneManager.findLeaf(rootPane, focusedPaneId);
 
   TerminalSession? get focusedSession => focusedLeaf?.session;
+
+  TabState copyWith({
+    PaneNode? rootPane,
+    String? focusedPaneId,
+    String? customTitle,
+    bool clearCustomTitle = false,
+  }) {
+    return TabState(
+      rootPane: rootPane ?? this.rootPane,
+      focusedPaneId: focusedPaneId ?? this.focusedPaneId,
+      customTitle: clearCustomTitle ? null : (customTitle ?? this.customTitle),
+    );
+  }
 }
 
 /// Top-level state: list of tabs + active tab index.
@@ -180,6 +198,16 @@ class SessionNotifier extends Notifier<SessionState> {
     _attachTabListeners(tab);
     final tabs = [...state.tabs, tab];
     state = SessionState(tabs: tabs, activeTabIndex: tabs.length - 1);
+  }
+
+  void renameTab(int index, String? title) {
+    if (index < 0 || index >= state.tabs.length) return;
+    final tabs = [...state.tabs];
+    tabs[index] = tabs[index].copyWith(
+      customTitle: title,
+      clearCustomTitle: title == null || title.isEmpty,
+    );
+    state = SessionState(tabs: tabs, activeTabIndex: state.activeTabIndex);
   }
 
   void switchTab(int index) {
