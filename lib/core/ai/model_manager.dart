@@ -152,7 +152,10 @@ class ModelManager {
   }
 }
 
-/// Handle for an in-progress model download. Supports cancellation.
+/// Handle for an in-progress model download.
+///
+/// Supports pause, resume, and cancellation. Downloads to a `.part`
+/// file and renames on completion. Resume uses HTTP Range headers.
 class ModelDownload {
   final String _url;
   final String _targetPath;
@@ -160,7 +163,9 @@ class ModelDownload {
   final void Function() _onComplete;
   final void Function(String error) _onError;
   bool _cancelled = false;
+  bool _paused = false;
   HttpClient? _client;
+  int _resumeOffset = 0;
 
   ModelDownload._({
     required String url,
@@ -174,41 +179,105 @@ class ModelDownload {
         _onComplete = onComplete,
         _onError = onError;
 
+  String get _partPath => '$_targetPath.part';
+
+  /// Whether the download is currently paused.
+  bool get isPaused => _paused;
+
+  /// Pauses the download. The partial file is kept for resuming.
+  void pause() {
+    _paused = true;
+    _client?.close(force: true);
+    _client = null;
+  }
+
+  /// Resumes a paused download from where it left off.
+  void resume() {
+    if (!_paused) return;
+    _paused = false;
+    _cancelled = false;
+    _start();
+  }
+
   /// Cancels the download and deletes any partial file.
   void cancel() {
     _cancelled = true;
+    _paused = false;
     _client?.close(force: true);
+    _client = null;
+    final part = File(_partPath);
+    if (part.existsSync()) part.deleteSync();
   }
 
   Future<void> _start() async {
     try {
-      final path = _targetPath;
-      final dir = Directory(File(path).parent.path);
+      final dir = Directory(File(_targetPath).parent.path);
       if (!dir.existsSync()) dir.createSync(recursive: true);
 
-      _client = HttpClient();
-      final uri = Uri.parse(_url);
-      var request = await _client!.getUrl(uri);
-      var response = await request.close();
+      final partFile = File(_partPath);
+      _resumeOffset = partFile.existsSync() ? partFile.lengthSync() : 0;
 
-      // Follow redirects manually (GitHub releases redirect)
-      while (response.isRedirect) {
-        final location = response.headers.value('location');
-        if (location == null) break;
-        request = await _client!.getUrl(Uri.parse(location));
-        response = await request.close();
+      _client = HttpClient();
+      _client!.autoUncompress = false;
+
+      // Resolve the final URL (follow redirects) before setting Range
+      var finalUrl = _url;
+      final headClient = HttpClient();
+      try {
+        final headRequest = await headClient.headUrl(Uri.parse(_url));
+        headRequest.followRedirects = true;
+        headRequest.maxRedirects = 5;
+        final headResponse = await headRequest.close().timeout(
+              const Duration(seconds: 10),
+            );
+        finalUrl = headResponse.redirects.isNotEmpty
+            ? headResponse.redirects.last.location.toString()
+            : _url;
+        await headResponse.drain<void>();
+      } on Exception {
+        // Use original URL if HEAD fails
+      } finally {
+        headClient.close();
       }
 
-      final total = response.contentLength;
-      var received = 0;
+      final request = await _client!.getUrl(Uri.parse(finalUrl));
+      if (_resumeOffset > 0) {
+        request.headers.set('Range', 'bytes=$_resumeOffset-');
+      }
+      request.followRedirects = true;
+      request.maxRedirects = 5;
+      final response = await request.close();
 
-      final file = File(path);
-      final sink = file.openWrite();
+      // Determine total size
+      int total;
+      if (response.statusCode == 206) {
+        // Partial content — server supports resume
+        final range = response.headers.value('content-range');
+        if (range != null && range.contains('/')) {
+          total = int.tryParse(range.split('/').last) ?? -1;
+        } else {
+          total = _resumeOffset + response.contentLength;
+        }
+      } else if (response.statusCode == 200) {
+        // Full content — server ignored Range or fresh download
+        _resumeOffset = 0;
+        total = response.contentLength;
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+
+      var received = _resumeOffset;
+      final sink = partFile.openWrite(
+        mode: _resumeOffset > 0 && response.statusCode == 206
+            ? FileMode.append
+            : FileMode.write,
+      );
 
       await for (final chunk in response) {
-        if (_cancelled) {
+        if (_cancelled || _paused) {
           await sink.close();
-          if (file.existsSync()) file.deleteSync();
+          _client?.close();
+          _client = null;
           return;
         }
         sink.add(chunk);
@@ -218,22 +287,37 @@ class ModelDownload {
 
       await sink.close();
       _client?.close();
+      _client = null;
 
-      if (_cancelled) {
-        if (file.existsSync()) file.deleteSync();
-        return;
-      }
+      if (_cancelled || _paused) return;
+
+      // Rename .part to final path
+      final target = File(_targetPath);
+      if (target.existsSync()) target.deleteSync();
+      partFile.renameSync(_targetPath);
 
       // Make executable
       if (Platform.isMacOS || Platform.isLinux) {
-        await Process.run('chmod', ['+x', path]);
+        await Process.run('chmod', ['+x', _targetPath]);
       }
 
       _onComplete();
     } on Exception catch (e) {
-      if (!_cancelled) {
+      if (!_cancelled && !_paused) {
         _onError(e.toString());
       }
     }
   }
+}
+
+/// Checks if a partial download exists for [size].
+bool hasPartialDownload(ModelSize size) {
+  final partPath = '${ModelManager.modelPath(size)}.part';
+  return File(partPath).existsSync();
+}
+
+/// Returns the size of the partial download in bytes, or 0.
+int partialDownloadSize(ModelSize size) {
+  final partFile = File('${ModelManager.modelPath(size)}.part');
+  return partFile.existsSync() ? partFile.lengthSync() : 0;
 }

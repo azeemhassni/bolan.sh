@@ -1609,6 +1609,7 @@ class _LocalModelCard extends StatefulWidget {
 class _LocalModelCardState extends State<_LocalModelCard> {
   ModelSize _selectedSize = ModelSize.small;
   bool _downloading = false;
+  bool _paused = false;
   int _received = 0;
   int _total = -1;
   String? _error;
@@ -1620,7 +1621,10 @@ class _LocalModelCardState extends State<_LocalModelCard> {
     _selectedSize = ModelManager.downloadedSize() ?? ModelSize.small;
   }
 
-  bool get _isSelectedDownloaded => ModelManager.isModelDownloaded(_selectedSize);
+  bool get _isSelectedDownloaded =>
+      ModelManager.isModelDownloaded(_selectedSize);
+
+  bool get _hasPartial => hasPartialDownload(_selectedSize);
 
   double get _progress =>
       _total > 0 ? (_received / _total).clamp(0.0, 1.0) : 0;
@@ -1636,9 +1640,12 @@ class _LocalModelCardState extends State<_LocalModelCard> {
   void _startDownload() {
     setState(() {
       _downloading = true;
+      _paused = false;
       _error = null;
-      _received = 0;
-      _total = -1;
+      if (!_hasPartial) {
+        _received = 0;
+        _total = -1;
+      }
     });
 
     _download = ModelManager.download(
@@ -1652,27 +1659,57 @@ class _LocalModelCardState extends State<_LocalModelCard> {
       },
       onComplete: () {
         if (!mounted) return;
-        setState(() => _downloading = false);
+        setState(() {
+          _downloading = false;
+          _paused = false;
+        });
         widget.onChanged();
       },
       onError: (error) {
         if (!mounted) return;
         setState(() {
           _downloading = false;
+          _paused = false;
           _error = error;
         });
       },
     );
   }
 
+  void _pauseDownload() {
+    _download?.pause();
+    setState(() {
+      _downloading = false;
+      _paused = true;
+    });
+  }
+
+  void _resumeDownload() {
+    if (_download != null) {
+      _download!.resume();
+      setState(() {
+        _downloading = true;
+        _paused = false;
+        _error = null;
+      });
+    } else {
+      // Reconnect — previous download object was lost (app restart)
+      _startDownload();
+    }
+  }
+
   void _cancelDownload() {
     _download?.cancel();
-    setState(() => _downloading = false);
+    setState(() {
+      _downloading = false;
+      _paused = false;
+    });
   }
 
   @override
   void dispose() {
-    if (_downloading) _download?.cancel();
+    // Pause instead of cancel so partial file is kept for resume
+    if (_downloading) _download?.pause();
     super.dispose();
   }
 
@@ -1762,6 +1799,16 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                     fontSize: 11,
                     decoration: TextDecoration.none,
                   ),
+                )
+              else if (_hasPartial && !_downloading)
+                Text(
+                  'Paused  ·  ${_formatBytes(partialDownloadSize(_selectedSize))} downloaded',
+                  style: TextStyle(
+                    color: t.dimForeground,
+                    fontFamily: t.fontFamily,
+                    fontSize: 11,
+                    decoration: TextDecoration.none,
+                  ),
                 ),
               const Spacer(),
               if (_isSelectedDownloaded && !_downloading)
@@ -1784,9 +1831,12 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                     ),
                   ),
                 ),
+              // Download / Resume button
               if (!_isSelectedDownloaded && !_downloading)
                 GestureDetector(
-                  onTap: _startDownload,
+                  onTap: _paused || _hasPartial
+                      ? _resumeDownload
+                      : _startDownload,
                   child: MouseRegion(
                     cursor: SystemMouseCursors.click,
                     child: Container(
@@ -1797,7 +1847,7 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        'Download',
+                        _paused || _hasPartial ? 'Resume' : 'Download',
                         style: TextStyle(
                           color: t.background,
                           fontFamily: t.fontFamily,
@@ -1809,7 +1859,24 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                     ),
                   ),
                 ),
-              if (_downloading)
+              // Pause + Cancel during active download
+              if (_downloading) ...[
+                GestureDetector(
+                  onTap: _pauseDownload,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: Text(
+                      'Pause',
+                      style: TextStyle(
+                        color: t.dimForeground,
+                        fontFamily: t.fontFamily,
+                        fontSize: 12,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 GestureDetector(
                   onTap: _cancelDownload,
                   child: MouseRegion(
@@ -1825,11 +1892,12 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                     ),
                   ),
                 ),
+              ],
             ],
           ),
 
-          // Download progress
-          if (_downloading) ...[
+          // Download progress (shown while downloading or paused)
+          if (_downloading || _paused) ...[
             const SizedBox(height: 10),
             ClipRRect(
               borderRadius: BorderRadius.circular(3),
