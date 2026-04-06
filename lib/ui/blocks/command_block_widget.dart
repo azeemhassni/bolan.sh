@@ -123,7 +123,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                 ),
               ),
               padding: const EdgeInsets.only(
-                left: 9, right: 12, top: 4, bottom: 4,
+                left: 9, right: 12, top: 8, bottom: 8,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -441,8 +441,9 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
       );
     }
 
-    // Use the window height minus some room for header/prompt
-    final maxHeight = MediaQuery.of(context).size.height - 120;
+    // Use the window height minus room for tab bar, prompt context,
+    // command header, block padding, and prompt area
+    final maxHeight = MediaQuery.of(context).size.height - 200;
 
     return Stack(
       children: [
@@ -456,6 +457,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
               onSecondaryTapDown: widget.onSecondaryTap,
               child: SingleChildScrollView(
                 controller: _scrollController,
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 child: textWidget,
               ),
             ),
