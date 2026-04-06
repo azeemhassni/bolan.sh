@@ -6,6 +6,7 @@ enum ModelSize {
   small,
   medium,
   large,
+  xl,
 }
 
 /// Metadata for each model size.
@@ -60,6 +61,16 @@ const modelInfoMap = <ModelSize, ModelInfo>{
     downloadSize: '~1.9 GB',
     ramRequired: '~3.2 GB',
     description: 'Best quality, needs more RAM',
+  ),
+  ModelSize.xl: ModelInfo(
+    label: 'XL',
+    modelName: 'Qwen2.5-Coder-7B-Instruct-GGUF',
+    fileName: 'qwen2.5-coder-7b-instruct-q4_k_m.gguf',
+    downloadUrl:
+        'https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_k_m.gguf',
+    downloadSize: '~4.7 GB',
+    ramRequired: '~6 GB',
+    description: 'Highest quality, best for complex tasks',
   ),
 };
 

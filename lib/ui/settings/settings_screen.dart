@@ -1794,6 +1794,27 @@ class _LocalModelCardState extends State<_LocalModelCard> {
               decoration: TextDecoration.none,
             ),
           ),
+          if (_selectedSize == ModelSize.xl)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 13, color: t.ansiYellow),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'This model requires more memory and may be noticeably slower on machines with limited RAM or no dedicated GPU.',
+                      style: TextStyle(
+                        color: t.ansiYellow,
+                        fontFamily: t.fontFamily,
+                        fontSize: 10,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 10),
 
           // Action row

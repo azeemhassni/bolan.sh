@@ -48,7 +48,7 @@ class ConfigValidator {
     if (raw == null) return const AiConfig();
     return AiConfig(
       provider: _oneOf(raw['provider'], ['local', 'gemini', 'ollama', 'openai', 'anthropic'], 'local'),
-      localModelSize: _oneOf(raw['local_model_size'], ['small', 'medium', 'large'], 'small'),
+      localModelSize: _oneOf(raw['local_model_size'], ['small', 'medium', 'large', 'xl'], 'small'),
       model: _string(raw['model'], ''),
       ollamaUrl: _string(raw['ollama_url'], 'http://127.0.0.1:11434'),
       geminiModel: _string(raw['gemini_model'], 'gemma-3-27b-it'),
