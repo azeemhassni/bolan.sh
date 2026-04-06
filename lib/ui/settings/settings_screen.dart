@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/ai/ai_provider_helper.dart';
 import '../../core/ai/api_key_storage.dart';
+import '../../core/ai/model_manager.dart';
 import '../../core/app_version.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
@@ -606,7 +607,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         theme: theme,
         child: _SegmentedControl(
           value: _config.ai.provider,
-          options: const ['gemini', 'anthropic', 'openai', 'ollama'],
+          options: const ['local', 'gemini', 'anthropic', 'openai', 'ollama'],
           theme: theme,
           onChanged: (v) => _updateAi(provider: v),
         ),
@@ -626,6 +627,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   List<Widget> _buildProviderSettings(BolonTheme theme) {
     switch (_config.ai.provider) {
+      case 'local':
+        return [
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: _LocalModelCard(
+              theme: theme,
+              onChanged: () => setState(() {}),
+            ),
+          ),
+        ];
       case 'gemini':
         return [
           _ApiKeyField(provider: 'gemini', theme: theme),
@@ -1569,6 +1580,252 @@ class _ThemeCard extends StatelessWidget {
             text: text,
             style: TextStyle(color: textColor, fontFamily: theme.fontFamily, fontSize: 7, height: 1.4),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Inline card for local model status with download progress.
+class _LocalModelCard extends StatefulWidget {
+  final BolonTheme theme;
+  final VoidCallback onChanged;
+
+  const _LocalModelCard({required this.theme, required this.onChanged});
+
+  @override
+  State<_LocalModelCard> createState() => _LocalModelCardState();
+}
+
+class _LocalModelCardState extends State<_LocalModelCard> {
+  bool _downloading = false;
+  int _received = 0;
+  int _total = -1;
+  String? _error;
+  ModelDownload? _download;
+
+  bool get _downloaded => ModelManager.isModelDownloaded();
+
+  double get _progress =>
+      _total > 0 ? (_received / _total).clamp(0.0, 1.0) : 0;
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  void _startDownload() {
+    setState(() {
+      _downloading = true;
+      _error = null;
+      _received = 0;
+      _total = -1;
+    });
+
+    _download = ModelManager.download(
+      onProgress: (received, total) {
+        if (!mounted) return;
+        setState(() {
+          _received = received;
+          _total = total;
+        });
+      },
+      onComplete: () {
+        if (!mounted) return;
+        setState(() => _downloading = false);
+        widget.onChanged();
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          _downloading = false;
+          _error = error;
+        });
+      },
+    );
+  }
+
+  void _cancelDownload() {
+    _download?.cancel();
+    setState(() => _downloading = false);
+  }
+
+  @override
+  void dispose() {
+    if (_downloading) _download?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.theme;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: t.statusChipBg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                _downloaded ? Icons.check_circle : Icons.memory,
+                size: 16,
+                color:
+                    _downloaded ? const Color(0xFF00FF92) : t.dimForeground,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _downloaded ? 'Model downloaded' : 'Local AI Model',
+                  style: TextStyle(
+                    color: t.foreground,
+                    fontFamily: t.fontFamily,
+                    fontSize: 13,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+              if (_downloaded)
+                GestureDetector(
+                  onTap: () async {
+                    await ModelManager.deleteModel();
+                    setState(() {});
+                    widget.onChanged();
+                  },
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: Text(
+                      'Delete',
+                      style: TextStyle(
+                        color: t.exitFailureFg,
+                        fontFamily: t.fontFamily,
+                        fontSize: 12,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                ),
+              if (!_downloaded && !_downloading)
+                GestureDetector(
+                  onTap: _startDownload,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00FF92),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Download',
+                        style: TextStyle(
+                          color: t.background,
+                          fontFamily: t.fontFamily,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (_downloading)
+                GestureDetector(
+                  onTap: _cancelDownload,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: t.exitFailureFg,
+                        fontFamily: t.fontFamily,
+                        fontSize: 12,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (!_downloaded && !_downloading && _error == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Runs locally — no data leaves your machine (~1.3 GB)',
+                style: TextStyle(
+                  color: t.dimForeground,
+                  fontFamily: t.fontFamily,
+                  fontSize: 11,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ),
+          if (_downloaded)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${_formatBytes(ModelManager.modelSize())} on disk',
+                style: TextStyle(
+                  color: t.dimForeground,
+                  fontFamily: t.fontFamily,
+                  fontSize: 11,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ),
+          if (_downloading) ...[
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: _total > 0 ? _progress : null,
+                minHeight: 4,
+                backgroundColor: t.blockBackground,
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFF00FF92)),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${_formatBytes(_received)}${_total > 0 ? ' / ${_formatBytes(_total)}  ${(_progress * 100).toStringAsFixed(0)}%' : ''}',
+              style: TextStyle(
+                color: t.dimForeground,
+                fontFamily: t.fontFamily,
+                fontSize: 11,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ],
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline,
+                      size: 14, color: t.exitFailureFg),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Download failed. Tap Download to retry.',
+                      style: TextStyle(
+                        color: t.exitFailureFg,
+                        fontFamily: t.fontFamily,
+                        fontSize: 11,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

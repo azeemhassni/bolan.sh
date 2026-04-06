@@ -6,6 +6,7 @@ import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/actions/app_action.dart';
+import '../../core/ai/model_manager.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../core/pane/pane_manager.dart';
@@ -16,6 +17,8 @@ import '../../providers/config_provider.dart';
 import '../../providers/font_size_provider.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../ai/model_download_dialog.dart';
+import '../ai/model_download_toast.dart';
 import '../palette/command_palette.dart';
 import '../settings/settings_screen.dart';
 import '../shared/confirm_dialog.dart';
@@ -40,6 +43,11 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   final _configLoader = ConfigLoader();
   final _notificationService = NotificationService();
   bool _showPalette = false;
+  bool _showDownloadDialog = false;
+  bool _showDownloadToast = false;
+  int _dlReceived = 0;
+  int _dlTotal = -1;
+  final _downloadDialogKey = GlobalKey<ModelDownloadDialogState>();
 
   @override
   void initState() {
@@ -53,6 +61,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       ref.read(configLoaderProvider.notifier).state = _configLoader;
       ref.read(notificationServiceProvider.notifier).state =
           _notificationService;
+      _checkLocalModelNeeded();
     });
   }
 
@@ -272,6 +281,30 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     }
 
     exit(0);
+  }
+
+  /// Shows the download dialog if AI is enabled, provider is local,
+  /// and the model hasn't been downloaded yet.
+  void _checkLocalModelNeeded() {
+    final config = _configLoader.config;
+    if (!config.ai.enabled) return;
+    if (config.ai.provider != 'local') return;
+    if (ModelManager.isModelDownloaded()) return;
+    setState(() => _showDownloadDialog = true);
+  }
+
+  void _dismissDownload() {
+    setState(() {
+      _showDownloadDialog = false;
+      _showDownloadToast = false;
+    });
+  }
+
+  void _backgroundDownload() {
+    setState(() {
+      _showDownloadDialog = false;
+      _showDownloadToast = true;
+    });
   }
 
   void _togglePalette() {
@@ -539,6 +572,21 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
               CommandPalette(
                 actions: _buildActions(),
                 onDismiss: () => setState(() => _showPalette = false),
+              ),
+            if (_showDownloadDialog)
+              ModelDownloadDialog(
+                key: _downloadDialogKey,
+                onDismiss: _dismissDownload,
+                onBackgrounded: _backgroundDownload,
+              ),
+            if (_showDownloadToast)
+              ModelDownloadToast(
+                received: _dlReceived,
+                total: _dlTotal,
+                onTap: () => setState(() {
+                  _showDownloadToast = false;
+                  _showDownloadDialog = true;
+                }),
               ),
           ],
         ),
