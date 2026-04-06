@@ -19,18 +19,21 @@ class CommandHistory {
   /// file yet) this also seeds entries from the user's bash/zsh
   /// history so completions and recall work immediately.
   Future<void> load() async {
-    final file = await _historyFile();
-    if (await file.exists()) {
-      final lines = await file.readAsLines();
-      _entries.addAll(lines.where((l) => l.isNotEmpty));
-      if (_entries.length > _maxEntries) {
-        _entries.removeRange(0, _entries.length - _maxEntries);
+    try {
+      final file = await _historyFile();
+      if (await file.exists()) {
+        final lines = await file.readAsLines();
+        _entries.addAll(lines.where((l) => l.isNotEmpty));
+        if (_entries.length > _maxEntries) {
+          _entries.removeRange(0, _entries.length - _maxEntries);
+        }
+        return;
       }
-      return;
+      await _bootstrapFromShellHistory();
+    } on Object {
+      // Best effort — a missing or unreadable history file shouldn't
+      // prevent the app from starting.
     }
-
-    // Fresh install — try to seed from the user's existing shell history.
-    await _bootstrapFromShellHistory();
   }
 
   Future<void> _bootstrapFromShellHistory() async {
@@ -42,7 +45,6 @@ class CommandHistory {
         : imported;
     _entries.addAll(capped);
 
-    // Persist so subsequent launches use the Bolan-owned file.
     final file = await _historyFile();
     await file.parent.create(recursive: true);
     await file.writeAsString('${capped.join('\n')}\n');

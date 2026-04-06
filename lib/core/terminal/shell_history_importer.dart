@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 /// Detects the user's login shell and parses its history file into a
@@ -54,22 +55,20 @@ class ShellHistoryImporter {
 
     if (!file.existsSync()) return null;
 
-    String content;
+    // zsh history meta-encodes non-ASCII bytes: 0x83 acts as a marker
+    // and the next byte is XOR'd with 0x20. Reading as raw bytes and
+    // unmeta'ing first avoids `SystemEncoding` decoder failures on any
+    // entry containing unicode. Bash history has no such markers, so
+    // the same path works for both.
+    final List<int> rawBytes;
     try {
-      // zsh history is sometimes meta-encoded with bytes > 0x7f xor'd
-      // with 0x20. Reading as latin-1 then sanitizing avoids decoder
-      // errors on non-UTF8 entries.
-      content = file.readAsStringSync(encoding: const SystemEncoding());
+      rawBytes = file.readAsBytesSync();
     } on FileSystemException {
       return null;
-    } on FormatException {
-      try {
-        content = String.fromCharCodes(file.readAsBytesSync());
-      } on Exception {
-        return null;
-      }
     }
 
+    final unmeta = _undoZshMeta(rawBytes);
+    final content = utf8.decode(unmeta, allowMalformed: true);
     final parsed = parser(content);
     return _dedupePreservingOrder(parsed);
   }
@@ -130,6 +129,22 @@ class ShellHistoryImporter {
       final trimmed = line.trimRight();
       if (trimmed.isEmpty) continue;
       out.add(trimmed);
+    }
+    return out;
+  }
+
+  /// Reverses zsh's "meta" byte encoding. zsh stores any byte greater
+  /// than 0x7f as the two-byte sequence `0x83 (b ^ 0x20)`. Undoing it
+  /// yields the original UTF-8 bytes for non-ASCII characters.
+  static List<int> _undoZshMeta(List<int> bytes) {
+    final out = <int>[];
+    for (var i = 0; i < bytes.length; i++) {
+      if (bytes[i] == 0x83 && i + 1 < bytes.length) {
+        out.add(bytes[i + 1] ^ 0x20);
+        i++;
+      } else {
+        out.add(bytes[i]);
+      }
     }
     return out;
   }
