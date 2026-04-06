@@ -80,7 +80,7 @@ class _FontSizeToastState extends State<FontSizeToast>
           'Font: ${widget.fontSize.round()}px',
           style: TextStyle(
             color: theme.foreground,
-            fontFamily: 'Operator Mono',
+            fontFamily: theme.fontFamily,
             fontSize: 14,
             decoration: TextDecoration.none,
           ),

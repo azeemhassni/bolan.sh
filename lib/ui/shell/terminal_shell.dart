@@ -430,7 +430,10 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   @override
   Widget build(BuildContext context) {
     final sessionState = ref.watch(sessionProvider);
-    final theme = ref.watch(activeThemeProvider);
+    final configuredFont =
+        _configLoader.config.editor.fontFamily;
+    final theme = ref.watch(activeThemeProvider)
+        .copyWith(fontFamily: configuredFont);
 
     // Auto-focus the active pane's prompt on tab/pane changes
     _syncPromptFocus(sessionState);

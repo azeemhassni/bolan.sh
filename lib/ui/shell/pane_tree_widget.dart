@@ -167,7 +167,7 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
           widget.leaf.session.tabTitle,
           style: TextStyle(
             color: theme.foreground,
-            fontFamily: 'Operator Mono',
+            fontFamily: theme.fontFamily,
             fontSize: 12,
             decoration: TextDecoration.none,
           ),

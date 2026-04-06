@@ -129,7 +129,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
     final fontSize = ref.watch(fontSizeProvider);
     final configLoader = ref.watch(configLoaderProvider);
     final lineHeight = configLoader?.config.editor.lineHeight ?? 1.0;
-    final fontFamily = configLoader?.config.editor.fontFamily ?? 'Operator Mono';
+    final fontFamily = configLoader?.config.editor.fontFamily ?? theme.fontFamily;
     final blocks = widget.session.blocks;
     final isRunning = widget.session.isCommandRunning;
 

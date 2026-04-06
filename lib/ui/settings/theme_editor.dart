@@ -31,7 +31,7 @@ class ThemeEditor extends StatelessWidget {
               'Duplicate this theme to edit colors',
               style: TextStyle(
                 color: t.dimForeground,
-                fontFamily: 'Operator Mono',
+                fontFamily: t.fontFamily,
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
                 decoration: TextDecoration.none,
@@ -84,7 +84,7 @@ class ThemeEditor extends StatelessWidget {
             title,
             style: TextStyle(
               color: t.foreground,
-              fontFamily: 'Operator Mono',
+              fontFamily: t.fontFamily,
               fontSize: 13,
               fontWeight: FontWeight.w600,
               decoration: TextDecoration.none,
@@ -108,7 +108,7 @@ class ThemeEditor extends StatelessWidget {
                 label,
                 style: TextStyle(
                   color: t.blockHeaderFg,
-                  fontFamily: 'Operator Mono',
+                  fontFamily: t.fontFamily,
                   fontSize: 12,
                   decoration: TextDecoration.none,
                 ),
@@ -134,7 +134,7 @@ class ThemeEditor extends StatelessWidget {
               _hex(color),
               style: TextStyle(
                 color: t.dimForeground,
-                fontFamily: 'Operator Mono',
+                fontFamily: t.fontFamily,
                 fontSize: 11,
                 decoration: TextDecoration.none,
               ),

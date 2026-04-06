@@ -183,7 +183,7 @@ class PromptInputState extends State<PromptInput> {
       text: TextSpan(
         text: textBeforeCursor,
         style: TextStyle(
-          fontFamily: 'Operator Mono',
+          fontFamily: theme.fontFamily,
           fontSize: widget.fontSize,
           height: 1.4,
         ),
@@ -305,14 +305,14 @@ class PromptInputState extends State<PromptInput> {
                                 ghostText: ghost,
                                 style: TextStyle(
                                   color: theme.dimForeground,
-                                  fontFamily: 'Operator Mono',
+                                  fontFamily: theme.fontFamily,
                                   fontSize: widget.fontSize,
                                   height: 1.4,
                                   decoration: TextDecoration.none,
                                 ),
                                 realStyle: TextStyle(
                                   color: Colors.transparent,
-                                  fontFamily: 'Operator Mono',
+                                  fontFamily: theme.fontFamily,
                                   fontSize: widget.fontSize,
                                   height: 1.4,
                                   decoration: TextDecoration.none,
@@ -331,7 +331,7 @@ class PromptInputState extends State<PromptInput> {
                           contextMenuBuilder: (_, __) => const SizedBox.shrink(),
                           style: TextStyle(
                             color: theme.foreground,
-                            fontFamily: 'Operator Mono',
+                            fontFamily: theme.fontFamily,
                             fontSize: widget.fontSize,
                             height: 1.4,
                             decoration: TextDecoration.none,

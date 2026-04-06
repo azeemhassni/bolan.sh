@@ -103,7 +103,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
                       controller: _hexController,
                       style: TextStyle(
                         color: theme.foreground,
-                        fontFamily: 'Operator Mono',
+                        fontFamily: theme.fontFamily,
                         fontSize: 13,
                       ),
                       decoration: InputDecoration(

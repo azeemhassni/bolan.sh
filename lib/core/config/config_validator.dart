@@ -33,7 +33,7 @@ class ConfigValidator {
   EditorConfig _validateEditor(Map<String, dynamic>? raw) {
     if (raw == null) return const EditorConfig();
     return EditorConfig(
-      fontFamily: _string(raw['font_family'], 'Operator Mono'),
+      fontFamily: _string(raw['font_family'], 'JetBrains Mono'),
       fontSize: _double(raw['font_size'], 13.0, min: 8, max: 32),
       lineHeight: _double(raw['line_height'], 1.2, min: 1.0, max: 2.5),
       cursorStyle: _oneOf(raw['cursor_style'], ['block', 'underline', 'bar'], 'block'),

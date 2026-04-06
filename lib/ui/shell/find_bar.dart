@@ -140,7 +140,7 @@ class FindBarState extends State<FindBar> {
                       focusNode: _focusNode,
                       style: TextStyle(
                         color: theme.foreground,
-                        fontFamily: 'Operator Mono',
+                        fontFamily: theme.fontFamily,
                         fontSize: 15,
                         decoration: TextDecoration.none,
                       ),
@@ -150,7 +150,7 @@ class FindBarState extends State<FindBar> {
                         hintText: 'Find',
                         hintStyle: TextStyle(
                           color: theme.dimForeground,
-                          fontFamily: 'Operator Mono',
+                          fontFamily: theme.fontFamily,
                           fontSize: 15,
                         ),
                         contentPadding: const EdgeInsets.symmetric(
@@ -208,7 +208,7 @@ class FindBarState extends State<FindBar> {
             '${widget.totalMatches > 0 ? widget.currentMatch + 1 : 0}/${widget.totalMatches}',
             style: TextStyle(
               color: theme.dimForeground,
-              fontFamily: 'Operator Mono',
+              fontFamily: theme.fontFamily,
               fontSize: 15,
               decoration: TextDecoration.none,
             ),
@@ -282,7 +282,7 @@ class _ToggleButton extends StatelessWidget {
                     label!,
                     style: TextStyle(
                       color: active ? theme.cursor : theme.dimForeground,
-                      fontFamily: 'Operator Mono',
+                      fontFamily: theme.fontFamily,
                       fontSize: 15,
                       fontWeight: active ? FontWeight.w600 : FontWeight.normal,
                       decoration: TextDecoration.none,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/theme/bolan_theme.dart';
+
 /// A compact outlined chip used in the prompt area.
 ///
 /// Supports both Material Icons and SVG asset icons.
@@ -49,7 +51,7 @@ class StatusChip extends StatelessWidget {
             style: TextStyle(
               color: fg,
               fontSize: 16,
-              fontFamily: 'Operator Mono',
+              fontFamily: BolonTheme.of(context).fontFamily,
               fontWeight: FontWeight.w500,
               decoration: TextDecoration.none,
             ),

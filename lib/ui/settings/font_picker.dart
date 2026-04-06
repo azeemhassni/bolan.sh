@@ -100,7 +100,7 @@ class _FontPickerState extends State<FontPicker> {
               controller: _searchController,
               style: TextStyle(
                 color: t.foreground,
-                fontFamily: 'Operator Mono',
+                fontFamily: t.fontFamily,
                 fontSize: 13,
                 decoration: TextDecoration.none,
               ),
@@ -109,7 +109,7 @@ class _FontPickerState extends State<FontPicker> {
                 hintText: 'Search fonts...',
                 hintStyle: TextStyle(
                   color: t.dimForeground,
-                  fontFamily: 'Operator Mono',
+                  fontFamily: t.fontFamily,
                   fontSize: 13,
                 ),
                 prefixIcon:
@@ -142,7 +142,7 @@ class _FontPickerState extends State<FontPicker> {
                           'No fonts found',
                           style: TextStyle(
                             color: t.dimForeground,
-                            fontFamily: 'Operator Mono',
+                            fontFamily: t.fontFamily,
                             fontSize: 12,
                             decoration: TextDecoration.none,
                           ),
@@ -216,7 +216,7 @@ class _FontRow extends StatelessWidget {
                       color: isSelected
                           ? theme.foreground
                           : theme.blockHeaderFg,
-                      fontFamily: 'Operator Mono',
+                      fontFamily: theme.fontFamily,
                       fontSize: 12,
                       fontWeight: isSelected
                           ? FontWeight.w600

@@ -45,7 +45,7 @@ Future<ConfirmResult?> showConfirmDialog(
               title,
               style: TextStyle(
                 color: t.foreground,
-                fontFamily: 'Operator Mono',
+                fontFamily: t.fontFamily,
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 decoration: TextDecoration.none,
@@ -56,7 +56,7 @@ Future<ConfirmResult?> showConfirmDialog(
               message,
               style: TextStyle(
                 color: t.dimForeground,
-                fontFamily: 'Operator Mono',
+                fontFamily: t.fontFamily,
                 fontSize: 13,
                 height: 1.5,
                 decoration: TextDecoration.none,
@@ -134,7 +134,7 @@ class _DialogButton extends StatelessWidget {
             label,
             style: TextStyle(
               color: fg,
-              fontFamily: 'Operator Mono',
+              fontFamily: theme.fontFamily,
               fontSize: 12,
               fontWeight: FontWeight.w500,
               decoration: TextDecoration.none,

@@ -20,7 +20,7 @@ class SystemFonts {
     }
 
     // Always include bundled fonts at the top
-    final bundled = ['JetBrains Mono', 'Operator Mono'];
+    final bundled = ['JetBrains Mono'];
     final allFonts = <String>{...bundled, ...fonts};
     final sorted = allFonts.toList()
       ..sort((a, b) {

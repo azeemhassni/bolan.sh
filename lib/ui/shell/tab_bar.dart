@@ -222,7 +222,7 @@ class _TabState extends State<_Tab> {
       style: TextStyle(
         color: fg,
         fontSize: _fontSize,
-        fontFamily: 'Operator Mono',
+        fontFamily: widget.theme.fontFamily,
         fontWeight: fontWeight,
         decoration: TextDecoration.none,
       ),
@@ -235,7 +235,7 @@ class _TabState extends State<_Tab> {
         final textPainter = TextPainter(
           text: TextSpan(
             text: widget.title,
-            style: const TextStyle(fontSize: _fontSize, fontFamily: 'Operator Mono'),
+            style: TextStyle(fontSize: _fontSize, fontFamily: widget.theme.fontFamily),
           ),
           maxLines: 1,
           textDirection: TextDirection.ltr,

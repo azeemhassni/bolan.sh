@@ -214,7 +214,7 @@ class _HistorySearchState extends State<HistorySearch> {
                       'history:',
                       style: TextStyle(
                         color: theme.statusShellFg,
-                        fontFamily: 'Operator Mono',
+                        fontFamily: theme.fontFamily,
                         fontSize: widget.fontSize,
                         fontWeight: FontWeight.w600,
                         decoration: TextDecoration.none,
@@ -230,7 +230,7 @@ class _HistorySearchState extends State<HistorySearch> {
                       onChanged: _onSearchChanged,
                       style: TextStyle(
                         color: theme.foreground,
-                        fontFamily: 'Operator Mono',
+                        fontFamily: theme.fontFamily,
                         fontSize: widget.fontSize,
                         decoration: TextDecoration.none,
                       ),
@@ -242,7 +242,7 @@ class _HistorySearchState extends State<HistorySearch> {
                             : 'search...',
                         hintStyle: TextStyle(
                           color: theme.dimForeground,
-                          fontFamily: 'Operator Mono',
+                          fontFamily: theme.fontFamily,
                           fontSize: widget.fontSize,
                         ),
                         border: InputBorder.none,
@@ -258,7 +258,7 @@ class _HistorySearchState extends State<HistorySearch> {
                     color: _isSmartMode
                         ? theme.ansiMagenta
                         : theme.dimForeground,
-                    fontFamily: 'Operator Mono',
+                    fontFamily: theme.fontFamily,
                     fontSize: widget.fontSize - 2,
                     decoration: TextDecoration.none,
                   ),
@@ -294,7 +294,7 @@ class _HistorySearchState extends State<HistorySearch> {
                           color: isSelected
                               ? theme.foreground
                               : theme.blockHeaderFg,
-                          fontFamily: 'Operator Mono',
+                          fontFamily: theme.fontFamily,
                           fontSize: widget.fontSize,
                           decoration: TextDecoration.none,
                         ),

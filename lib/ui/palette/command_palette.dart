@@ -146,7 +146,7 @@ class _CommandPaletteState extends State<CommandPalette> {
           focusNode: _focusNode,
           style: TextStyle(
             color: theme.foreground,
-            fontFamily: 'Operator Mono',
+            fontFamily: theme.fontFamily,
             fontSize: 14,
             decoration: TextDecoration.none,
           ),
@@ -155,7 +155,7 @@ class _CommandPaletteState extends State<CommandPalette> {
             hintText: 'Type a command...',
             hintStyle: TextStyle(
               color: theme.dimForeground,
-              fontFamily: 'Operator Mono',
+              fontFamily: theme.fontFamily,
               fontSize: 14,
             ),
             prefixIcon: Icon(Icons.search, color: theme.dimForeground, size: 18),
@@ -204,7 +204,7 @@ class _CommandPaletteState extends State<CommandPalette> {
                         color: isSelected
                             ? theme.foreground
                             : theme.blockHeaderFg,
-                        fontFamily: 'Operator Mono',
+                        fontFamily: theme.fontFamily,
                         fontSize: 13,
                         decoration: TextDecoration.none,
                       ),
@@ -215,7 +215,7 @@ class _CommandPaletteState extends State<CommandPalette> {
                       action.shortcut!,
                       style: TextStyle(
                         color: theme.dimForeground,
-                        fontFamily: 'Operator Mono',
+                        fontFamily: theme.fontFamily,
                         fontSize: 11,
                         decoration: TextDecoration.none,
                       ),
@@ -236,7 +236,7 @@ class _CommandPaletteState extends State<CommandPalette> {
         'No matching commands',
         style: TextStyle(
           color: theme.dimForeground,
-          fontFamily: 'Operator Mono',
+          fontFamily: theme.fontFamily,
           fontSize: 13,
           decoration: TextDecoration.none,
         ),

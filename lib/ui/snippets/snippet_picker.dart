@@ -148,7 +148,7 @@ class _SnippetPickerState extends State<SnippetPicker> {
           focusNode: _focusNode,
           style: TextStyle(
             color: theme.foreground,
-            fontFamily: 'Operator Mono',
+            fontFamily: theme.fontFamily,
             fontSize: 14,
             decoration: TextDecoration.none,
           ),
@@ -157,7 +157,7 @@ class _SnippetPickerState extends State<SnippetPicker> {
             hintText: 'Search snippets...',
             hintStyle: TextStyle(
               color: theme.dimForeground,
-              fontFamily: 'Operator Mono',
+              fontFamily: theme.fontFamily,
               fontSize: 14,
             ),
             prefixIcon:
@@ -197,7 +197,7 @@ class _SnippetPickerState extends State<SnippetPicker> {
                       color: isSelected
                           ? theme.foreground
                           : theme.blockHeaderFg,
-                      fontFamily: 'Operator Mono',
+                      fontFamily: theme.fontFamily,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       decoration: TextDecoration.none,
@@ -208,7 +208,7 @@ class _SnippetPickerState extends State<SnippetPicker> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: theme.dimForeground,
-                      fontFamily: 'Operator Mono',
+                      fontFamily: theme.fontFamily,
                       fontSize: 11,
                       decoration: TextDecoration.none,
                     ),
@@ -229,7 +229,7 @@ class _SnippetPickerState extends State<SnippetPicker> {
         'No matching snippets',
         style: TextStyle(
           color: theme.dimForeground,
-          fontFamily: 'Operator Mono',
+          fontFamily: theme.fontFamily,
           fontSize: 13,
           decoration: TextDecoration.none,
         ),
@@ -245,7 +245,7 @@ class _SnippetPickerState extends State<SnippetPicker> {
         textAlign: TextAlign.center,
         style: TextStyle(
           color: theme.dimForeground,
-          fontFamily: 'Operator Mono',
+          fontFamily: theme.fontFamily,
           fontSize: 13,
           decoration: TextDecoration.none,
         ),

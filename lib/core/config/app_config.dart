@@ -61,7 +61,7 @@ class EditorConfig {
   final bool ligatures;
 
   const EditorConfig({
-    this.fontFamily = 'Operator Mono',
+    this.fontFamily = 'JetBrains Mono',
     this.fontSize = 13.0,
     this.lineHeight = 1.0,
     this.cursorStyle = 'block',

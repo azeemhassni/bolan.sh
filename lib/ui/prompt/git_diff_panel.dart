@@ -102,7 +102,7 @@ class _GitDiffPanelState extends State<GitDiffPanel> {
                     'Changes',
                     style: TextStyle(
                       color: theme.foreground,
-                      fontFamily: 'Operator Mono',
+                      fontFamily: theme.fontFamily,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       decoration: TextDecoration.none,
@@ -113,7 +113,7 @@ class _GitDiffPanelState extends State<GitDiffPanel> {
                     'esc to close',
                     style: TextStyle(
                       color: theme.dimForeground,
-                      fontFamily: 'Operator Mono',
+                      fontFamily: theme.fontFamily,
                       fontSize: 11,
                       decoration: TextDecoration.none,
                     ),
@@ -155,7 +155,7 @@ class _GitDiffPanelState extends State<GitDiffPanel> {
                             'No changes',
                             style: TextStyle(
                               color: theme.dimForeground,
-                              fontFamily: 'Operator Mono',
+                              fontFamily: theme.fontFamily,
                               fontSize: 13,
                               decoration: TextDecoration.none,
                             ),
@@ -195,7 +195,7 @@ class _GitDiffPanelState extends State<GitDiffPanel> {
         text: '$line\n',
         style: TextStyle(
           color: color,
-          fontFamily: 'Operator Mono',
+          fontFamily: theme.fontFamily,
           fontSize: 12,
           height: 1.4,
           decoration: TextDecoration.none,

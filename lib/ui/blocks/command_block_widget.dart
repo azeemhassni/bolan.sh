@@ -128,7 +128,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                       block.command,
                       style: TextStyle(
                         color: theme.foreground,
-                        fontFamily: 'Operator Mono',
+                        fontFamily: theme.fontFamily,
                         fontSize: widget.fontSize,
                         fontWeight: FontWeight.w600,
                         decoration: TextDecoration.none,
@@ -141,7 +141,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                       style: TextStyle(
                         color: theme.exitSuccessFg,
                         fontSize: 11,
-                        fontFamily: 'Operator Mono',
+                        fontFamily: theme.fontFamily,
                         decoration: TextDecoration.none,
                       ),
                     )
@@ -157,7 +157,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                       _formatDuration(block.duration!),
                       style: TextStyle(
                         color: theme.dimForeground,
-                        fontFamily: 'Operator Mono',
+                        fontFamily: theme.fontFamily,
                         fontSize: widget.fontSize - 2,
                         decoration: TextDecoration.none,
                       ),
@@ -198,7 +198,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                             _explanation!,
                             style: TextStyle(
                               color: theme.foreground,
-                              fontFamily: 'Operator Mono',
+                              fontFamily: theme.fontFamily,
                               fontSize: widget.fontSize - 1,
                               height: 1.4,
                               decoration: TextDecoration.none,
@@ -238,7 +238,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                             _explaining ? 'Explaining...' : 'Explain Error',
                             style: TextStyle(
                               color: theme.ansiMagenta,
-                              fontFamily: 'Operator Mono',
+                              fontFamily: theme.fontFamily,
                               fontSize: 12,
                               decoration: TextDecoration.none,
                             ),
@@ -258,7 +258,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
   Widget _buildPlainOutput(CommandBlock block, BolonTheme theme) {
     final baseStyle = TextStyle(
       color: theme.foreground,
-      fontFamily: 'Operator Mono',
+      fontFamily: theme.fontFamily,
       fontSize: widget.fontSize,
       height: widget.lineHeight,
       decoration: TextDecoration.none,
@@ -363,7 +363,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
   Widget _buildScrollableOutput(CommandBlock block, BolonTheme theme) {
     final baseStyle = TextStyle(
       color: theme.foreground,
-      fontFamily: 'Operator Mono',
+      fontFamily: theme.fontFamily,
       fontSize: widget.fontSize,
       height: widget.lineHeight,
       decoration: TextDecoration.none,

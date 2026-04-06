@@ -96,7 +96,7 @@ class _GitCommitPanelState extends State<GitCommitPanel> {
                 'AI Commit Message',
                 style: TextStyle(
                   color: theme.foreground,
-                  fontFamily: 'Operator Mono',
+                  fontFamily: theme.fontFamily,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   decoration: TextDecoration.none,
@@ -107,7 +107,7 @@ class _GitCommitPanelState extends State<GitCommitPanel> {
                 'Cmd+Enter to commit · Esc to cancel',
                 style: TextStyle(
                   color: theme.dimForeground,
-                  fontFamily: 'Operator Mono',
+                  fontFamily: theme.fontFamily,
                   fontSize: 11,
                   decoration: TextDecoration.none,
                 ),
@@ -127,7 +127,7 @@ class _GitCommitPanelState extends State<GitCommitPanel> {
               minLines: 3,
               style: TextStyle(
                 color: theme.foreground,
-                fontFamily: 'Operator Mono',
+                fontFamily: theme.fontFamily,
                 fontSize: 13,
                 height: 1.5,
                 decoration: TextDecoration.none,
@@ -203,7 +203,7 @@ class _Button extends StatelessWidget {
             label,
             style: TextStyle(
               color: color,
-              fontFamily: 'Operator Mono',
+              fontFamily: BolonTheme.of(context).fontFamily,
               fontSize: 12,
               fontWeight: FontWeight.w500,
               decoration: TextDecoration.none,

@@ -11,6 +11,9 @@ class BolonTheme {
   final Brightness brightness;
   final bool isBuiltIn;
 
+  // Editor
+  final String fontFamily;
+
   // Window
   final Color background;
   final Color tabBarBackground;
@@ -64,6 +67,7 @@ class BolonTheme {
     this.displayName = 'Default Dark',
     this.brightness = Brightness.dark,
     this.isBuiltIn = true,
+    this.fontFamily = 'JetBrains Mono',
     required this.background,
     required this.tabBarBackground,
     required this.statusBarBackground,
@@ -116,6 +120,7 @@ class BolonTheme {
     String? displayName,
     Brightness? brightness,
     bool? isBuiltIn,
+    String? fontFamily,
     Color? background,
     Color? tabBarBackground,
     Color? statusBarBackground,
@@ -158,6 +163,7 @@ class BolonTheme {
       displayName: displayName ?? this.displayName,
       brightness: brightness ?? this.brightness,
       isBuiltIn: isBuiltIn ?? this.isBuiltIn,
+      fontFamily: fontFamily ?? this.fontFamily,
       background: background ?? this.background,
       tabBarBackground: tabBarBackground ?? this.tabBarBackground,
       statusBarBackground: statusBarBackground ?? this.statusBarBackground,

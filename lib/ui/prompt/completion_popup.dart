@@ -100,7 +100,7 @@ class _CompletionPopupState extends State<CompletionPopup> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: isSelected ? theme.foreground : theme.blockHeaderFg,
-                  fontFamily: 'Operator Mono',
+                  fontFamily: theme.fontFamily,
                   fontSize: widget.fontSize,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   decoration: TextDecoration.none,

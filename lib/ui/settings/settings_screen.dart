@@ -74,7 +74,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'Settings',
                         style: TextStyle(
                           color: theme.foreground,
-                          fontFamily: 'Operator Mono',
+                          fontFamily: theme.fontFamily,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           decoration: TextDecoration.none,
@@ -97,7 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'Bolan v$appVersion',
                         style: TextStyle(
                           color: theme.dimForeground,
-                          fontFamily: 'Operator Mono',
+                          fontFamily: theme.fontFamily,
                           fontSize: 11,
                           decoration: TextDecoration.none,
                         ),
@@ -171,7 +171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'Theme',
         style: TextStyle(
           color: theme.foreground,
-          fontFamily: 'Operator Mono',
+          fontFamily: theme.fontFamily,
           fontSize: 13,
           fontWeight: FontWeight.w500,
           decoration: TextDecoration.none,
@@ -332,7 +332,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'Rename Theme',
                 style: TextStyle(
                   color: t.foreground,
-                  fontFamily: 'Operator Mono',
+                  fontFamily: theme.fontFamily,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -346,7 +346,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   autofocus: true,
                   style: TextStyle(
                     color: t.foreground,
-                    fontFamily: 'Operator Mono',
+                    fontFamily: theme.fontFamily,
                     fontSize: 13,
                   ),
                   decoration: InputDecoration(
@@ -498,7 +498,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Config: ~/.config/bolan/config.toml',
           style: TextStyle(
             color: theme.dimForeground,
-            fontFamily: 'Operator Mono',
+            fontFamily: theme.fontFamily,
             fontSize: 11,
             decoration: TextDecoration.none,
           ),
@@ -849,7 +849,7 @@ class _SidebarTab extends StatelessWidget {
                 style: TextStyle(
                   color:
                       isSelected ? theme.foreground : theme.dimForeground,
-                  fontFamily: 'Operator Mono',
+                  fontFamily: theme.fontFamily,
                   fontSize: 13,
                   fontWeight:
                       isSelected ? FontWeight.w500 : FontWeight.normal,
@@ -888,7 +888,7 @@ class _Field extends StatelessWidget {
             label,
             style: TextStyle(
               color: theme.foreground,
-              fontFamily: 'Operator Mono',
+              fontFamily: theme.fontFamily,
               fontSize: 13,
               fontWeight: FontWeight.w500,
               decoration: TextDecoration.none,
@@ -900,7 +900,7 @@ class _Field extends StatelessWidget {
               help!,
               style: TextStyle(
                 color: theme.dimForeground,
-                fontFamily: 'Operator Mono',
+                fontFamily: theme.fontFamily,
                 fontSize: 11,
                 decoration: TextDecoration.none,
               ),
@@ -939,7 +939,7 @@ class _Input extends StatelessWidget {
         obscureText: obscure,
         style: TextStyle(
           color: theme.foreground,
-          fontFamily: 'Operator Mono',
+          fontFamily: theme.fontFamily,
           fontSize: 13,
         ),
         decoration: InputDecoration(
@@ -1023,7 +1023,7 @@ class _Slider extends StatelessWidget {
             textAlign: TextAlign.right,
             style: TextStyle(
               color: theme.foreground,
-              fontFamily: 'Operator Mono',
+              fontFamily: theme.fontFamily,
               fontSize: 13,
               decoration: TextDecoration.none,
             ),
@@ -1084,7 +1084,7 @@ class _SegmentedControl extends StatelessWidget {
                     color: value == options[i]
                         ? theme.cursor
                         : theme.dimForeground,
-                    fontFamily: 'Operator Mono',
+                    fontFamily: theme.fontFamily,
                     fontSize: 12,
                     fontWeight: value == options[i]
                         ? FontWeight.w600
@@ -1129,7 +1129,7 @@ class _Toggle extends StatelessWidget {
                   label,
                   style: TextStyle(
                     color: theme.foreground,
-                    fontFamily: 'Operator Mono',
+                    fontFamily: theme.fontFamily,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     decoration: TextDecoration.none,
@@ -1140,7 +1140,7 @@ class _Toggle extends StatelessWidget {
                     help!,
                     style: TextStyle(
                       color: theme.dimForeground,
-                      fontFamily: 'Operator Mono',
+                      fontFamily: theme.fontFamily,
                       fontSize: 11,
                       decoration: TextDecoration.none,
                     ),
@@ -1207,7 +1207,7 @@ class _ApiKeyFieldState extends State<_ApiKeyField> {
             'API Key',
             style: TextStyle(
               color: widget.theme.foreground,
-              fontFamily: 'Operator Mono',
+              fontFamily: widget.theme.fontFamily,
               fontSize: 13,
               fontWeight: FontWeight.w500,
               decoration: TextDecoration.none,
@@ -1244,7 +1244,7 @@ class _ApiKeyFieldState extends State<_ApiKeyField> {
                     color: _hasKey
                         ? widget.theme.foreground
                         : widget.theme.dimForeground,
-                    fontFamily: 'Operator Mono',
+                    fontFamily: widget.theme.fontFamily,
                     fontSize: 13,
                     decoration: TextDecoration.none,
                   ),
@@ -1320,7 +1320,7 @@ class _ActionButton extends StatelessWidget {
           label,
           style: TextStyle(
             color: color,
-            fontFamily: 'Operator Mono',
+            fontFamily: theme.fontFamily,
             fontSize: 12,
             fontWeight: FontWeight.w500,
             decoration: TextDecoration.none,
@@ -1387,7 +1387,7 @@ class _TestConnectionButtonState extends State<_TestConnectionButton> {
                     _testing ? 'Testing...' : 'Test Connection',
                     style: TextStyle(
                       color: widget.theme.foreground,
-                      fontFamily: 'Operator Mono',
+                      fontFamily: widget.theme.fontFamily,
                       fontSize: 12,
                       decoration: TextDecoration.none,
                     ),
@@ -1416,7 +1416,7 @@ class _TestConnectionButtonState extends State<_TestConnectionButton> {
                     color: _success == true
                         ? widget.theme.exitSuccessFg
                         : widget.theme.exitFailureFg,
-                    fontFamily: 'Operator Mono',
+                    fontFamily: widget.theme.fontFamily,
                     fontSize: 12,
                     decoration: TextDecoration.none,
                   ),
@@ -1559,7 +1559,7 @@ class _ThemeCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: theme.foreground,
-                    fontFamily: 'Operator Mono',
+                    fontFamily: theme.fontFamily,
                     fontSize: 10,
                     fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                     decoration: TextDecoration.none,
@@ -1579,11 +1579,11 @@ class _ThemeCard extends StatelessWidget {
         children: [
           TextSpan(
             text: prefix,
-            style: TextStyle(color: prefixColor, fontFamily: 'Operator Mono', fontSize: 7, height: 1.4),
+            style: TextStyle(color: prefixColor, fontFamily: theme.fontFamily, fontSize: 7, height: 1.4),
           ),
           TextSpan(
             text: text,
-            style: TextStyle(color: textColor, fontFamily: 'Operator Mono', fontSize: 7, height: 1.4),
+            style: TextStyle(color: textColor, fontFamily: theme.fontFamily, fontSize: 7, height: 1.4),
           ),
         ],
       ),

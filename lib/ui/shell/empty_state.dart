@@ -51,7 +51,7 @@ class EmptyState extends StatelessWidget {
               'No open sessions',
               style: TextStyle(
                 color: theme.dimForeground,
-                fontFamily: 'Operator Mono',
+                fontFamily: theme.fontFamily,
                 fontSize: 13,
                 decoration: TextDecoration.none,
               ),
@@ -76,7 +76,7 @@ class EmptyState extends StatelessWidget {
                           '>_ ',
                           style: TextStyle(
                             color: const Color(0xFF00FF92),
-                            fontFamily: 'Operator Mono',
+                            fontFamily: theme.fontFamily,
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
                             decoration: TextDecoration.none,
@@ -86,7 +86,7 @@ class EmptyState extends StatelessWidget {
                           'New Session',
                           style: TextStyle(
                             color: const Color(0xFF00FF92),
-                            fontFamily: 'Operator Mono',
+                            fontFamily: theme.fontFamily,
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
                             decoration: TextDecoration.none,
@@ -103,7 +103,7 @@ class EmptyState extends StatelessWidget {
               '${mod}T',
               style: TextStyle(
                 color: theme.dimForeground.withAlpha(120),
-                fontFamily: 'Operator Mono',
+                fontFamily: theme.fontFamily,
                 fontSize: 12,
                 decoration: TextDecoration.none,
               ),

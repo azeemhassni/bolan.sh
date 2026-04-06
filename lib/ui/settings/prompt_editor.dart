@@ -93,7 +93,7 @@ class _PromptEditorState extends State<PromptEditor> {
               'Active Chips',
               style: TextStyle(
                 color: theme.foreground,
-                fontFamily: 'Operator Mono',
+                fontFamily: theme.fontFamily,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 decoration: TextDecoration.none,
@@ -108,7 +108,7 @@ class _PromptEditorState extends State<PromptEditor> {
                   'Restore default',
                   style: TextStyle(
                     color: theme.cursor,
-                    fontFamily: 'Operator Mono',
+                    fontFamily: theme.fontFamily,
                     fontSize: 12,
                     decoration: TextDecoration.none,
                   ),
@@ -156,7 +156,7 @@ class _PromptEditorState extends State<PromptEditor> {
                           : 'No chips selected. Drag from below.',
                       style: TextStyle(
                         color: theme.dimForeground,
-                        fontFamily: 'Operator Mono',
+                        fontFamily: theme.fontFamily,
                         fontSize: 12,
                         decoration: TextDecoration.none,
                       ),
@@ -221,7 +221,7 @@ class _PromptEditorState extends State<PromptEditor> {
           'Available Chips',
           style: TextStyle(
             color: theme.foreground,
-            fontFamily: 'Operator Mono',
+            fontFamily: theme.fontFamily,
             fontSize: 13,
             fontWeight: FontWeight.w600,
             decoration: TextDecoration.none,
@@ -242,7 +242,7 @@ class _PromptEditorState extends State<PromptEditor> {
                   'All chips are active.',
                   style: TextStyle(
                     color: theme.dimForeground,
-                    fontFamily: 'Operator Mono',
+                    fontFamily: theme.fontFamily,
                     fontSize: 12,
                     decoration: TextDecoration.none,
                   ),
@@ -301,7 +301,7 @@ class _PromptEditorState extends State<PromptEditor> {
             example,
             style: TextStyle(
               color: color,
-              fontFamily: 'Operator Mono',
+              fontFamily: theme.fontFamily,
               fontSize: 13,
               fontWeight: FontWeight.w500,
               decoration: TextDecoration.none,
@@ -344,7 +344,7 @@ class _PromptEditorState extends State<PromptEditor> {
               type.label,
               style: TextStyle(
                 color: color,
-                fontFamily: 'Operator Mono',
+                fontFamily: theme.fontFamily,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 decoration: TextDecoration.none,
