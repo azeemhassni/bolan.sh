@@ -12,12 +12,18 @@ class CommandBlock {
   final DateTime? finishedAt;
   final int? exitCode;
   final bool isRunning;
+  final String cwd;
+  final String shellName;
+  final String? gitBranch;
 
   const CommandBlock({
     required this.id,
     required this.command,
     this.output = '',
     this.rawOutput = '',
+    this.cwd = '',
+    this.shellName = '',
+    this.gitBranch,
     required this.startedAt,
     this.finishedAt,
     this.exitCode,
@@ -33,6 +39,9 @@ class CommandBlock {
     DateTime? finishedAt,
     int? exitCode,
     bool? isRunning,
+    String? cwd,
+    String? shellName,
+    String? gitBranch,
   }) {
     return CommandBlock(
       id: id ?? this.id,
@@ -43,6 +52,9 @@ class CommandBlock {
       finishedAt: finishedAt ?? this.finishedAt,
       exitCode: exitCode ?? this.exitCode,
       isRunning: isRunning ?? this.isRunning,
+      cwd: cwd ?? this.cwd,
+      shellName: shellName ?? this.shellName,
+      gitBranch: gitBranch ?? this.gitBranch,
     );
   }
 

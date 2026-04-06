@@ -98,29 +98,38 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
     final block = widget.block;
     final isFailed = block.exitCode != null && block.exitCode! > 0;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: block.hasOutput ? _copyOutput : null,
-        child: Container(
-          decoration: BoxDecoration(
-            color: _hovered ? theme.blockBackground : theme.background,
-            border: Border(
-              left: BorderSide(
-                color: isFailed ? theme.exitFailureFg : Colors.transparent,
-                width: 3,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Prompt context line
+        Padding(
+          padding: const EdgeInsets.only(left: 12, right: 12, top: 12, bottom: 2),
+          child: _buildPromptContext(block, theme),
+        ),
+        // Block body
+        MouseRegion(
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: GestureDetector(
+            onTap: block.hasOutput ? _copyOutput : null,
+            child: Container(
+              decoration: BoxDecoration(
+                color: _hovered ? theme.blockBackground : theme.background,
+                border: Border(
+                  left: BorderSide(
+                    color: isFailed ? theme.exitFailureFg : Colors.transparent,
+                    width: 3,
+                  ),
+                ),
               ),
-            ),
-          ),
-          padding: const EdgeInsets.only(
-            left: 9, right: 12, top: 4, bottom: 4,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Command header
-              Row(
+              padding: const EdgeInsets.only(
+                left: 9, right: 12, top: 4, bottom: 4,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Command header
+                  Row(
                 children: [
                   Expanded(
                     child: Text(
@@ -250,6 +259,54 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
             ],
           ),
         ),
+      ),
+    ),
+    // Divider between blocks
+    Padding(
+      padding: const EdgeInsets.only(left: 12, right: 12, top: 8),
+      child: Divider(
+        height: 1,
+        thickness: 1,
+        color: theme.blockBorder.withAlpha(60),
+      ),
+    ),
+    ],
+    );
+  }
+
+  Widget _buildPromptContext(CommandBlock block, BolonTheme theme) {
+    final duration = block.duration;
+    final durationText = duration != null ? _formatDuration(duration) : '';
+
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(
+          fontFamily: theme.fontFamily,
+          fontSize: widget.fontSize - 2,
+          decoration: TextDecoration.none,
+        ),
+        children: [
+          if (block.shellName.isNotEmpty)
+            TextSpan(
+              text: '${block.shellName} ',
+              style: TextStyle(color: theme.dimForeground),
+            ),
+          if (block.cwd.isNotEmpty)
+            TextSpan(
+              text: '${block.cwd} ',
+              style: TextStyle(color: theme.statusCwdFg),
+            ),
+          if (block.gitBranch != null)
+            TextSpan(
+              text: 'git:(${block.gitBranch}) ',
+              style: TextStyle(color: theme.statusGitFg),
+            ),
+          if (durationText.isNotEmpty)
+            TextSpan(
+              text: '($durationText)',
+              style: TextStyle(color: theme.dimForeground),
+            ),
+        ],
       ),
     );
   }

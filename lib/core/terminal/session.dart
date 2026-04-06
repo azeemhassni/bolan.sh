@@ -328,6 +328,9 @@ class TerminalSession extends ChangeNotifier {
             id: _uuid.v4(),
             command: command,
             startedAt: DateTime.now(),
+            cwd: abbreviatedCwd,
+            shellName: shellName,
+            gitBranch: _gitBranch.isNotEmpty ? _gitBranch : null,
           );
           _commandRunning = true;
           notifyListeners();
