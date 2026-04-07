@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/ai/model_manager.dart';
 import '../../core/theme/bolan_theme.dart';
+import '../../providers/model_download_provider.dart';
 
 /// Modal dialog for downloading the local AI model.
 ///
 /// Shows privacy messaging, download progress with speed/size,
 /// and a "Continue in background" option.
-class ModelDownloadDialog extends StatefulWidget {
+class ModelDownloadDialog extends ConsumerStatefulWidget {
   final VoidCallback onDismiss;
   final VoidCallback onBackgrounded;
 
@@ -18,55 +20,35 @@ class ModelDownloadDialog extends StatefulWidget {
   });
 
   @override
-  State<ModelDownloadDialog> createState() => ModelDownloadDialogState();
+  ConsumerState<ModelDownloadDialog> createState() =>
+      ModelDownloadDialogState();
 }
 
-class ModelDownloadDialogState extends State<ModelDownloadDialog> {
-  _DownloadState _state = _DownloadState.prompt;
-  ModelDownload? _download;
-  int _received = 0;
-  int _total = -1;
-  String? _error;
+class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
+  bool _promptShown = true;
   DateTime? _startTime;
 
   @override
-  void dispose() {
-    if (_state == _DownloadState.downloading) {
-      _download?.cancel();
+  void initState() {
+    super.initState();
+    final dl = ref.read(modelDownloadProvider);
+    // If a download is already in progress (e.g. started from Settings),
+    // skip the prompt and go straight to progress.
+    if (dl.state.downloading || dl.state.paused) {
+      _promptShown = false;
     }
-    super.dispose();
   }
 
   void _startDownload() {
     setState(() {
-      _state = _DownloadState.downloading;
+      _promptShown = false;
       _startTime = DateTime.now();
     });
-
-    _download = ModelManager.download(
-      onProgress: (received, total) {
-        if (!mounted) return;
-        setState(() {
-          _received = received;
-          _total = total;
-        });
-      },
-      onComplete: () {
-        if (!mounted) return;
-        setState(() => _state = _DownloadState.complete);
-      },
-      onError: (error) {
-        if (!mounted) return;
-        setState(() {
-          _state = _DownloadState.error;
-          _error = error;
-        });
-      },
-    );
+    ref.read(modelDownloadProvider).start(ModelSize.small);
   }
 
   void _cancel() {
-    _download?.cancel();
+    ref.read(modelDownloadProvider).cancel();
     widget.onDismiss();
   }
 
@@ -79,22 +61,31 @@ class ModelDownloadDialogState extends State<ModelDownloadDialog> {
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
-  String _formatSpeed() {
-    if (_startTime == null || _received == 0) return '';
+  String _formatSpeed(int received) {
+    if (_startTime == null || received == 0) return '';
     final elapsed = DateTime.now().difference(_startTime!).inSeconds;
     if (elapsed == 0) return '';
-    final bytesPerSec = _received / elapsed;
+    final bytesPerSec = received / elapsed;
     return '${_formatBytes(bytesPerSec.round())}/s';
-  }
-
-  double get _progress {
-    if (_total <= 0) return 0;
-    return (_received / _total).clamp(0.0, 1.0);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
+    final dl = ref.watch(modelDownloadProvider);
+    final s = dl.state;
+
+    // Determine which view to show
+    final Widget content;
+    if (_promptShown && !s.downloading && !s.complete && s.error == null) {
+      content = _buildPrompt(theme);
+    } else if (s.complete) {
+      content = _buildComplete(theme);
+    } else if (s.error != null) {
+      content = _buildError(theme, s.error!);
+    } else {
+      content = _buildProgress(theme, s);
+    }
 
     return GestureDetector(
       onTap: () {},
@@ -118,12 +109,7 @@ class ModelDownloadDialogState extends State<ModelDownloadDialog> {
                   ),
                 ],
               ),
-              child: switch (_state) {
-                _DownloadState.prompt => _buildPrompt(theme),
-                _DownloadState.downloading => _buildProgress(theme),
-                _DownloadState.complete => _buildComplete(theme),
-                _DownloadState.error => _buildError(theme),
-              },
+              child: content,
             ),
           ),
         ),
@@ -197,9 +183,10 @@ class ModelDownloadDialogState extends State<ModelDownloadDialog> {
     );
   }
 
-  Widget _buildProgress(BolonTheme theme) {
-    final percent = (_progress * 100).toStringAsFixed(0);
-    final speed = _formatSpeed();
+  Widget _buildProgress(BolonTheme theme, ModelDownloadState s) {
+    final progress = s.progress;
+    final percent = (progress * 100).toStringAsFixed(0);
+    final speed = _formatSpeed(s.received);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -219,7 +206,7 @@ class ModelDownloadDialogState extends State<ModelDownloadDialog> {
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: _total > 0 ? _progress : null,
+            value: s.total > 0 ? progress : null,
             minHeight: 6,
             backgroundColor: theme.statusChipBg,
             valueColor:
@@ -231,7 +218,7 @@ class ModelDownloadDialogState extends State<ModelDownloadDialog> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              '${_formatBytes(_received)}${_total > 0 ? ' / ${_formatBytes(_total)}' : ''}',
+              '${_formatBytes(s.received)}${s.total > 0 ? ' / ${_formatBytes(s.total)}' : ''}',
               style: TextStyle(
                 color: theme.dimForeground,
                 fontFamily: theme.fontFamily,
@@ -240,7 +227,7 @@ class ModelDownloadDialogState extends State<ModelDownloadDialog> {
               ),
             ),
             Text(
-              _total > 0 ? '$percent%  $speed' : speed,
+              s.total > 0 ? '$percent%  $speed' : speed,
               style: TextStyle(
                 color: theme.dimForeground,
                 fontFamily: theme.fontFamily,
@@ -303,13 +290,16 @@ class ModelDownloadDialogState extends State<ModelDownloadDialog> {
           label: 'Done',
           theme: theme,
           isPrimary: true,
-          onTap: widget.onDismiss,
+          onTap: () {
+            ref.read(modelDownloadProvider).clearComplete();
+            widget.onDismiss();
+          },
         ),
       ],
     );
   }
 
-  Widget _buildError(BolonTheme theme) {
+  Widget _buildError(BolonTheme theme, String error) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,7 +322,7 @@ class ModelDownloadDialogState extends State<ModelDownloadDialog> {
         ),
         const SizedBox(height: 12),
         Text(
-          _error ?? 'Unknown error',
+          error,
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
@@ -352,7 +342,10 @@ class ModelDownloadDialogState extends State<ModelDownloadDialog> {
               label: 'Retry',
               theme: theme,
               isPrimary: true,
-              onTap: _startDownload,
+              onTap: () {
+                setState(() => _startTime = DateTime.now());
+                ref.read(modelDownloadProvider).start(ModelSize.small);
+              },
             ),
           ],
         ),
@@ -360,8 +353,6 @@ class ModelDownloadDialogState extends State<ModelDownloadDialog> {
     );
   }
 }
-
-enum _DownloadState { prompt, downloading, complete, error }
 
 class _Button extends StatelessWidget {
   final String label;

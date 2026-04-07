@@ -1,6 +1,7 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/ai/ai_provider_helper.dart';
 import '../../core/ai/api_key_storage.dart';
@@ -10,6 +11,7 @@ import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/theme_registry.dart';
+import '../../providers/model_download_provider.dart';
 import 'font_picker.dart';
 import 'prompt_editor.dart';
 import 'theme_editor.dart';
@@ -1601,7 +1603,7 @@ class _ThemeCard extends StatelessWidget {
 }
 
 /// Inline card for local model size selection, download, and status.
-class _LocalModelCard extends StatefulWidget {
+class _LocalModelCard extends ConsumerStatefulWidget {
   final BolonTheme theme;
   final String activeSize;
   final VoidCallback onChanged;
@@ -1615,34 +1617,35 @@ class _LocalModelCard extends StatefulWidget {
   });
 
   @override
-  State<_LocalModelCard> createState() => _LocalModelCardState();
+  ConsumerState<_LocalModelCard> createState() => _LocalModelCardState();
 }
 
-class _LocalModelCardState extends State<_LocalModelCard> {
+class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
   ModelSize _selectedSize = ModelSize.small;
-  bool _downloading = false;
-  bool _paused = false;
-  int _received = 0;
-  int _total = -1;
-  String? _error;
-  ModelDownload? _download;
 
   @override
   void initState() {
     super.initState();
-    _selectedSize = ModelSize.values.firstWhere(
-      (s) => s.name == widget.activeSize,
-      orElse: () => ModelManager.downloadedSize() ?? ModelSize.small,
-    );
+    final dl = ref.read(modelDownloadProvider);
+    // If a download is already running, sync selected size from it
+    if (dl.state.downloading || dl.state.paused) {
+      _selectedSize = dl.state.size;
+    } else {
+      _selectedSize = ModelSize.values.firstWhere(
+        (s) => s.name == widget.activeSize,
+        orElse: () => ModelManager.downloadedSize() ?? ModelSize.small,
+      );
+    }
+    dl.onComplete = () {
+      widget.onSizeChanged(_selectedSize.name);
+      widget.onChanged();
+    };
   }
 
   bool get _isSelectedDownloaded =>
       ModelManager.isModelDownloaded(_selectedSize);
 
   bool get _hasPartial => hasPartialDownload(_selectedSize);
-
-  double get _progress =>
-      _total > 0 ? (_received / _total).clamp(0.0, 1.0) : 0;
 
   String _formatBytes(int bytes) {
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
@@ -1652,86 +1655,12 @@ class _LocalModelCardState extends State<_LocalModelCard> {
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
-  void _startDownload() {
-    setState(() {
-      _downloading = true;
-      _paused = false;
-      _error = null;
-      if (!_hasPartial) {
-        _received = 0;
-        _total = -1;
-      }
-    });
-
-    _download = ModelManager.download(
-      size: _selectedSize,
-      onProgress: (received, total) {
-        if (!mounted) return;
-        setState(() {
-          _received = received;
-          _total = total;
-        });
-      },
-      onComplete: () {
-        if (!mounted) return;
-        setState(() {
-          _downloading = false;
-          _paused = false;
-        });
-        // Auto-activate the newly downloaded model
-        widget.onSizeChanged(_selectedSize.name);
-        widget.onChanged();
-      },
-      onError: (error) {
-        if (!mounted) return;
-        setState(() {
-          _downloading = false;
-          _paused = false;
-          _error = error;
-        });
-      },
-    );
-  }
-
-  void _pauseDownload() {
-    _download?.pause();
-    setState(() {
-      _downloading = false;
-      _paused = true;
-    });
-  }
-
-  void _resumeDownload() {
-    if (_download != null) {
-      _download!.resume();
-      setState(() {
-        _downloading = true;
-        _paused = false;
-        _error = null;
-      });
-    } else {
-      // Reconnect — previous download object was lost (app restart)
-      _startDownload();
-    }
-  }
-
-  void _cancelDownload() {
-    _download?.cancel();
-    setState(() {
-      _downloading = false;
-      _paused = false;
-    });
-  }
-
-  @override
-  void dispose() {
-    // Pause instead of cancel so partial file is kept for resume
-    if (_downloading) _download?.pause();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final dl = ref.watch(modelDownloadProvider);
+    final dlState = dl.state;
+    final isActiveDownload =
+        (dlState.downloading || dlState.paused) && dlState.size == _selectedSize;
     final t = widget.theme;
     final info = modelInfoMap[_selectedSize]!;
     final configuredSize = ModelSize.values.firstWhere(
@@ -1759,7 +1688,7 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                   isSelected: _selectedSize == size,
                   isDownloaded: ModelManager.isModelDownloaded(size),
                   theme: t,
-                  onTap: _downloading
+                  onTap: dlState.downloading
                       ? null
                       : () {
                           setState(() => _selectedSize = size);
@@ -1847,7 +1776,7 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                     decoration: TextDecoration.none,
                   ),
                 )
-              else if (_hasPartial && !_downloading)
+              else if (_hasPartial && !isActiveDownload)
                 Text(
                   'Paused  ·  ${_formatBytes(partialDownloadSize(_selectedSize))} downloaded',
                   style: TextStyle(
@@ -1858,7 +1787,7 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                   ),
                 ),
               const Spacer(),
-              if (_isSelectedDownloaded && !_downloading)
+              if (_isSelectedDownloaded && !isActiveDownload)
                 GestureDetector(
                   onTap: () async {
                     await ModelManager.deleteModel(_selectedSize);
@@ -1879,11 +1808,20 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                   ),
                 ),
               // Download / Resume button
-              if (!_isSelectedDownloaded && !_downloading)
+              if (!_isSelectedDownloaded && !isActiveDownload)
                 GestureDetector(
-                  onTap: _paused || _hasPartial
-                      ? _resumeDownload
-                      : _startDownload,
+                  onTap: () {
+                    final n = ref.read(modelDownloadProvider);
+                    n.onComplete = () {
+                      widget.onSizeChanged(_selectedSize.name);
+                      widget.onChanged();
+                    };
+                    if (dlState.paused && dlState.size == _selectedSize) {
+                      n.resume();
+                    } else {
+                      n.start(_selectedSize);
+                    }
+                  },
                   child: MouseRegion(
                     cursor: SystemMouseCursors.click,
                     child: Container(
@@ -1894,7 +1832,9 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        _paused || _hasPartial ? 'Resume' : 'Download',
+                        (dlState.paused && dlState.size == _selectedSize) || _hasPartial
+                            ? 'Resume'
+                            : 'Download',
                         style: TextStyle(
                           color: t.background,
                           fontFamily: t.fontFamily,
@@ -1907,9 +1847,9 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                   ),
                 ),
               // Pause + Cancel during active download
-              if (_downloading) ...[
+              if (isActiveDownload && dlState.downloading) ...[
                 GestureDetector(
-                  onTap: _pauseDownload,
+                  onTap: () => ref.read(modelDownloadProvider).pause(),
                   child: MouseRegion(
                     cursor: SystemMouseCursors.click,
                     child: Text(
@@ -1925,7 +1865,7 @@ class _LocalModelCardState extends State<_LocalModelCard> {
                 ),
                 const SizedBox(width: 12),
                 GestureDetector(
-                  onTap: _cancelDownload,
+                  onTap: () => ref.read(modelDownloadProvider).cancel(),
                   child: MouseRegion(
                     cursor: SystemMouseCursors.click,
                     child: Text(
@@ -1944,12 +1884,12 @@ class _LocalModelCardState extends State<_LocalModelCard> {
           ),
 
           // Download progress (shown while downloading or paused)
-          if (_downloading || _paused) ...[
+          if (isActiveDownload) ...[
             const SizedBox(height: 10),
             ClipRRect(
               borderRadius: BorderRadius.circular(3),
               child: LinearProgressIndicator(
-                value: _total > 0 ? _progress : null,
+                value: dlState.total > 0 ? dlState.progress : null,
                 minHeight: 4,
                 backgroundColor: t.blockBackground,
                 valueColor: const AlwaysStoppedAnimation<Color>(
@@ -1958,7 +1898,7 @@ class _LocalModelCardState extends State<_LocalModelCard> {
             ),
             const SizedBox(height: 6),
             Text(
-              '${_formatBytes(_received)}${_total > 0 ? ' / ${_formatBytes(_total)}  ${(_progress * 100).toStringAsFixed(0)}%' : ''}',
+              '${_formatBytes(dlState.received)}${dlState.total > 0 ? ' / ${_formatBytes(dlState.total)}  ${(dlState.progress * 100).toStringAsFixed(0)}%' : ''}',
               style: TextStyle(
                 color: t.dimForeground,
                 fontFamily: t.fontFamily,
@@ -1969,7 +1909,7 @@ class _LocalModelCardState extends State<_LocalModelCard> {
           ],
 
           // Error
-          if (_error != null)
+          if (dlState.error != null && dlState.size == _selectedSize)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Row(

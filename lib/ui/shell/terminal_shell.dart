@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/actions/app_action.dart';
 import '../../core/ai/ai_provider_helper.dart';
+import '../../core/ai/local_llm_provider.dart';
 import '../../core/ai/model_manager.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/notifications/notification_service.dart';
@@ -15,9 +16,11 @@ import '../../core/pane/pane_node.dart';
 import '../../core/platform_shortcuts.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/config_provider.dart';
+import '../../providers/model_download_provider.dart';
 import '../../providers/font_size_provider.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../ai/memory_warning_dialog.dart';
 import '../ai/model_download_dialog.dart';
 import '../ai/model_download_toast.dart';
 import '../palette/command_palette.dart';
@@ -46,8 +49,6 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   bool _showPalette = false;
   bool _showDownloadDialog = false;
   bool _showDownloadToast = false;
-  int _dlReceived = 0;
-  int _dlTotal = -1;
   final _downloadDialogKey = GlobalKey<ModelDownloadDialogState>();
 
   @override
@@ -60,6 +61,10 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     AiProviderHelper.configuredLocalModelSize =
         _configLoader.config.ai.localModelSize;
     HardwareKeyboard.instance.addHandler(_globalKeyHandler);
+    LocalLlmProvider.memoryConfirmCallback = _confirmHighMemoryLoad;
+    // Sweep up any orphan llamafile server left from a previous Bolan
+    // run that was force-quit, crashed, or interrupted by reboot.
+    LocalLlmProvider.killStaleLocalLlmServer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(configLoaderProvider.notifier).state = _configLoader;
       ref.read(notificationServiceProvider.notifier).state =
@@ -68,10 +73,33 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     });
   }
 
+  /// Bridges [LocalLlmProvider]'s memory warning into a UI dialog.
+  Future<bool> _confirmHighMemoryLoad({
+    required String modelLabel,
+    required int requiredBytes,
+    required int availableBytes,
+    int? totalBytes,
+  }) async {
+    if (!mounted) return false;
+    // Use the Riverpod theme provider — this State's own context is
+    // above the BolonThemeProvider in the tree.
+    final theme = ref.read(activeThemeProvider);
+    return showMemoryWarningDialog(
+      context,
+      theme: theme,
+      modelLabel: modelLabel,
+      requiredBytes: requiredBytes,
+      availableBytes: availableBytes,
+      totalBytes: totalBytes,
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(_globalKeyHandler);
+    LocalLlmProvider.memoryConfirmCallback = null;
+    AiProviderHelper.dispose();
     _configLoader.removeListener(_onConfigChanged);
     _configLoader.dispose();
     super.dispose();
@@ -82,6 +110,11 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     _notificationService.setAppFocused(
       state == AppLifecycleState.resumed,
     );
+    // App window closed / process about to exit — kill the LLM server
+    // so it doesn't outlive Bolan as an orphan.
+    if (state == AppLifecycleState.detached) {
+      AiProviderHelper.dispose();
+    }
   }
 
   void _onConfigChanged() {
@@ -95,8 +128,15 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     if (config.activeTheme != currentTheme) {
       ref.read(activeThemeNameProvider.notifier).state = config.activeTheme;
     }
-    // Sync local model size for AI provider
-    AiProviderHelper.configuredLocalModelSize = config.ai.localModelSize;
+    // Sync local model size for AI provider. If the size actually
+    // changed, eagerly tear down the running server so the old model
+    // stops hogging RAM — otherwise it would linger until the next
+    // AI request triggered a lazy restart.
+    final newSize = config.ai.localModelSize;
+    if (AiProviderHelper.configuredLocalModelSize != newSize) {
+      AiProviderHelper.configuredLocalModelSize = newSize;
+      AiProviderHelper.dispose();
+    }
   }
 
   /// Global key handler: forwards printable key presses to the focused pane's
@@ -336,6 +376,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         isDangerous: true,
       );
       if (result != ConfirmResult.closeAll) return;
+      AiProviderHelper.dispose();
       exit(0);
     }
 
@@ -354,6 +395,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       if (result != ConfirmResult.closeAll) return;
     }
 
+    AiProviderHelper.dispose();
     exit(0);
   }
 
@@ -605,14 +647,26 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                 onBackgrounded: _backgroundDownload,
               ),
             if (_showDownloadToast)
-              ModelDownloadToast(
-                received: _dlReceived,
-                total: _dlTotal,
-                onTap: () => setState(() {
-                  _showDownloadToast = false;
-                  _showDownloadDialog = true;
-                }),
-              ),
+              Builder(builder: (context) {
+                final dl = ref.watch(modelDownloadProvider);
+                final s = dl.state;
+                // Auto-hide toast when download completes
+                if (s.complete || (!s.downloading && !s.paused)) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && _showDownloadToast) {
+                      setState(() => _showDownloadToast = false);
+                    }
+                  });
+                }
+                return ModelDownloadToast(
+                  received: s.received,
+                  total: s.total,
+                  onTap: () => setState(() {
+                    _showDownloadToast = false;
+                    _showDownloadDialog = true;
+                  }),
+                );
+              }),
           ],
         ),
       ),
