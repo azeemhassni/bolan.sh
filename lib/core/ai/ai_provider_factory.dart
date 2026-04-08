@@ -45,9 +45,10 @@ class AiProviderFactory {
         );
 
       case 'ollama':
+        // Ollama runs locally and never needs an API key.
         return OpenAiCompatibleProvider(
           baseUrl: config.ollamaUrl,
-          model: 'llama3',
+          model: config.model.isNotEmpty ? config.model : 'llama3',
           name: 'Ollama',
         );
 

@@ -26,6 +26,8 @@ class AiProviderHelper {
     required String providerName,
     String geminiModel = 'gemma-3-27b-it',
     String anthropicMode = 'claude-code',
+    String ollamaUrl = 'http://127.0.0.1:11434',
+    String ollamaModel = 'llama3',
   }) async {
     switch (providerName) {
       case 'local':
@@ -63,9 +65,10 @@ class AiProviderHelper {
         );
 
       case 'ollama':
+        // Ollama runs locally and never needs an API key.
         return OpenAiCompatibleProvider(
-          baseUrl: 'http://127.0.0.1:11434',
-          model: 'llama3',
+          baseUrl: ollamaUrl,
+          model: ollamaModel,
           name: 'Ollama',
         );
 

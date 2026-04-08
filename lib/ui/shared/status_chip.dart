@@ -25,10 +25,10 @@ class StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: fg.withAlpha(60), width: 1),
       ),
       child: Row(
@@ -37,22 +37,22 @@ class StatusChip extends StatelessWidget {
           if (svgIcon != null) ...[
             SvgPicture.asset(
               svgIcon!,
-              width: 16,
-              height: 16,
+              width: 18,
+              height: 18,
               colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 6),
           ] else if (icon != null) ...[
-            Icon(icon, size: 16, color: fg),
-            const SizedBox(width: 5),
+            Icon(icon, size: 18, color: fg),
+            const SizedBox(width: 6),
           ],
           Text(
             text,
             style: TextStyle(
               color: fg,
-              fontSize: 16,
+              fontSize: 18,
               fontFamily: BolonTheme.of(context).fontFamily,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w700,
               decoration: TextDecoration.none,
             ),
           ),

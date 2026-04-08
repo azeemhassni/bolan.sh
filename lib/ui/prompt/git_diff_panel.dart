@@ -74,18 +74,26 @@ class _GitDiffPanelState extends State<GitDiffPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
+    final media = MediaQuery.of(context).size;
 
     return Focus(
       focusNode: _focusNode,
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.6,
+          maxWidth: media.width * 0.85,
+          maxHeight: media.height * 0.75,
         ),
         decoration: BoxDecoration(
           color: theme.blockBackground,
-          border: Border(
-            top: BorderSide(color: theme.blockBorder, width: 1),
-          ),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: theme.blockBorder, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(120),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

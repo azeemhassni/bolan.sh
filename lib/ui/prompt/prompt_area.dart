@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../core/config/prompt_config.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
+import '../shared/bolan_dialog.dart';
 import '../shared/status_chip.dart';
 import 'git_diff_panel.dart';
 import 'prompt_input.dart';
@@ -50,7 +51,21 @@ class PromptArea extends StatefulWidget {
 
 class _PromptAreaState extends State<PromptArea> {
   bool _aiMode = false;
-  bool _showDiffPanel = false;
+
+  void _openDiffOverlay() {
+    showBolanDialog<void>(
+      context: context,
+      builder: (ctx) => Center(
+        child: Material(
+          color: Colors.transparent,
+          child: GitDiffPanel(
+            cwd: widget.session.cwd,
+            onClose: () => Navigator.of(ctx).pop(),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -125,7 +140,7 @@ class _PromptAreaState extends State<PromptArea> {
         if (!widget.session.hasGitStats) return [];
         return [
           GestureDetector(
-            onTap: () => setState(() => _showDiffPanel = !_showDiffPanel),
+            onTap: _openDiffOverlay,
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
               child: Container(
@@ -134,9 +149,7 @@ class _PromptAreaState extends State<PromptArea> {
                   color: theme.statusChipBg,
                   borderRadius: BorderRadius.circular(5),
                   border: Border.all(
-                    color: _showDiffPanel
-                        ? theme.cursor.withAlpha(80)
-                        : theme.foreground.withAlpha(40),
+                    color: theme.foreground.withAlpha(40),
                     width: 1,
                   ),
                 ),
@@ -250,13 +263,6 @@ class _PromptAreaState extends State<PromptArea> {
               ],
             ),
           ),
-
-          // Diff panel
-          if (_showDiffPanel)
-            GitDiffPanel(
-              cwd: widget.session.cwd,
-              onClose: () => setState(() => _showDiffPanel = false),
-            ),
 
           // Text input
           PromptInput(

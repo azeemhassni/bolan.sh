@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/ai/model_manager.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/model_download_provider.dart';
+import '../shared/bolan_dialog.dart';
 
 /// Modal dialog for downloading the local AI model.
 ///
@@ -75,7 +76,6 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
     final dl = ref.watch(modelDownloadProvider);
     final s = dl.state;
 
-    // Determine which view to show
     final Widget content;
     if (_promptShown && !s.downloading && !s.complete && s.error == null) {
       content = _buildPrompt(theme);
@@ -87,32 +87,13 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
       content = _buildProgress(theme, s);
     }
 
+    // This dialog is mounted inline by [TerminalShell], not via
+    // showDialog, so it provides its own backdrop.
     return GestureDetector(
       onTap: () {},
       child: Container(
         color: Colors.black54,
-        child: Center(
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              width: 440,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: theme.blockBackground,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: theme.blockBorder, width: 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(100),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: content,
-            ),
-          ),
-        ),
+        child: BolanDialog(child: content),
       ),
     );
   }
@@ -122,59 +103,30 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.shield_outlined,
-                size: 20, color: const Color(0xFF00FF92)),
-            const SizedBox(width: 10),
-            Text(
-              'Local AI Model',
-              style: TextStyle(
-                color: theme.foreground,
-                fontFamily: theme.fontFamily,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ],
+        BolanDialogTitle(
+          text: 'Local AI Model',
+          icon: Icons.shield_outlined,
+          iconColor: theme.cursor,
         ),
         const SizedBox(height: 16),
-        Text(
+        const BolanDialogText(
           'Bolan uses a local AI model for command generation. '
           'Everything runs on your machine — no data leaves your computer.',
-          style: TextStyle(
-            color: theme.dimForeground,
-            fontFamily: theme.fontFamily,
-            fontSize: 13,
-            height: 1.5,
-            decoration: TextDecoration.none,
-          ),
         ),
         const SizedBox(height: 8),
-        Text(
-          'Download size: ~1.3 GB',
-          style: TextStyle(
-            color: theme.dimForeground,
-            fontFamily: theme.fontFamily,
-            fontSize: 12,
-            decoration: TextDecoration.none,
-          ),
-        ),
+        const BolanDialogText('Download size: ~1.3 GB'),
         const SizedBox(height: 24),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            _Button(
+            BolanDialogButton(
               label: 'Not Now',
-              theme: theme,
               onTap: widget.onDismiss,
             ),
             const SizedBox(width: 10),
-            _Button(
+            BolanDialogButton(
               label: 'Download',
-              theme: theme,
-              isPrimary: true,
+              kind: BolanButtonKind.primary,
               onTap: _startDownload,
             ),
           ],
@@ -192,16 +144,7 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Downloading AI model...',
-          style: TextStyle(
-            color: theme.foreground,
-            fontFamily: theme.fontFamily,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            decoration: TextDecoration.none,
-          ),
-        ),
+        const BolanDialogTitle(text: 'Downloading AI model...'),
         const SizedBox(height: 16),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
@@ -209,8 +152,7 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
             value: s.total > 0 ? progress : null,
             minHeight: 6,
             backgroundColor: theme.statusChipBg,
-            valueColor:
-                const AlwaysStoppedAnimation<Color>(Color(0xFF00FF92)),
+            valueColor: AlwaysStoppedAnimation<Color>(theme.cursor),
           ),
         ),
         const SizedBox(height: 10),
@@ -241,15 +183,13 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            _Button(
+            BolanDialogButton(
               label: 'Cancel',
-              theme: theme,
               onTap: _cancel,
             ),
             const SizedBox(width: 10),
-            _Button(
+            BolanDialogButton(
               label: 'Continue in Background',
-              theme: theme,
               onTap: widget.onBackgrounded,
             ),
           ],
@@ -261,35 +201,19 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
   Widget _buildComplete(BolonTheme theme) {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Icon(Icons.check_circle_outline,
-            size: 48, color: const Color(0xFF00FF92)),
+        Icon(Icons.check_circle_outline, size: 48, color: theme.cursor),
         const SizedBox(height: 16),
-        Text(
-          'Model downloaded',
-          style: TextStyle(
-            color: theme.foreground,
-            fontFamily: theme.fontFamily,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            decoration: TextDecoration.none,
-          ),
-        ),
+        const BolanDialogTitle(text: 'Model downloaded'),
         const SizedBox(height: 8),
-        Text(
+        const BolanDialogText(
           'Local AI is ready. Type # followed by what you want to do.',
-          style: TextStyle(
-            color: theme.dimForeground,
-            fontFamily: theme.fontFamily,
-            fontSize: 13,
-            decoration: TextDecoration.none,
-          ),
         ),
         const SizedBox(height: 20),
-        _Button(
+        BolanDialogButton(
           label: 'Done',
-          theme: theme,
-          isPrimary: true,
+          kind: BolanButtonKind.primary,
           onTap: () {
             ref.read(modelDownloadProvider).clearComplete();
             widget.onDismiss();
@@ -304,44 +228,22 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.error_outline, size: 20, color: theme.exitFailureFg),
-            const SizedBox(width: 8),
-            Text(
-              'Download failed',
-              style: TextStyle(
-                color: theme.foreground,
-                fontFamily: theme.fontFamily,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ],
+        BolanDialogTitle(
+          text: 'Download failed',
+          icon: Icons.error_outline,
+          iconColor: theme.exitFailureFg,
         ),
         const SizedBox(height: 12),
-        Text(
-          error,
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: theme.dimForeground,
-            fontFamily: theme.fontFamily,
-            fontSize: 12,
-            decoration: TextDecoration.none,
-          ),
-        ),
+        BolanDialogText(error, maxLines: 3, overflow: TextOverflow.ellipsis),
         const SizedBox(height: 20),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            _Button(label: 'Close', theme: theme, onTap: widget.onDismiss),
+            BolanDialogButton(label: 'Close', onTap: widget.onDismiss),
             const SizedBox(width: 10),
-            _Button(
+            BolanDialogButton(
               label: 'Retry',
-              theme: theme,
-              isPrimary: true,
+              kind: BolanButtonKind.primary,
               onTap: () {
                 setState(() => _startTime = DateTime.now());
                 ref.read(modelDownloadProvider).start(ModelSize.small);
@@ -350,49 +252,6 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
           ],
         ),
       ],
-    );
-  }
-}
-
-class _Button extends StatelessWidget {
-  final String label;
-  final BolonTheme theme;
-  final bool isPrimary;
-  final VoidCallback onTap;
-
-  const _Button({
-    required this.label,
-    required this.theme,
-    this.isPrimary = false,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: isPrimary
-                ? const Color(0xFF00FF92)
-                : theme.statusChipBg,
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isPrimary ? theme.background : theme.foreground,
-              fontFamily: theme.fontFamily,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              decoration: TextDecoration.none,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

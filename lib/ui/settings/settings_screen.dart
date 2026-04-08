@@ -1468,10 +1468,14 @@ class _TestConnectionButtonState extends State<_TestConnectionButton> {
         providerName: config.provider,
         geminiModel: config.geminiModel,
         anthropicMode: config.anthropicMode,
+        ollamaUrl: config.ollamaUrl,
+        ollamaModel: config.model.isNotEmpty ? config.model : 'llama3',
       );
 
       if (provider == null) {
         setState(() {
+          // Ollama and Local LLM never need an API key, so this branch
+          // only fires for cloud providers (OpenAI / Anthropic / Gemini).
           _result = 'No API key configured';
           _success = false;
         });
