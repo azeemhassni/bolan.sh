@@ -248,6 +248,16 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     // Don't forward keys during tab rename
     if (tabRenameActive) return false;
 
+    // Don't steal keys when any text input already has focus —
+    // popovers, dialogs, settings forms, find bar, etc. The check
+    // looks at the leaf widget under the primary focus and bails if
+    // it's an EditableText (the underlying widget every Flutter text
+    // input is built on).
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary != null && primary.context?.widget is EditableText) {
+      return false;
+    }
+
     final isPrintable = event.character != null &&
         event.character!.isNotEmpty &&
         !HardwareKeyboard.instance.isControlPressed &&

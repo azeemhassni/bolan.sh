@@ -7,8 +7,11 @@ import 'package:intl/intl.dart';
 import '../../core/config/prompt_config.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
+import '../shared/anchored_popover.dart';
 import '../shared/bolan_dialog.dart';
 import '../shared/status_chip.dart';
+import 'branch_picker.dart';
+import 'directory_picker.dart';
 import 'git_diff_panel.dart';
 import 'prompt_input.dart';
 
@@ -51,6 +54,8 @@ class PromptArea extends StatefulWidget {
 
 class _PromptAreaState extends State<PromptArea> {
   bool _aiMode = false;
+  final GlobalKey _cwdChipKey = GlobalKey();
+  final GlobalKey _branchChipKey = GlobalKey();
 
   void _openDiffOverlay() {
     showBolanDialog<void>(
@@ -63,6 +68,43 @@ class _PromptAreaState extends State<PromptArea> {
             onClose: () => Navigator.of(ctx).pop(),
           ),
         ),
+      ),
+    );
+  }
+
+  void _openDirectoryPicker() {
+    late AnchoredPopoverHandle handle;
+    handle = showAnchoredPopover(
+      context: context,
+      anchorKey: _cwdChipKey,
+      maxWidth: 360,
+      maxHeight: 340,
+      child: DirectoryPicker(
+        initialPath: widget.session.cwd,
+        onSelect: (path) {
+          // cd into the chosen directory by sending the command to the
+          // PTY. Quote to handle paths with spaces.
+          widget.session.writeInput("cd '${path.replaceAll("'", "'\\''")}'\n");
+        },
+        onDismiss: () => handle.dismiss(),
+      ),
+    );
+  }
+
+  void _openBranchPicker() {
+    late AnchoredPopoverHandle handle;
+    handle = showAnchoredPopover(
+      context: context,
+      anchorKey: _branchChipKey,
+      maxWidth: 320,
+      maxHeight: 340,
+      child: BranchPicker(
+        cwd: widget.session.cwd,
+        currentBranch: widget.session.gitBranch,
+        onSelect: (branch) {
+          widget.session.writeInput("git checkout '${branch.replaceAll("'", "'\\''")}'\n");
+        },
+        onDismiss: () => handle.dismiss(),
       ),
     );
   }
@@ -117,22 +159,36 @@ class _PromptAreaState extends State<PromptArea> {
       case PromptChipType.cwd:
         if (widget.session.abbreviatedCwd.isEmpty) return [];
         return [
-          StatusChip(
-            text: widget.session.abbreviatedCwd,
-            fg: theme.statusCwdFg,
-            bg: theme.statusChipBg,
-            svgIcon: 'assets/icons/ic_folder_code.svg',
+          GestureDetector(
+            key: _cwdChipKey,
+            onTap: _openDirectoryPicker,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: StatusChip(
+                text: widget.session.abbreviatedCwd,
+                fg: theme.statusCwdFg,
+                bg: theme.statusChipBg,
+                svgIcon: 'assets/icons/ic_folder_code.svg',
+              ),
+            ),
           ),
         ];
 
       case PromptChipType.gitBranch:
         if (widget.session.gitBranch.isEmpty) return [];
         return [
-          StatusChip(
-            text: '${widget.session.gitBranch}${widget.session.gitDirty ? " !" : ""}',
-            fg: theme.statusGitFg,
-            bg: theme.statusChipBg,
-            svgIcon: 'assets/icons/ic_git.svg',
+          GestureDetector(
+            key: _branchChipKey,
+            onTap: _openBranchPicker,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: StatusChip(
+                text: '${widget.session.gitBranch}${widget.session.gitDirty ? " !" : ""}',
+                fg: theme.statusGitFg,
+                bg: theme.statusChipBg,
+                svgIcon: 'assets/icons/ic_git.svg',
+              ),
+            ),
           ),
         ];
 
