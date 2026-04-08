@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/config/prompt_config.dart';
@@ -199,36 +198,45 @@ class _PromptAreaState extends State<PromptArea> {
             onTap: _openDiffOverlay,
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.statusChipBg,
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(
-                    color: theme.foreground.withAlpha(40),
-                    width: 1,
-                  ),
-                ),
+              child: StatusChip(
+                fg: theme.foreground,
+                bg: theme.statusChipBg,
+                svgIcon: 'assets/icons/ic_diff.svg',
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SvgPicture.asset(
-                      'assets/icons/ic_diff.svg',
-                      width: 14, height: 14,
-                      colorFilter: ColorFilter.mode(theme.foreground, BlendMode.srcIn),
+                    Text(
+                      '${widget.session.gitFilesChanged}',
+                      style: TextStyle(
+                        color: theme.foreground,
+                        fontFamily: theme.fontFamily,
+                        fontSize: StatusChip.textSize,
+                        fontWeight: StatusChip.textWeight,
+                        decoration: TextDecoration.none,
+                      ),
                     ),
-                    const SizedBox(width: 5),
-                    Text('${widget.session.gitFilesChanged}',
-                      style: TextStyle(color: theme.foreground, fontFamily: theme.fontFamily,
-                        fontSize: 13, fontWeight: FontWeight.w500, decoration: TextDecoration.none)),
+                    const SizedBox(width: 8),
+                    Text(
+                      '+${widget.session.gitInsertions}',
+                      style: TextStyle(
+                        color: theme.exitSuccessFg,
+                        fontFamily: theme.fontFamily,
+                        fontSize: StatusChip.textSize,
+                        fontWeight: StatusChip.textWeight,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
                     const SizedBox(width: 6),
-                    Text('+${widget.session.gitInsertions}',
-                      style: TextStyle(color: theme.exitSuccessFg, fontFamily: theme.fontFamily,
-                        fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
-                    const SizedBox(width: 4),
-                    Text('-${widget.session.gitDeletions}',
-                      style: TextStyle(color: theme.exitFailureFg, fontFamily: theme.fontFamily,
-                        fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
+                    Text(
+                      '-${widget.session.gitDeletions}',
+                      style: TextStyle(
+                        color: theme.exitFailureFg,
+                        fontFamily: theme.fontFamily,
+                        fontSize: StatusChip.textSize,
+                        fontWeight: StatusChip.textWeight,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
                   ],
                 ),
               ),
