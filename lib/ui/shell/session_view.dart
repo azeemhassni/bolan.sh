@@ -191,6 +191,7 @@ class _SessionViewState extends ConsumerState<SessionView> {
                       currentMatchIndex: _findCurrentMatch,
                       blockMatchStartIndex: _matchStartIndexForBlock(i),
                       onSecondaryTap: widget.onSecondaryTap,
+                      onRerun: (cmd) => widget.session.writeInput('$cmd\n'),
                     ),
                 ],
                 prompt: PromptArea(
@@ -429,17 +430,20 @@ class _BlocksWithStickyPromptState extends State<_BlocksWithStickyPrompt> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Scrollable content: blocks + inline prompt (when not overflowing)
+        // Scrollable content: blocks (as slivers) + inline prompt
+        // (when not overflowing). Each block builds a SliverMainAxisGroup
+        // with a pinned header, so the command + action bar of the
+        // currently-visible block stays at the top of the viewport.
         Positioned.fill(
-          bottom: _overflows ? 80 : 0, // leave room for pinned prompt
-          child: ListView(
+          bottom: _overflows ? 80 : 0,
+          child: CustomScrollView(
             key: _contentKey,
             controller: widget.scrollController,
             physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.only(top: 8),
-            children: [
+            slivers: [
+              const SliverToBoxAdapter(child: SizedBox(height: 8)),
               ...widget.blocks,
-              if (!_overflows) widget.prompt,
+              if (!_overflows) SliverToBoxAdapter(child: widget.prompt),
             ],
           ),
         ),
