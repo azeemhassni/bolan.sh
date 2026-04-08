@@ -11,6 +11,7 @@ import '../../core/theme/bolan_theme.dart';
 import '../shared/anchored_popover.dart';
 import 'ansi_text_parser.dart';
 import 'linkified_text.dart';
+import 'share_image_dialog.dart';
 
 /// Renders a completed command as a Warp-style block.
 ///
@@ -600,6 +601,18 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
     await _flashCopy(_CopyFlash.block);
   }
 
+  Future<void> _shareAsImage() async {
+    final theme = BolonTheme.of(context);
+    await showShareImageDialog(
+      context,
+      command: widget.block.command,
+      output: widget.block.output,
+      rawOutput: widget.block.rawOutput,
+      shellName: widget.shellName,
+      theme: theme,
+    );
+  }
+
   Future<void> _saveOutput() async {
     final loc = await getSaveLocation(
       suggestedName: 'output.txt',
@@ -646,6 +659,14 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                 handle.dismiss();
               },
             ),
+          _BlockMenuItem(
+            icon: Icons.image_outlined,
+            label: 'Share as image…',
+            onTap: () {
+              handle.dismiss();
+              _shareAsImage();
+            },
+          ),
           if (canExplain)
             _BlockMenuItem(
               icon: Icons.auto_awesome,

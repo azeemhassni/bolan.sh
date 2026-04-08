@@ -809,6 +809,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? shareHistory,
     String? localModelSize,
   }) {
+    // Belt-and-suspenders: this can be invoked from an async download
+    // completion callback that fires after the user has navigated
+    // away from Settings.
+    if (!mounted) return;
     setState(() {
       _config = AppConfig(
         general: _config.general,
@@ -1626,6 +1630,7 @@ class _LocalModelCard extends ConsumerStatefulWidget {
 
 class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
   ModelSize _selectedSize = ModelSize.small;
+  VoidCallback? _onCompleteCallback;
 
   @override
   void initState() {
@@ -1640,10 +1645,30 @@ class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
         orElse: () => ModelManager.downloadedSize() ?? ModelSize.small,
       );
     }
-    dl.onComplete = () {
+    _onCompleteCallback = () {
+      // The download notifier is global and outlives this card. If
+      // the user navigates away from Settings before the download
+      // finishes, the closure can fire on a disposed widget — guard
+      // and bail.
+      if (!mounted) return;
       widget.onSizeChanged(_selectedSize.name);
       widget.onChanged();
     };
+    dl.onComplete = _onCompleteCallback;
+  }
+
+  @override
+  void dispose() {
+    // Detach our completion callback from the global notifier so it
+    // doesn't reach back into a defunct State after the user leaves
+    // Settings while a download is still running. Identity check
+    // prevents clearing a newer instance's callback if the card was
+    // recreated after we registered ours.
+    final dl = ref.read(modelDownloadProvider);
+    if (identical(dl.onComplete, _onCompleteCallback)) {
+      dl.onComplete = null;
+    }
+    super.dispose();
   }
 
   bool get _isSelectedDownloaded =>
@@ -1816,10 +1841,10 @@ class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
                 GestureDetector(
                   onTap: () {
                     final n = ref.read(modelDownloadProvider);
-                    n.onComplete = () {
-                      widget.onSizeChanged(_selectedSize.name);
-                      widget.onChanged();
-                    };
+                    // Reuse the mounted-guarded closure from initState
+                    // (also tracked for cleanup in dispose) instead of
+                    // installing a fresh unguarded one on every click.
+                    n.onComplete = _onCompleteCallback;
                     if (dlState.paused && dlState.size == _selectedSize) {
                       n.resume();
                     } else {
