@@ -44,9 +44,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
+      # subosito/flutter-action's hosted metadata doesn't list arm64
+      # binaries for the "stable" channel, so we install Flutter
+      # directly from git. Works on any architecture.
+      - name: Install Flutter from git
+        run: |
+          git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$HOME/flutter"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Flutter doctor
+        run: flutter doctor -v
 
       - name: Install Linux dependencies
         run: |
