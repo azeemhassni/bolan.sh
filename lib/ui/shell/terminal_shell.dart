@@ -289,12 +289,20 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   }
 
   void _openSettings() {
-    final currentTheme = ref.read(activeThemeProvider);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => BolonThemeProvider(
-          theme: currentTheme,
-          child: SettingsScreen(configLoader: _configLoader),
+        builder: (_) => Consumer(
+          builder: (ctx, ref, _) {
+            // Watch (not read) so the wrapper rebuilds whenever the
+            // active theme changes — including from inside Settings
+            // itself. Without this, Settings is frozen to whatever
+            // theme was active when the route was pushed.
+            final theme = ref.watch(activeThemeProvider);
+            return BolonThemeProvider(
+              theme: theme,
+              child: SettingsScreen(configLoader: _configLoader),
+            );
+          },
         ),
       ),
     );
