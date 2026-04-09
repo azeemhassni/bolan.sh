@@ -232,6 +232,32 @@ class SessionNotifier extends Notifier<SessionState> {
     state = SessionState(tabs: tabs, activeTabIndex: activeIndex);
   }
 
+  /// Moves the tab at [oldIndex] to [newIndex], adjusting the active
+  /// tab pointer so the same logical tab stays selected.
+  void reorderTab(int oldIndex, int newIndex) {
+    if (oldIndex == newIndex) return;
+    if (oldIndex < 0 || oldIndex >= state.tabs.length) return;
+    if (newIndex < 0 || newIndex > state.tabs.length) return;
+
+    final tabs = [...state.tabs];
+    final moved = tabs.removeAt(oldIndex);
+    // Account for the removal shifting indices when moving forward.
+    final insertAt = newIndex > oldIndex ? newIndex - 1 : newIndex;
+    tabs.insert(insertAt, moved);
+
+    // Recompute the active index so the previously focused tab stays
+    // focused after the reorder.
+    var active = state.activeTabIndex;
+    if (active == oldIndex) {
+      active = insertAt;
+    } else if (oldIndex < active && insertAt >= active) {
+      active--;
+    } else if (oldIndex > active && insertAt <= active) {
+      active++;
+    }
+    state = SessionState(tabs: tabs, activeTabIndex: active);
+  }
+
   // --- Pane operations ---
 
   void splitPane(Axis axis) {

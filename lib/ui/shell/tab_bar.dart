@@ -79,20 +79,31 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                   final fullTitle = tab.customTitle ??
                       session?.fullTabTitle ??
                       'zsh';
-                  return _Tab(
-                    title: title,
-                    fullTitle: fullTitle,
-                    status: session?.tabStatus ?? TabStatus.idle,
-                    isActive: isActive,
-                    isRenamed: tab.customTitle != null,
+                  return _DraggableTab(
+                    index: index,
                     theme: theme,
-                    onTap: () =>
-                        ref.read(sessionProvider.notifier).switchTab(index),
-                    onClose: () => widget.onCloseTab != null
-                        ? widget.onCloseTab!(index)
-                        : ref.read(sessionProvider.notifier).closeTab(index),
-                    onRename: (name) =>
-                        ref.read(sessionProvider.notifier).renameTab(index, name),
+                    onReorder: (oldIndex, newIndex) => ref
+                        .read(sessionProvider.notifier)
+                        .reorderTab(oldIndex, newIndex),
+                    child: _Tab(
+                      title: title,
+                      fullTitle: fullTitle,
+                      status: session?.tabStatus ?? TabStatus.idle,
+                      isActive: isActive,
+                      isRenamed: tab.customTitle != null,
+                      theme: theme,
+                      onTap: () => ref
+                          .read(sessionProvider.notifier)
+                          .switchTab(index),
+                      onClose: () => widget.onCloseTab != null
+                          ? widget.onCloseTab!(index)
+                          : ref
+                              .read(sessionProvider.notifier)
+                              .closeTab(index),
+                      onRename: (name) => ref
+                          .read(sessionProvider.notifier)
+                          .renameTab(index, name),
+                    ),
                   );
                 },
               ),
@@ -308,7 +319,6 @@ class _TabState extends State<_Tab> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: _editing ? null : widget.onTap,
-        onDoubleTap: _editing ? null : _startEditing,
         onSecondaryTapDown: _editing
             ? null
             : (details) => _showContextMenu(details, context),
@@ -629,6 +639,91 @@ class _IconButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Wraps a [_Tab] in a [Draggable] + [DragTarget] pair so the user
+/// can reorder tabs by dragging one onto another. The drag carries
+/// the source index; the drop target reorders via [onReorder].
+class _DraggableTab extends StatefulWidget {
+  final int index;
+  final BolonTheme theme;
+  final Widget child;
+  final void Function(int oldIndex, int newIndex) onReorder;
+
+  const _DraggableTab({
+    required this.index,
+    required this.theme,
+    required this.child,
+    required this.onReorder,
+  });
+
+  @override
+  State<_DraggableTab> createState() => _DraggableTabState();
+}
+
+class _DraggableTabState extends State<_DraggableTab> {
+  bool _hovering = false;
+  bool _dropAfter = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.theme;
+    return DragTarget<int>(
+      onWillAcceptWithDetails: (details) => details.data != widget.index,
+      onMove: (details) {
+        // Decide whether the drop should land BEFORE or AFTER this
+        // tab based on whether the pointer is in its left or right
+        // half. Computed in local coordinates.
+        final box = context.findRenderObject() as RenderBox?;
+        if (box == null) return;
+        final local = box.globalToLocal(details.offset);
+        final after = local.dx > box.size.width / 2;
+        if (after != _dropAfter || !_hovering) {
+          setState(() {
+            _hovering = true;
+            _dropAfter = after;
+          });
+        }
+      },
+      onLeave: (_) => setState(() => _hovering = false),
+      onAcceptWithDetails: (details) {
+        final from = details.data;
+        final to = widget.index + (_dropAfter ? 1 : 0);
+        widget.onReorder(from, to);
+        setState(() => _hovering = false);
+      },
+      builder: (context, candidate, rejected) {
+        return Stack(
+          children: [
+            Draggable<int>(
+              data: widget.index,
+              axis: Axis.horizontal,
+              feedback: Material(
+                color: Colors.transparent,
+                child: Opacity(opacity: 0.85, child: widget.child),
+              ),
+              childWhenDragging:
+                  Opacity(opacity: 0.35, child: widget.child),
+              child: widget.child,
+            ),
+            // Drop indicator — a 2px accent stripe on the side the
+            // dragged tab will land.
+            if (_hovering)
+              Positioned(
+                left: _dropAfter ? null : 0,
+                right: _dropAfter ? 0 : null,
+                top: 4,
+                bottom: 4,
+                child: Container(
+                  width: 2,
+                  color: t.effectiveTabAccent,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
