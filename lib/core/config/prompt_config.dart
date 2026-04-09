@@ -18,6 +18,10 @@ enum PromptChipType {
   nvm,
   kubectl,
   pythonVenv,
+  awsProfile,
+  gcpProject,
+  terraformWorkspace,
+  dockerContext,
 }
 
 /// Display metadata for each chip type.
@@ -35,6 +39,10 @@ extension PromptChipMeta on PromptChipType {
         PromptChipType.nvm => 'Node version',
         PromptChipType.kubectl => 'Kubectl context',
         PromptChipType.pythonVenv => 'Python venv',
+        PromptChipType.awsProfile => 'AWS profile',
+        PromptChipType.gcpProject => 'GCP project',
+        PromptChipType.terraformWorkspace => 'Terraform workspace',
+        PromptChipType.dockerContext => 'Docker context',
       };
 
   String get example => switch (this) {
@@ -50,6 +58,10 @@ extension PromptChipMeta on PromptChipType {
         PromptChipType.nvm => 'v20.11.0',
         PromptChipType.kubectl => 'prod-east · bolan',
         PromptChipType.pythonVenv => 'venv (3.12)',
+        PromptChipType.awsProfile => 'production',
+        PromptChipType.gcpProject => 'bolan-prod',
+        PromptChipType.terraformWorkspace => 'staging',
+        PromptChipType.dockerContext => 'colima',
       };
 
   String get id => name;
@@ -63,6 +75,10 @@ extension PromptChipMeta on PromptChipType {
         PromptChipType.nvm => 'assets/icons/ic_nodejs.svg',
         PromptChipType.kubectl => 'assets/icons/ic_kubernetes.svg',
         PromptChipType.pythonVenv => 'assets/icons/ic_python.svg',
+        PromptChipType.awsProfile => 'assets/icons/ic_aws.svg',
+        PromptChipType.gcpProject => 'assets/icons/ic_gcp.svg',
+        PromptChipType.terraformWorkspace => 'assets/icons/ic_terraform.svg',
+        PromptChipType.dockerContext => 'assets/icons/ic_docker.svg',
         _ => null,
       };
 
@@ -80,6 +96,10 @@ extension PromptChipMeta on PromptChipType {
         PromptChipType.nvm => theme.ansiGreen,
         PromptChipType.kubectl => theme.ansiBlue,
         PromptChipType.pythonVenv => theme.ansiYellow,
+        PromptChipType.awsProfile => theme.ansiYellow,
+        PromptChipType.gcpProject => theme.ansiBlue,
+        PromptChipType.terraformWorkspace => theme.ansiMagenta,
+        PromptChipType.dockerContext => theme.ansiCyan,
       };
 
   /// Material icon fallback for chip types without SVG.

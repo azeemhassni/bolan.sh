@@ -78,6 +78,18 @@ class TerminalSession extends ChangeNotifier {
   String _pythonVenvVersion = '';
   String _pythonVenvPath = '';
 
+  // Phase 2: shell-emitted env var chips. Updated by the OSC 7777
+  // hook the shell integration emits on every prompt. Empty when
+  // the shell integration hasn't run yet (first prompt).
+  String _activeVirtualEnv = '';
+  String _awsProfile = '';
+  String _gcpProject = '';
+  String _dockerContext = '';
+
+  // terraform: detected by walking ancestors for `.terraform/environment`
+  // (file-based, no shell hook needed).
+  String _terraformWorkspace = '';
+
   // Buffer for capturing command output between C and D markers
   final StringBuffer _outputCapture = StringBuffer();
 
@@ -217,6 +229,30 @@ class TerminalSession extends ChangeNotifier {
 
   /// Whether the python venv chip should be shown.
   bool get hasPythonVenv => _pythonVenvName.isNotEmpty;
+
+  /// Absolute path to the venv currently activated in the shell
+  /// (`$VIRTUAL_ENV` from the shell-integration hook). Empty if
+  /// none is active.
+  String get activeVirtualEnv => _activeVirtualEnv;
+
+  /// `$AWS_PROFILE` from the shell, or empty if unset (in which
+  /// case the AWS CLI uses "default").
+  String get awsProfile => _awsProfile;
+  bool get hasAwsProfile => _awsProfile.isNotEmpty;
+
+  /// `$CLOUDSDK_CORE_PROJECT` or `$GCP_PROJECT` from the shell,
+  /// whichever is set.
+  String get gcpProject => _gcpProject;
+  bool get hasGcpProject => _gcpProject.isNotEmpty;
+
+  /// `$DOCKER_CONTEXT` from the shell, or empty if unset.
+  String get dockerContext => _dockerContext;
+  bool get hasDockerContext => _dockerContext.isNotEmpty;
+
+  /// Active terraform workspace from the nearest `.terraform/environment`,
+  /// or empty if not in a terraform project.
+  String get terraformWorkspace => _terraformWorkspace;
+  bool get hasTerraformWorkspace => _terraformWorkspace.isNotEmpty;
 
   /// Shell name (e.g. "zsh", "bash").
   String get shellName => title;
@@ -373,13 +409,16 @@ class TerminalSession extends ChangeNotifier {
       notifyListeners();
     };
 
-    // OSC sequences: shell integration (133) and CWD (7)
+    // OSC sequences: shell integration (133), CWD (7), Bolan
+    // env-var snapshot (7777, custom — see _injectShellIntegration).
     terminal.onPrivateOSC = (String code, List<String> args) {
       if (code == '133') {
         final event = parseOsc133(args);
         if (event != null) _handleShellEvent(event);
       } else if (code == '7' && args.isNotEmpty) {
         _handleOsc7(args[0]);
+      } else if (code == '7777') {
+        _handleOscEnv(args);
       }
     };
 
@@ -387,6 +426,7 @@ class TerminalSession extends ChangeNotifier {
     _updateNvmStatus();
     _updatePythonVenvStatus();
     _updateKubeStatus();
+    _updateTerraformStatus();
 
     // Poll kubectl context every 5 seconds — kube context changes
     // are global to the machine and not tied to cwd, so we can't
@@ -598,10 +638,73 @@ class TerminalSession extends ChangeNotifier {
         _updateGitStatus();
         _updateNvmStatus();
         _updatePythonVenvStatus();
+        _updateTerraformStatus();
         notifyListeners();
       }
     } on FormatException {
       // Ignore malformed URIs
+    }
+  }
+
+  /// Handles OSC 7777 — Bolan-specific env var snapshot emitted by
+  /// the shell integration on every prompt. Args is a list of
+  /// `KEY=VALUE` strings; missing keys/values are normalized to
+  /// empty strings here.
+  void _handleOscEnv(List<String> args) {
+    var changed = false;
+    for (final pair in args) {
+      final eq = pair.indexOf('=');
+      if (eq < 0) continue;
+      final key = pair.substring(0, eq);
+      final value = pair.substring(eq + 1);
+      switch (key) {
+        case 'AWS_PROFILE':
+          if (_awsProfile != value) {
+            _awsProfile = value;
+            changed = true;
+          }
+        case 'GCP_PROJECT':
+          if (_gcpProject != value) {
+            _gcpProject = value;
+            changed = true;
+          }
+        case 'DOCKER_CONTEXT':
+          if (_dockerContext != value) {
+            _dockerContext = value;
+            changed = true;
+          }
+        case 'VIRTUAL_ENV':
+          if (_activeVirtualEnv != value) {
+            _activeVirtualEnv = value;
+            changed = true;
+          }
+      }
+    }
+    if (changed) notifyListeners();
+  }
+
+  /// Walks up the cwd ancestor chain looking for `.terraform/environment`,
+  /// the file Terraform writes to track the active workspace per
+  /// project. Reads it directly — no `terraform` command needed.
+  Future<void> _updateTerraformStatus() async {
+    if (_cwd.isEmpty) return;
+    final found = _findAncestorFile(_cwd, '.terraform/environment');
+    if (found == null) {
+      if (_terraformWorkspace.isNotEmpty) {
+        _terraformWorkspace = '';
+        notifyListeners();
+      }
+      return;
+    }
+    try {
+      final raw = await File(found).readAsString();
+      final ws = raw.trim();
+      if (ws != _terraformWorkspace) {
+        _terraformWorkspace = ws;
+        notifyListeners();
+      }
+    } on FileSystemException {
+      // Best effort.
     }
   }
 
@@ -805,6 +908,11 @@ class TerminalSession extends ChangeNotifier {
     if (shellName == 'zsh') {
       // Hide the shell's native prompt — Bolan renders its own prompt area.
       // Set PS1 to empty so no prompt text appears in the terminal output.
+      //
+      // OSC 7777 (Bolan-specific) emits a snapshot of selected env
+      // vars on every prompt. The session parses these and updates
+      // the live tool chips that depend on shell-side state — AWS
+      // profile, GCP project, Docker context, active Python venv.
       script = r"""
 PS1=''
 RPS1=''
@@ -814,10 +922,18 @@ __bolan_prompt_end()   { printf '\e]133;B\a'; }
 __bolan_cmd_start()    { printf '\e]133;C;%s\a' "$1"; }
 __bolan_cmd_end()      { local ec=$?; printf "\e]133;D;$ec\a"; }
 __bolan_osc7()         { printf '\e]7;file://%s%s\a' "$HOST" "$PWD"; }
+__bolan_env() {
+  printf '\e]7777;AWS_PROFILE=%s;GCP_PROJECT=%s;DOCKER_CONTEXT=%s;VIRTUAL_ENV=%s\a' \
+    "${AWS_PROFILE:-}" \
+    "${CLOUDSDK_CORE_PROJECT:-${GCP_PROJECT:-}}" \
+    "${DOCKER_CONTEXT:-}" \
+    "${VIRTUAL_ENV:-}"
+}
 autoload -Uz add-zsh-hook
 add-zsh-hook precmd  __bolan_cmd_end
 add-zsh-hook precmd  __bolan_prompt_start
 add-zsh-hook precmd  __bolan_osc7
+add-zsh-hook precmd  __bolan_env
 add-zsh-hook preexec __bolan_prompt_end
 add-zsh-hook preexec __bolan_cmd_start
 """;
@@ -829,8 +945,15 @@ __bolan_prompt_end()   { printf '\e]133;B\a'; }
 __bolan_cmd_start()    { printf '\e]133;C;%s\a' "$BASH_COMMAND"; }
 __bolan_cmd_end()      { local ec=$?; printf "\e]133;D;$ec\a"; }
 __bolan_osc7()         { printf '\e]7;file://%s%s\a' "$HOSTNAME" "$PWD"; }
+__bolan_env() {
+  printf '\e]7777;AWS_PROFILE=%s;GCP_PROJECT=%s;DOCKER_CONTEXT=%s;VIRTUAL_ENV=%s\a' \
+    "${AWS_PROFILE:-}" \
+    "${CLOUDSDK_CORE_PROJECT:-${GCP_PROJECT:-}}" \
+    "${DOCKER_CONTEXT:-}" \
+    "${VIRTUAL_ENV:-}"
+}
 __bolan_preexec() { __bolan_prompt_end; __bolan_cmd_start; }
-__bolan_precmd() { __bolan_cmd_end; __bolan_prompt_start; __bolan_osc7; }
+__bolan_precmd() { __bolan_cmd_end; __bolan_prompt_start; __bolan_osc7; __bolan_env; }
 trap '__bolan_preexec' DEBUG
 PROMPT_COMMAND="__bolan_precmd;${PROMPT_COMMAND}"
 """;

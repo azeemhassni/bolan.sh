@@ -461,15 +461,27 @@ class _PromptAreaState extends State<PromptArea> {
         ];
 
       case PromptChipType.pythonVenv:
-        if (!widget.session.hasPythonVenv) return [];
-        final name = widget.session.pythonVenvName;
+        // Prefer the actually-active venv reported by the shell hook;
+        // fall back to filesystem detection of `pyvenv.cfg` in cwd
+        // ancestors if the shell hasn't emitted yet.
+        final activePath = widget.session.activeVirtualEnv;
+        final hasActive = activePath.isNotEmpty;
+        final hasOnDisk = widget.session.hasPythonVenv;
+        if (!hasActive && !hasOnDisk) return [];
+        final name = hasActive
+            ? activePath.split('/').last
+            : widget.session.pythonVenvName;
         final ver = widget.session.pythonVenvVersion;
-        final label = ver.isNotEmpty ? '$name ($ver)' : name;
+        final label = ver.isNotEmpty && !hasActive
+            ? '$name ($ver)'
+            : name;
         return [
           GestureDetector(
-            onTap: _activatePythonVenv,
+            onTap: hasActive ? null : _activatePythonVenv,
             child: MouseRegion(
-              cursor: SystemMouseCursors.click,
+              cursor: hasActive
+                  ? SystemMouseCursors.basic
+                  : SystemMouseCursors.click,
               child: StatusChip(
                 text: label,
                 fg: theme.ansiYellow,
@@ -477,6 +489,50 @@ class _PromptAreaState extends State<PromptArea> {
                 svgIcon: 'assets/icons/ic_python.svg',
               ),
             ),
+          ),
+        ];
+
+      case PromptChipType.awsProfile:
+        if (!widget.session.hasAwsProfile) return [];
+        return [
+          StatusChip(
+            text: widget.session.awsProfile,
+            fg: theme.ansiYellow,
+            bg: theme.statusChipBg,
+            svgIcon: 'assets/icons/ic_aws.svg',
+          ),
+        ];
+
+      case PromptChipType.gcpProject:
+        if (!widget.session.hasGcpProject) return [];
+        return [
+          StatusChip(
+            text: widget.session.gcpProject,
+            fg: theme.ansiBlue,
+            bg: theme.statusChipBg,
+            svgIcon: 'assets/icons/ic_gcp.svg',
+          ),
+        ];
+
+      case PromptChipType.terraformWorkspace:
+        if (!widget.session.hasTerraformWorkspace) return [];
+        return [
+          StatusChip(
+            text: widget.session.terraformWorkspace,
+            fg: theme.ansiMagenta,
+            bg: theme.statusChipBg,
+            svgIcon: 'assets/icons/ic_terraform.svg',
+          ),
+        ];
+
+      case PromptChipType.dockerContext:
+        if (!widget.session.hasDockerContext) return [];
+        return [
+          StatusChip(
+            text: widget.session.dockerContext,
+            fg: theme.ansiCyan,
+            bg: theme.statusChipBg,
+            svgIcon: 'assets/icons/ic_docker.svg',
           ),
         ];
     }
