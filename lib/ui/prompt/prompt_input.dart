@@ -52,7 +52,11 @@ class PromptInput extends StatefulWidget {
 }
 
 class PromptInputState extends State<PromptInput> {
-  final _controller = TextEditingController();
+  // Custom controller renders the ghost text as an extra TextSpan
+  // appended to the editor's own RichText. This puts the ghost in
+  // the SAME render object as the input — there's no overlay, so
+  // there's nothing to misalign. See [_GhostTextController].
+  final _controller = _GhostTextController();
   late final FocusNode _focusNode;
   int _historyIndex = -1;
   String _savedInput = '';
@@ -79,6 +83,18 @@ class PromptInputState extends State<PromptInput> {
   // Git commit panel state
   bool _showCommitPanel = false;
   String _commitMessage = '';
+
+  /// Authoritative line metric shared by the prompt TextField AND
+  /// the ghost text RichText overlaid on top of it. Without
+  /// `forceStrutHeight: true`, TextField (with isDense) and RichText
+  /// compute slightly different baselines and the ghost text drifts
+  /// vertically by a pixel or two.
+  StrutStyle _promptStrutStyle(BolonTheme theme) => StrutStyle(
+        fontFamily: theme.fontFamily,
+        fontSize: widget.fontSize,
+        height: 1.4,
+        forceStrutHeight: true,
+      );
 
   /// Ghost text: AI loading indicator, completions, or history match.
   String get _ghostText {
@@ -285,7 +301,28 @@ class PromptInputState extends State<PromptInput> {
               anthropicMode: widget.anthropicMode,
             ),
 
-          // Input with ghost text overlay + completion popup
+          // Input + ghost text + completion popup.
+          //
+          // The ghost text is rendered INSIDE the TextField via a
+          // custom controller (`_GhostTextController`) that overrides
+          // `buildTextSpan` to append a dim TextSpan after the real
+          // text. One render path = one baseline = perfect alignment
+          // at every font size, with no overlay/strut acrobatics.
+          Builder(builder: (_) {
+            // Push the current ghost text into the controller so its
+            // `buildTextSpan` returns the appended span on next paint.
+            _controller.updateGhost(
+              ghost,
+              TextStyle(
+                color: theme.dimForeground,
+                fontFamily: theme.fontFamily,
+                fontSize: widget.fontSize,
+                height: 1.4,
+                decoration: TextDecoration.none,
+              ),
+            );
+            return const SizedBox.shrink();
+          }),
           CompositedTransformTarget(
             link: _completionLayerLink,
             child: Padding(
@@ -293,57 +330,29 @@ class PromptInputState extends State<PromptInput> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Stack(
-                      children: [
-                        // Ghost text
-                        if (ghost.isNotEmpty)
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: _GhostTextOverlay(
-                                controller: _controller,
-                                ghostText: ghost,
-                                style: TextStyle(
-                                  color: theme.dimForeground,
-                                  fontFamily: theme.fontFamily,
-                                  fontSize: widget.fontSize,
-                                  height: 1.4,
-                                  decoration: TextDecoration.none,
-                                ),
-                                realStyle: TextStyle(
-                                  color: Colors.transparent,
-                                  fontFamily: theme.fontFamily,
-                                  fontSize: widget.fontSize,
-                                  height: 1.4,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                            ),
-                          ),
-
-                        // Real input
-                        TextField(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          autofocus: true,
-                          maxLines: null,
-                          minLines: 1,
-                          contextMenuBuilder: (_, __) => const SizedBox.shrink(),
-                          style: TextStyle(
-                            color: theme.foreground,
-                            fontFamily: theme.fontFamily,
-                            fontSize: widget.fontSize,
-                            height: 1.4,
-                            decoration: TextDecoration.none,
-                          ),
-                          cursorColor: _isAiMode ? theme.ansiMagenta : theme.cursor,
-                          cursorWidth: 2,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                            isDense: true,
-                          ),
-                        ),
-                      ],
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      autofocus: true,
+                      maxLines: null,
+                      minLines: 1,
+                      contextMenuBuilder: (_, __) => const SizedBox.shrink(),
+                      style: TextStyle(
+                        color: theme.foreground,
+                        fontFamily: theme.fontFamily,
+                        fontSize: widget.fontSize,
+                        height: 1.4,
+                        decoration: TextDecoration.none,
+                      ),
+                      strutStyle: _promptStrutStyle(theme),
+                      cursorColor:
+                          _isAiMode ? theme.ansiMagenta : theme.cursor,
+                      cursorWidth: 2,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                        isDense: true,
+                      ),
                     ),
                   ),
 
@@ -963,29 +972,47 @@ class PromptInputState extends State<PromptInput> {
   }
 }
 
-/// Renders ghost/shadow text after the real text content.
-class _GhostTextOverlay extends StatelessWidget {
-  final TextEditingController controller;
-  final String ghostText;
-  final TextStyle style;
-  final TextStyle realStyle;
+/// `TextEditingController` that renders an inline ghost text suffix
+/// directly inside the editor's own RichText. The ghost is appended
+/// in `buildTextSpan` AFTER the real text but is NOT part of the
+/// controller's `text` value, so it doesn't affect the cursor
+/// position, selection, or what the user submits.
+///
+/// This eliminates the entire alignment problem: real text and ghost
+/// text are spans of the same RenderParagraph inside one EditableText
+/// — they share a single baseline, single line metric, single layout.
+class _GhostTextController extends TextEditingController {
+  String _ghostText = '';
+  TextStyle? _ghostStyle;
 
-  const _GhostTextOverlay({
-    required this.controller,
-    required this.ghostText,
-    required this.style,
-    required this.realStyle,
-  });
+  /// Updates the ghost text and triggers a rebuild of the field.
+  /// Cheap no-op if neither value changed.
+  void updateGhost(String text, TextStyle style) {
+    if (text == _ghostText && style == _ghostStyle) return;
+    _ghostText = text;
+    _ghostStyle = style;
+    notifyListeners();
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return RichText(
-      text: TextSpan(
-        children: [
-          TextSpan(text: controller.text, style: realStyle),
-          TextSpan(text: ghostText, style: style),
-        ],
-      ),
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    // Reuse the framework's composing-region handling for IME input.
+    final base = super.buildTextSpan(
+      context: context,
+      style: style,
+      withComposing: withComposing,
+    );
+    if (_ghostText.isEmpty || _ghostStyle == null) return base;
+    return TextSpan(
+      style: style,
+      children: [
+        base,
+        TextSpan(text: _ghostText, style: _ghostStyle),
+      ],
     );
   }
 }

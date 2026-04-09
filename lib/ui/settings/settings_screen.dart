@@ -1631,11 +1631,16 @@ class _LocalModelCard extends ConsumerStatefulWidget {
 class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
   ModelSize _selectedSize = ModelSize.small;
   VoidCallback? _onCompleteCallback;
+  // Cached notifier reference. Riverpod forbids `ref` access in
+  // dispose, so we save the notifier from initState and use this
+  // reference to detach our callback at teardown.
+  ModelDownloadNotifier? _downloadNotifier;
 
   @override
   void initState() {
     super.initState();
     final dl = ref.read(modelDownloadProvider);
+    _downloadNotifier = dl;
     // If a download is already running, sync selected size from it
     if (dl.state.downloading || dl.state.paused) {
       _selectedSize = dl.state.size;
@@ -1663,9 +1668,11 @@ class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
     // doesn't reach back into a defunct State after the user leaves
     // Settings while a download is still running. Identity check
     // prevents clearing a newer instance's callback if the card was
-    // recreated after we registered ours.
-    final dl = ref.read(modelDownloadProvider);
-    if (identical(dl.onComplete, _onCompleteCallback)) {
+    // recreated after we registered ours. We use the cached
+    // [_downloadNotifier] because Riverpod refuses `ref` access
+    // post-dispose.
+    final dl = _downloadNotifier;
+    if (dl != null && identical(dl.onComplete, _onCompleteCallback)) {
       dl.onComplete = null;
     }
     super.dispose();
