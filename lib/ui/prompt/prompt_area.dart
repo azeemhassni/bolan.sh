@@ -8,6 +8,7 @@ import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../shared/anchored_popover.dart';
 import '../shared/bolan_dialog.dart';
+import '../shared/popover_menu.dart';
 import '../shared/status_chip.dart';
 import 'branch_picker.dart';
 import 'directory_picker.dart';
@@ -55,6 +56,8 @@ class _PromptAreaState extends State<PromptArea> {
   bool _aiMode = false;
   final GlobalKey _cwdChipKey = GlobalKey();
   final GlobalKey _branchChipKey = GlobalKey();
+  final GlobalKey _nvmChipKey = GlobalKey();
+  final GlobalKey _kubeChipKey = GlobalKey();
 
   void _openDiffOverlay() {
     showBolanDialog<void>(
@@ -106,6 +109,122 @@ class _PromptAreaState extends State<PromptArea> {
         onDismiss: () => handle.dismiss(),
       ),
     );
+  }
+
+  /// Opens a popover listing all node versions installed via nvm.
+  /// Selecting one writes `nvm use <v>` to the PTY.
+  Future<void> _openNvmPicker() async {
+    final versions = await _listNvmVersions();
+    if (!mounted) return;
+    if (versions.isEmpty) {
+      widget.session.writeInput('nvm use\n');
+      return;
+    }
+    final requested = widget.session.nvmrcVersion;
+    late AnchoredPopoverHandle handle;
+    handle = showAnchoredPopover(
+      context: context,
+      anchorKey: _nvmChipKey,
+      maxWidth: 240,
+      maxHeight: 320,
+      child: PopoverMenuList(
+        items: [
+          for (final v in versions)
+            PopoverMenuItem(
+              icon: v == requested
+                  ? Icons.check_circle_outline
+                  : Icons.circle_outlined,
+              label: v == requested ? '$v  (.nvmrc)' : v,
+              onTap: () {
+                widget.session.writeInput('nvm use $v\n');
+                handle.dismiss();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// `nvm ls` parsed into a list of bare version strings (e.g.
+  /// `20.11.0`). Returns an empty list if nvm isn't installed or
+  /// the shell isn't sourced — the caller falls back to writing
+  /// `nvm use\n` directly.
+  Future<List<String>> _listNvmVersions() async {
+    final shell = Platform.environment['SHELL'] ?? '/bin/zsh';
+    try {
+      final result = await Process.run(
+        shell,
+        ['-l', '-c', 'nvm ls --no-colors --no-alias 2>/dev/null'],
+      );
+      if (result.exitCode != 0) return const [];
+      final out = result.stdout as String;
+      final versions = <String>[];
+      for (final line in out.split('\n')) {
+        final m = RegExp(r'v(\d+\.\d+\.\d+)').firstMatch(line);
+        if (m != null) versions.add(m.group(1)!);
+      }
+      // Dedupe while preserving order, newest last.
+      final seen = <String>{};
+      return versions.where((v) => seen.add(v)).toList();
+    } on ProcessException {
+      return const [];
+    }
+  }
+
+  /// Opens a popover listing all kubectl contexts. Selecting one
+  /// runs `kubectl config use-context <name>` in the PTY.
+  Future<void> _openKubePicker() async {
+    final contexts = await _listKubeContexts();
+    if (!mounted) return;
+    final current = widget.session.kubeContext;
+    late AnchoredPopoverHandle handle;
+    handle = showAnchoredPopover(
+      context: context,
+      anchorKey: _kubeChipKey,
+      maxWidth: 320,
+      maxHeight: 360,
+      child: PopoverMenuList(
+        items: [
+          for (final ctx in contexts)
+            PopoverMenuItem(
+              icon: ctx == current
+                  ? Icons.check_circle_outline
+                  : Icons.circle_outlined,
+              label: ctx,
+              onTap: () {
+                widget.session.writeInput(
+                    "kubectl config use-context '${ctx.replaceAll("'", "'\\''")}'\n");
+                handle.dismiss();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<List<String>> _listKubeContexts() async {
+    try {
+      final result = await Process.run(
+        'kubectl',
+        ['config', 'get-contexts', '-o', 'name'],
+      );
+      if (result.exitCode != 0) return const [];
+      return (result.stdout as String)
+          .split('\n')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+    } on ProcessException {
+      return const [];
+    }
+  }
+
+  /// Sources the venv's `activate` script in the running shell.
+  void _activatePythonVenv() {
+    final venvPath = widget.session.pythonVenvPath;
+    if (venvPath.isEmpty) return;
+    final escaped = venvPath.replaceAll("'", "'\\''");
+    widget.session.writeInput("source '$escaped/bin/activate'\n");
   }
 
   @override
@@ -291,6 +410,73 @@ class _PromptAreaState extends State<PromptArea> {
             fg: theme.ansiGreen,
             bg: theme.statusChipBg,
             icon: Icons.calendar_today,
+          ),
+        ];
+
+      case PromptChipType.nvm:
+        if (!widget.session.hasNvmrc) return [];
+        // Show the requested .nvmrc version. If `node --version`
+        // returned something different, prepend a small mismatch
+        // marker so the user knows they need to switch.
+        final requested = widget.session.nvmrcVersion;
+        final active = widget.session.nodeVersion.replaceFirst('v', '');
+        final mismatch =
+            active.isNotEmpty && active != requested;
+        final label = mismatch ? '$requested (≠$active)' : 'v$requested';
+        return [
+          GestureDetector(
+            key: _nvmChipKey,
+            onTap: _openNvmPicker,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: StatusChip(
+                text: label,
+                fg: mismatch ? theme.ansiYellow : theme.ansiGreen,
+                bg: theme.statusChipBg,
+                svgIcon: 'assets/icons/ic_nodejs.svg',
+              ),
+            ),
+          ),
+        ];
+
+      case PromptChipType.kubectl:
+        if (!widget.session.hasKubeContext) return [];
+        final ctx = widget.session.kubeContext;
+        final ns = widget.session.kubeNamespace;
+        final label = ns.isEmpty ? ctx : '$ctx · $ns';
+        return [
+          GestureDetector(
+            key: _kubeChipKey,
+            onTap: _openKubePicker,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: StatusChip(
+                text: label,
+                fg: theme.ansiBlue,
+                bg: theme.statusChipBg,
+                svgIcon: 'assets/icons/ic_kubernetes.svg',
+              ),
+            ),
+          ),
+        ];
+
+      case PromptChipType.pythonVenv:
+        if (!widget.session.hasPythonVenv) return [];
+        final name = widget.session.pythonVenvName;
+        final ver = widget.session.pythonVenvVersion;
+        final label = ver.isNotEmpty ? '$name ($ver)' : name;
+        return [
+          GestureDetector(
+            onTap: _activatePythonVenv,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: StatusChip(
+                text: label,
+                fg: theme.ansiYellow,
+                bg: theme.statusChipBg,
+                svgIcon: 'assets/icons/ic_python.svg',
+              ),
+            ),
           ),
         ];
     }

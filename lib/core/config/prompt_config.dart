@@ -13,6 +13,11 @@ enum PromptChipType {
   time12h,
   time24h,
   date,
+  // Live tool chips — appear only when the relevant context is
+  // detected in the current working directory or environment.
+  nvm,
+  kubectl,
+  pythonVenv,
 }
 
 /// Display metadata for each chip type.
@@ -27,6 +32,9 @@ extension PromptChipMeta on PromptChipType {
         PromptChipType.time12h => 'Time (12h)',
         PromptChipType.time24h => 'Time (24h)',
         PromptChipType.date => 'Date',
+        PromptChipType.nvm => 'Node version',
+        PromptChipType.kubectl => 'Kubectl context',
+        PromptChipType.pythonVenv => 'Python venv',
       };
 
   String get example => switch (this) {
@@ -39,6 +47,9 @@ extension PromptChipMeta on PromptChipType {
         PromptChipType.time12h => '03:48 pm',
         PromptChipType.time24h => '15:48',
         PromptChipType.date => 'Apr 3, 2026',
+        PromptChipType.nvm => 'v20.11.0',
+        PromptChipType.kubectl => 'prod-east · bolan',
+        PromptChipType.pythonVenv => 'venv (3.12)',
       };
 
   String get id => name;
@@ -49,6 +60,9 @@ extension PromptChipMeta on PromptChipType {
         PromptChipType.cwd => 'assets/icons/ic_folder_code.svg',
         PromptChipType.gitBranch => 'assets/icons/ic_git.svg',
         PromptChipType.gitChanges => 'assets/icons/ic_diff.svg',
+        PromptChipType.nvm => 'assets/icons/ic_nodejs.svg',
+        PromptChipType.kubectl => 'assets/icons/ic_kubernetes.svg',
+        PromptChipType.pythonVenv => 'assets/icons/ic_python.svg',
         _ => null,
       };
 
@@ -63,6 +77,9 @@ extension PromptChipMeta on PromptChipType {
         PromptChipType.time12h => theme.ansiRed,
         PromptChipType.time24h => theme.ansiRed,
         PromptChipType.date => theme.ansiGreen,
+        PromptChipType.nvm => theme.ansiGreen,
+        PromptChipType.kubectl => theme.ansiBlue,
+        PromptChipType.pythonVenv => theme.ansiYellow,
       };
 
   /// Material icon fallback for chip types without SVG.

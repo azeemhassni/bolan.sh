@@ -56,6 +56,28 @@ class TerminalSession extends ChangeNotifier {
   int _gitInsertions = 0;
   int _gitDeletions = 0;
 
+  // Live tool chips — populated by directory + tool detection.
+  // nvm: detected when an `.nvmrc` file is found in cwd or an
+  // ancestor and `node` is on PATH. Stores the active node version
+  // string (e.g. "v20.11.0") and the requested version from .nvmrc.
+  String _nodeVersion = '';
+  String _nvmrcVersion = '';
+  String _nvmrcDir = '';
+
+  // kubectl: populated by polling `kubectl config current-context`
+  // every few seconds. Available on every session, not directory-
+  // dependent.
+  String _kubeContext = '';
+  String _kubeNamespace = '';
+  Timer? _kubePollTimer;
+
+  // python venv: detected by walking ancestors for `pyvenv.cfg`.
+  // Stores the venv directory's basename and the python version
+  // recorded inside pyvenv.cfg.
+  String _pythonVenvName = '';
+  String _pythonVenvVersion = '';
+  String _pythonVenvPath = '';
+
   // Buffer for capturing command output between C and D markers
   final StringBuffer _outputCapture = StringBuffer();
 
@@ -161,6 +183,41 @@ class TerminalSession extends ChangeNotifier {
   /// Whether there are trackable git stats to show.
   bool get hasGitStats => _gitFilesChanged > 0;
 
+  // ── Live tool chip getters ───────────────────────────────────
+
+  /// Active Node.js version (`v20.11.0`), or empty if Node isn't on
+  /// PATH or this directory has no .nvmrc.
+  String get nodeVersion => _nodeVersion;
+
+  /// Version requested by the nearest `.nvmrc` file (`20.11.0`).
+  String get nvmrcVersion => _nvmrcVersion;
+
+  /// Whether the chip should be shown — i.e. an `.nvmrc` was found
+  /// somewhere in the cwd ancestor chain.
+  bool get hasNvmrc => _nvmrcVersion.isNotEmpty;
+
+  /// Current `kubectl` context, or empty if kubectl isn't installed.
+  String get kubeContext => _kubeContext;
+
+  /// Current `kubectl` namespace, or empty if not set.
+  String get kubeNamespace => _kubeNamespace;
+
+  /// Whether the kubectl chip should be shown.
+  bool get hasKubeContext => _kubeContext.isNotEmpty;
+
+  /// Basename of the Python venv directory found via ancestor walk.
+  String get pythonVenvName => _pythonVenvName;
+
+  /// Python version recorded in the venv's `pyvenv.cfg` (e.g. "3.12").
+  String get pythonVenvVersion => _pythonVenvVersion;
+
+  /// Absolute path to the venv directory (used to compose the
+  /// activate command when the user clicks the chip).
+  String get pythonVenvPath => _pythonVenvPath;
+
+  /// Whether the python venv chip should be shown.
+  bool get hasPythonVenv => _pythonVenvName.isNotEmpty;
+
   /// Shell name (e.g. "zsh", "bash").
   String get shellName => title;
 
@@ -252,6 +309,7 @@ class TerminalSession extends ChangeNotifier {
     if (_disposed) return;
     _disposed = true;
     _outputSub?.cancel();
+    _kubePollTimer?.cancel();
     _pty.kill();
     _completionEngine?.dispose();
     super.dispose();
@@ -324,6 +382,20 @@ class TerminalSession extends ChangeNotifier {
         _handleOsc7(args[0]);
       }
     };
+
+    // Kick off the live tool detection for the initial cwd.
+    _updateNvmStatus();
+    _updatePythonVenvStatus();
+    _updateKubeStatus();
+
+    // Poll kubectl context every 5 seconds — kube context changes
+    // are global to the machine and not tied to cwd, so we can't
+    // hook them off OSC 7. 5s feels live without burning CPU.
+    _kubePollTimer?.cancel();
+    _kubePollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _updateKubeStatus(),
+    );
   }
 
   void _handleShellEvent(ShellEvent event) {
@@ -524,11 +596,161 @@ class TerminalSession extends ChangeNotifier {
       if (newCwd.isNotEmpty && newCwd != _cwd) {
         _cwd = newCwd;
         _updateGitStatus();
+        _updateNvmStatus();
+        _updatePythonVenvStatus();
         notifyListeners();
       }
     } on FormatException {
       // Ignore malformed URIs
     }
+  }
+
+  /// Walks up the cwd ancestor chain looking for an `.nvmrc` file.
+  /// If found, reads the requested version and runs `node --version`
+  /// in the cwd to capture whatever version is currently active.
+  Future<void> _updateNvmStatus() async {
+    if (_cwd.isEmpty) return;
+    final found = _findAncestorFile(_cwd, '.nvmrc');
+    if (found == null) {
+      if (_nvmrcVersion.isNotEmpty || _nvmrcDir.isNotEmpty) {
+        _nvmrcVersion = '';
+        _nvmrcDir = '';
+        _nodeVersion = '';
+        notifyListeners();
+      }
+      return;
+    }
+    try {
+      final raw = await File(found).readAsString();
+      final requested = raw.trim().replaceFirst(RegExp(r'^v'), '');
+      _nvmrcVersion = requested;
+      _nvmrcDir = found.substring(0, found.length - '.nvmrc'.length);
+    } on FileSystemException {
+      _nvmrcVersion = '';
+      _nvmrcDir = '';
+    }
+
+    try {
+      final result = await Process.run(
+        'node',
+        ['--version'],
+        workingDirectory: _cwd,
+      );
+      if (result.exitCode == 0) {
+        _nodeVersion = (result.stdout as String).trim();
+      } else {
+        _nodeVersion = '';
+      }
+    } on ProcessException {
+      _nodeVersion = '';
+    }
+    notifyListeners();
+  }
+
+  /// Walks up the cwd ancestor chain for `pyvenv.cfg`. The directory
+  /// containing it is the venv root; its basename is shown in the
+  /// chip and the python version is read from the cfg file.
+  Future<void> _updatePythonVenvStatus() async {
+    if (_cwd.isEmpty) return;
+    final cfgPath = _findAncestorFile(_cwd, 'pyvenv.cfg');
+    if (cfgPath == null) {
+      if (_pythonVenvName.isNotEmpty) {
+        _pythonVenvName = '';
+        _pythonVenvVersion = '';
+        _pythonVenvPath = '';
+        notifyListeners();
+      }
+      return;
+    }
+    final venvDir = cfgPath.substring(0, cfgPath.length - '/pyvenv.cfg'.length);
+    final venvName = venvDir.split('/').last;
+    String version = '';
+    try {
+      final raw = await File(cfgPath).readAsString();
+      for (final line in raw.split('\n')) {
+        final m = RegExp(r'^version\s*=\s*(.+)$').firstMatch(line.trim());
+        if (m != null) {
+          version = m.group(1)!.trim();
+          break;
+        }
+      }
+    } on FileSystemException {
+      // Best effort — show the venv even if we can't parse the cfg.
+    }
+    if (_pythonVenvName != venvName ||
+        _pythonVenvVersion != version ||
+        _pythonVenvPath != venvDir) {
+      _pythonVenvName = venvName;
+      _pythonVenvVersion = version;
+      _pythonVenvPath = venvDir;
+      notifyListeners();
+    }
+  }
+
+  /// Polls `kubectl config current-context` (and the active
+  /// namespace) at a low frequency. The chip shows whatever is
+  /// currently active across the whole machine, not per-cwd.
+  Future<void> _updateKubeStatus() async {
+    try {
+      final ctxResult = await Process.run(
+        'kubectl',
+        ['config', 'current-context'],
+      );
+      if (ctxResult.exitCode != 0) {
+        if (_kubeContext.isNotEmpty || _kubeNamespace.isNotEmpty) {
+          _kubeContext = '';
+          _kubeNamespace = '';
+          notifyListeners();
+        }
+        return;
+      }
+      final newContext = (ctxResult.stdout as String).trim();
+
+      final nsResult = await Process.run(
+        'kubectl',
+        [
+          'config',
+          'view',
+          '--minify',
+          '--output',
+          'jsonpath={..namespace}',
+        ],
+      );
+      final newNamespace = nsResult.exitCode == 0
+          ? (nsResult.stdout as String).trim()
+          : '';
+
+      if (newContext != _kubeContext || newNamespace != _kubeNamespace) {
+        _kubeContext = newContext;
+        _kubeNamespace = newNamespace;
+        notifyListeners();
+      }
+    } on ProcessException {
+      // kubectl not installed — leave state empty, the chip won't render.
+      if (_kubeContext.isNotEmpty || _kubeNamespace.isNotEmpty) {
+        _kubeContext = '';
+        _kubeNamespace = '';
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Walks up from [start] looking for [filename]. Returns the
+  /// absolute path of the first match, or null if it reaches the
+  /// filesystem root without finding it.
+  String? _findAncestorFile(String start, String filename) {
+    var dir = start;
+    while (dir.isNotEmpty && dir != '/') {
+      final candidate = '$dir/$filename';
+      if (File(candidate).existsSync()) return candidate;
+      final i = dir.lastIndexOf('/');
+      if (i <= 0) break;
+      dir = dir.substring(0, i);
+    }
+    // Check the root too.
+    final rootCandidate = '/$filename';
+    if (File(rootCandidate).existsSync()) return rootCandidate;
+    return null;
   }
 
   /// Queries git status for the current working directory.
