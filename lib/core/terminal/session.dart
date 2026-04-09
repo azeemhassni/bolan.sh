@@ -572,13 +572,45 @@ class TerminalSession extends ChangeNotifier {
   ///
   /// `\e[>4m` (XTMODKEYS) gets parsed as `\e[4m` (SGR underline).
   /// `\e[<u` and `\e[>Xq` are kitty keyboard / XTMODKEYS sequences.
-  /// These are all private CSI with `>` or `<` prefixes.
-  static final _unsupportedCsiRe = RegExp(
-    r'\x1B\[[<>][0-9;]*[a-zA-Z]',
+  /// Matches escape sequences that xterm.dart 4.0.0 does not
+  /// implement and either misparses, drops only the introducer (and
+  /// then renders the payload as text), or leaks the trailing byte
+  /// as a literal character. Stripping them is safe because none of
+  /// these affect visual rendering — they're purely
+  /// host↔terminal protocol negotiation or out-of-band features
+  /// (sixel, kitty graphics, terminfo queries) that xterm.dart can't
+  /// render anyway.
+  ///
+  /// Covered:
+  ///   `\e[>...FINAL`  — private CSI `>` (e.g. XTMODKEYS `\e[>4m`,
+  ///                     which xterm.dart misreads as `\e[4m`
+  ///                     underline because it drops the `>` prefix)
+  ///   `\e[<...FINAL`  — private CSI `<` (kitty keyboard restore)
+  ///   `\e=`           — DECKPAM (Application Keypad Mode)
+  ///   `\e>`           — DECKPNM (Normal Keypad Mode)
+  ///   `\eP...ST`      — DCS (Device Control String, sixel etc.)
+  ///   `\e^...ST`      — PM  (Privacy Message)
+  ///   `\e_...ST`      — APC (Application Program Command, kitty
+  ///                     graphics, iTerm2 image protocol)
+  ///   `\eX...ST`      — SOS (Start of String)
+  ///
+  /// For the last four, xterm.dart's parser only consumes the 2-byte
+  /// introducer (`\eP`, `\e_`, …) and discards just that — the
+  /// payload that should run until ST (`\e\` or BEL) then renders
+  /// verbatim into the buffer, which can manifest as a long line of
+  /// gibberish or a stray `⊠`-like glyph for ESC followed by random
+  /// content. Stripping the entire string solves both at once.
+  ///
+  /// `\e=` and `\e>` were the source of the mysterious `⊠>` at the
+  /// bottom of `git diff` (less emits them around its session).
+  static final _unsupportedEscapeRe = RegExp(
+    r'\x1B\[[<>][0-9;]*[a-zA-Z]'
+    r'|\x1B[=>]'
+    r'|\x1B[P^_X][^\x07\x1B]*(?:\x07|\x1B\\)',
   );
 
   static String _stripUnsupportedCsi(String input) {
-    return input.replaceAll(_unsupportedCsiRe, '');
+    return input.replaceAll(_unsupportedEscapeRe, '');
   }
 
   /// Matches in-place redraw CSI sequences. Catches:
@@ -1003,10 +1035,32 @@ __bolan_env() {
     "${VIRTUAL_ENV:-}" \
     "$node_version"
 }
-__bolan_preexec() { __bolan_prompt_end; __bolan_cmd_start; }
-__bolan_precmd() { __bolan_cmd_end; __bolan_prompt_start; __bolan_osc7; __bolan_env; }
-trap '__bolan_preexec' DEBUG
-PROMPT_COMMAND="__bolan_precmd;${PROMPT_COMMAND}"
+# bash's DEBUG trap fires for EVERY simple command, including the
+# ones that run inside PROMPT_COMMAND. Without a guard, every prompt
+# would re-fire __bolan_preexec for `__bolan_cmd_end`,
+# `__bolan_prompt_start`, etc. and Bolan would record `__bolan_precmd`
+# as the running command. We use a guard variable that's set while
+# PROMPT_COMMAND is running so the DEBUG trap can ignore those calls
+# (this is the same technique bash-preexec.sh uses).
+__bolan_inside_precmd=0
+__bolan_preexec_invoke() {
+  # Skip if we're already inside PROMPT_COMMAND.
+  if [[ "$__bolan_inside_precmd" -eq 1 ]]; then return; fi
+  # Skip readline completion machinery.
+  if [[ -n "$COMP_LINE" ]]; then return; fi
+  __bolan_prompt_end
+  __bolan_cmd_start
+}
+__bolan_precmd_invoke() {
+  __bolan_inside_precmd=1
+  __bolan_cmd_end
+  __bolan_prompt_start
+  __bolan_osc7
+  __bolan_env
+  __bolan_inside_precmd=0
+}
+trap '__bolan_preexec_invoke' DEBUG
+PROMPT_COMMAND="__bolan_precmd_invoke${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 """;
     }
 
