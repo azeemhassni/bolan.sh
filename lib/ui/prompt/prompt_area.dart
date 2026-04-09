@@ -210,7 +210,7 @@ class _PromptAreaState extends State<PromptArea> {
                       style: TextStyle(
                         color: theme.foreground,
                         fontFamily: theme.fontFamily,
-                        fontSize: StatusChip.textSize,
+                        fontSize: StatusChip.textSizeFor(widget.fontSize),
                         fontWeight: StatusChip.textWeight,
                         decoration: TextDecoration.none,
                       ),
@@ -221,7 +221,7 @@ class _PromptAreaState extends State<PromptArea> {
                       style: TextStyle(
                         color: theme.exitSuccessFg,
                         fontFamily: theme.fontFamily,
-                        fontSize: StatusChip.textSize,
+                        fontSize: StatusChip.textSizeFor(widget.fontSize),
                         fontWeight: StatusChip.textWeight,
                         decoration: TextDecoration.none,
                       ),
@@ -232,7 +232,7 @@ class _PromptAreaState extends State<PromptArea> {
                       style: TextStyle(
                         color: theme.exitFailureFg,
                         fontFamily: theme.fontFamily,
-                        fontSize: StatusChip.textSize,
+                        fontSize: StatusChip.textSizeFor(widget.fontSize),
                         fontWeight: StatusChip.textWeight,
                         decoration: TextDecoration.none,
                       ),

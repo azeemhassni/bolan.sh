@@ -142,12 +142,31 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   /// Global key handler: forwards printable key presses to the focused pane's
   /// prompt input, so typing anywhere automatically goes to the right pane.
   bool _globalKeyHandler(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
+    final isDown = event is KeyDownEvent;
+    final isRepeat = event is KeyRepeatEvent;
+    if (!isDown && !isRepeat) return false;
 
     final meta = isPrimaryModifierPressed;
     final shift = HardwareKeyboard.instance.isShiftPressed;
     final alt = HardwareKeyboard.instance.isAltPressed;
     final key = event.logicalKey;
+
+    // ── Repeating shortcuts (act on hold) ──
+    // Zoom in/out should keep firing while the user holds the key,
+    // matching browser/IDE convention. Done before the
+    // single-fire-only guard below.
+    if (meta && key == LogicalKeyboardKey.equal) {
+      ref.read(fontSizeProvider.notifier).increase();
+      return true;
+    }
+    if (meta && key == LogicalKeyboardKey.minus) {
+      ref.read(fontSizeProvider.notifier).decrease();
+      return true;
+    }
+
+    // Everything below this line should fire ONCE per press, never
+    // on auto-repeat (you don't want holding ⌘T to spawn 60 tabs).
+    if (!isDown) return false;
 
     // ── Global shortcuts (always work, any focus state) ──
 
@@ -209,14 +228,6 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     if (meta && key == LogicalKeyboardKey.keyF) {
       // Handled by session_view — just consume to prevent DANG
       return false;
-    }
-    if (meta && key == LogicalKeyboardKey.equal) {
-      ref.read(fontSizeProvider.notifier).increase();
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.minus) {
-      ref.read(fontSizeProvider.notifier).decrease();
-      return true;
     }
     if (meta && key == LogicalKeyboardKey.digit0) {
       ref.read(fontSizeProvider.notifier).reset();

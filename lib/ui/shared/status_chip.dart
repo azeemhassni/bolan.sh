@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/theme/bolan_theme.dart';
+import '../../providers/font_size_provider.dart';
 
 /// A compact outlined chip used in the prompt area.
 ///
@@ -9,7 +11,11 @@ import '../../core/theme/bolan_theme.dart';
 /// content like multi-color counts). All chips share the same chrome:
 /// padding, border radius, icon size, and font size — touch them in
 /// one place and every chip in the app updates.
-class StatusChip extends StatelessWidget {
+///
+/// Chip text and icon size scale with the global terminal font size
+/// (`fontSizeProvider`) so the Cmd/Ctrl + and - shortcuts grow and
+/// shrink chips together with terminal text.
+class StatusChip extends ConsumerWidget {
   final String? text;
 
   /// Alternative to [text] when the chip needs richer inline content
@@ -22,14 +28,21 @@ class StatusChip extends StatelessWidget {
   final IconData? icon;
   final String? svgIcon;
 
-  /// Standard chip metrics. Touch these and every chip updates.
-  static const double textSize = 18;
+  /// Static chip metrics that don't scale with font size.
   static const FontWeight textWeight = FontWeight.w700;
-  static const double iconSize = 18;
   static const double iconGap = 6;
   static const EdgeInsets padding =
       EdgeInsets.symmetric(horizontal: 12, vertical: 6);
   static const double cornerRadius = 6;
+
+  /// Chip text matches the current terminal font size exactly.
+  /// The only visual distinction from terminal text is [textWeight]
+  /// (bold) — same family, same size.
+  static double textSizeFor(double baseFontSize) => baseFontSize;
+
+  /// Chip icon size matches the chip text size so icons stay
+  /// proportional to their label.
+  static double iconSizeFor(double baseFontSize) => baseFontSize;
 
   const StatusChip({
     super.key,
@@ -43,7 +56,11 @@ class StatusChip extends StatelessWidget {
             'StatusChip needs either text or child');
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final baseFontSize = ref.watch(fontSizeProvider);
+    final textSize = textSizeFor(baseFontSize);
+    final iconSize = iconSizeFor(baseFontSize);
+
     return Container(
       padding: padding,
       decoration: BoxDecoration(

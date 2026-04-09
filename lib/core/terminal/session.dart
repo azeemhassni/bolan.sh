@@ -269,7 +269,20 @@ class TerminalSession extends ChangeNotifier {
       // misinterprets. \e[>4m (XTMODKEYS) gets parsed as \e[4m (underline).
       // \e[<u (kitty keyboard restore) also causes issues.
       final cleaned = _stripUnsupportedCsi(decoded);
-      terminal.write(cleaned);
+
+      // xterm.dart 4.0.0 has a buffer-line resize race: when the
+      // terminal column count changes (window/pane resize or zoom),
+      // existing buffer lines occasionally aren't re-allocated in
+      // time and `setCell` writes past the underlying Uint32List
+      // capacity, throwing RangeError. A dropped chunk of output is
+      // far better than a dead session — log the error and continue.
+      try {
+        terminal.write(cleaned);
+      } on RangeError catch (e, st) {
+        debugPrint('terminal.write RangeError (xterm.dart resize race): $e\n$st');
+      } on Object catch (e, st) {
+        debugPrint('terminal.write failed: $e\n$st');
+      }
 
       // Capture output while a command is running
       if (_commandRunning) {

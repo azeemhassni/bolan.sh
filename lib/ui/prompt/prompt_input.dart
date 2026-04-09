@@ -244,7 +244,20 @@ class PromptInputState extends State<PromptInput> {
     _lastBlockCount = blocks.length;
   }
 
+  /// Last text value seen by [_onTextChanged]. Used to filter out
+  /// notifications fired by [_GhostTextController.updateGhost],
+  /// which mutate the controller's ghost state but NOT its `text`
+  /// value. Without this filter, every ghost update would clobber
+  /// active completions.
+  String _lastObservedText = '';
+
   void _onTextChanged() {
+    if (_controller.text == _lastObservedText) {
+      // Ghost-only notification — nothing to do here.
+      return;
+    }
+    _lastObservedText = _controller.text;
+
     final aiMode = widget.aiEnabled &&
         _controller.text.startsWith('#') &&
         _controller.text.length > 1;
@@ -272,6 +285,21 @@ class PromptInputState extends State<PromptInput> {
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
     final ghost = _ghostText;
+
+    // Push the current ghost into the custom controller so its
+    // `buildTextSpan` renders it as an inline suffix. The controller
+    // defers its notifyListeners() to a post-frame callback so this
+    // call is safe inside build.
+    _controller.updateGhost(
+      ghost,
+      TextStyle(
+        color: theme.dimForeground,
+        fontFamily: theme.fontFamily,
+        fontSize: widget.fontSize,
+        height: 1.4,
+        decoration: TextDecoration.none,
+      ),
+    );
 
     return Material(
       color: Colors.transparent,
@@ -308,21 +336,10 @@ class PromptInputState extends State<PromptInput> {
           // `buildTextSpan` to append a dim TextSpan after the real
           // text. One render path = one baseline = perfect alignment
           // at every font size, with no overlay/strut acrobatics.
-          Builder(builder: (_) {
-            // Push the current ghost text into the controller so its
-            // `buildTextSpan` returns the appended span on next paint.
-            _controller.updateGhost(
-              ghost,
-              TextStyle(
-                color: theme.dimForeground,
-                fontFamily: theme.fontFamily,
-                fontSize: widget.fontSize,
-                height: 1.4,
-                decoration: TextDecoration.none,
-              ),
-            );
-            return const SizedBox.shrink();
-          }),
+          // The current ghost is pushed into the controller at the
+          // top of build (see above this Column); the controller
+          // defers its notification to a post-frame callback so
+          // we never call setState during build.
           CompositedTransformTarget(
             link: _completionLayerLink,
             child: Padding(
@@ -985,13 +1002,21 @@ class _GhostTextController extends TextEditingController {
   String _ghostText = '';
   TextStyle? _ghostStyle;
 
-  /// Updates the ghost text and triggers a rebuild of the field.
+  /// Updates the ghost text and schedules a rebuild of the field.
   /// Cheap no-op if neither value changed.
+  ///
+  /// The notification is deferred to a post-frame callback because
+  /// callers (like the prompt widget's build method) typically invoke
+  /// `updateGhost` *during* a build phase, and `notifyListeners()`
+  /// would otherwise trigger `setState()` in any widget listening to
+  /// this controller — which is illegal mid-build.
   void updateGhost(String text, TextStyle style) {
     if (text == _ghostText && style == _ghostStyle) return;
     _ghostText = text;
     _ghostStyle = style;
-    notifyListeners();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 
   @override
