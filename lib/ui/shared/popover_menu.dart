@@ -42,13 +42,14 @@ class PopoverMenuList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    // ListView (not Column) so menus with many items scroll inside
+    // the popover's bounded height instead of overflowing. shrinkWrap
+    // keeps short menus rendering at their natural size.
+    return ListView.builder(
+      shrinkWrap: true,
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [for (final item in items) _PopoverMenuRow(item: item)],
-      ),
+      itemCount: items.length,
+      itemBuilder: (context, i) => _PopoverMenuRow(item: items[i]),
     );
   }
 }

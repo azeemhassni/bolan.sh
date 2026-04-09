@@ -64,12 +64,11 @@ class TerminalSession extends ChangeNotifier {
   String _nvmrcVersion = '';
   String _nvmrcDir = '';
 
-  // kubectl: populated by polling `kubectl config current-context`
-  // every few seconds. Available on every session, not directory-
-  // dependent.
+  // kubectl: updated by `_refreshOnPrompt` (runs after every
+  // command via the OSC 133 prompt-start hook). Global to the
+  // machine, not directory-dependent.
   String _kubeContext = '';
   String _kubeNamespace = '';
-  Timer? _kubePollTimer;
 
   // python venv: detected by walking ancestors for `pyvenv.cfg`.
   // Stores the venv directory's basename and the python version
@@ -208,6 +207,34 @@ class TerminalSession extends ChangeNotifier {
   /// somewhere in the cwd ancestor chain.
   bool get hasNvmrc => _nvmrcVersion.isNotEmpty;
 
+  /// Whether the active node version satisfies the `.nvmrc`
+  /// requirement using nvm's prefix-matching rules:
+  ///
+  /// - `.nvmrc = 21`     matches any `21.*.*`  (e.g. `21.7.4`)
+  /// - `.nvmrc = 21.5`   matches any `21.5.*`  (e.g. `21.5.0`)
+  /// - `.nvmrc = 21.5.0` matches only `21.5.0`
+  ///
+  /// Non-numeric `.nvmrc` values (`lts/*`, `node`, `latest`, etc.)
+  /// can't be resolved without invoking nvm itself, so we treat
+  /// them as matching to avoid a false-positive mismatch warning.
+  bool get nvmVersionMatches {
+    if (_nvmrcVersion.isEmpty) return true;
+    if (_nodeVersion.isEmpty) return true;
+    final requested = _nvmrcVersion;
+    // Special tags — don't try to resolve.
+    if (!RegExp(r'^\d').hasMatch(requested)) return true;
+    final active = _nodeVersion.startsWith('v')
+        ? _nodeVersion.substring(1)
+        : _nodeVersion;
+    final r = requested.split('.');
+    final a = active.split('.');
+    if (r.length > a.length) return false;
+    for (var i = 0; i < r.length; i++) {
+      if (r[i] != a[i]) return false;
+    }
+    return true;
+  }
+
   /// Current `kubectl` context, or empty if kubectl isn't installed.
   String get kubeContext => _kubeContext;
 
@@ -345,7 +372,6 @@ class TerminalSession extends ChangeNotifier {
     if (_disposed) return;
     _disposed = true;
     _outputSub?.cancel();
-    _kubePollTimer?.cancel();
     _pty.kill();
     _completionEngine?.dispose();
     super.dispose();
@@ -422,20 +448,13 @@ class TerminalSession extends ChangeNotifier {
       }
     };
 
-    // Kick off the live tool detection for the initial cwd.
+    // Kick off the live tool detection for the initial cwd. Every
+    // chip after this point refreshes via `_refreshOnPrompt` on
+    // each PromptStart event — no polling timers.
     _updateNvmStatus();
     _updatePythonVenvStatus();
     _updateKubeStatus();
     _updateTerraformStatus();
-
-    // Poll kubectl context every 5 seconds — kube context changes
-    // are global to the machine and not tied to cwd, so we can't
-    // hook them off OSC 7. 5s feels live without burning CPU.
-    _kubePollTimer?.cancel();
-    _kubePollTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => _updateKubeStatus(),
-    );
   }
 
   void _handleShellEvent(ShellEvent event) {
@@ -447,6 +466,12 @@ class TerminalSession extends ChangeNotifier {
           _finalizeBlock(exitCode: null);
         }
         _commandRunning = false;
+        // Refresh every live chip on each prompt so they reflect
+        // changes from the just-finished command (git checkout,
+        // terraform workspace select, kubectl config use-context,
+        // etc.). Env-var chips are already refreshed by the OSC
+        // 7777 hook on the same prompt cycle.
+        _refreshOnPrompt();
 
       case PromptEnd():
         break;
@@ -678,6 +703,15 @@ class TerminalSession extends ChangeNotifier {
             _activeVirtualEnv = value;
             changed = true;
           }
+        case 'NODE_VERSION':
+          // Comes from the SHELL's `node --version`, which sees
+          // whichever node nvm has switched into the parent shell's
+          // PATH. Spawning `node` ourselves wouldn't see those
+          // mutations because subprocesses re-read PATH from scratch.
+          if (_nodeVersion != value) {
+            _nodeVersion = value;
+            changed = true;
+          }
       }
     }
     if (changed) notifyListeners();
@@ -708,9 +742,12 @@ class TerminalSession extends ChangeNotifier {
     }
   }
 
-  /// Walks up the cwd ancestor chain looking for an `.nvmrc` file.
-  /// If found, reads the requested version and runs `node --version`
-  /// in the cwd to capture whatever version is currently active.
+  /// Walks up the cwd ancestor chain looking for an `.nvmrc` file
+  /// and reads the requested version. The currently *active* node
+  /// version is NOT detected here — that comes from the shell's
+  /// own `node --version` via the OSC 7777 env-var hook, because a
+  /// child process spawned from Bolan re-reads PATH from scratch
+  /// and would never see nvm's runtime PATH mutations.
   Future<void> _updateNvmStatus() async {
     if (_cwd.isEmpty) return;
     final found = _findAncestorFile(_cwd, '.nvmrc');
@@ -718,7 +755,6 @@ class TerminalSession extends ChangeNotifier {
       if (_nvmrcVersion.isNotEmpty || _nvmrcDir.isNotEmpty) {
         _nvmrcVersion = '';
         _nvmrcDir = '';
-        _nodeVersion = '';
         notifyListeners();
       }
       return;
@@ -726,28 +762,33 @@ class TerminalSession extends ChangeNotifier {
     try {
       final raw = await File(found).readAsString();
       final requested = raw.trim().replaceFirst(RegExp(r'^v'), '');
-      _nvmrcVersion = requested;
-      _nvmrcDir = found.substring(0, found.length - '.nvmrc'.length);
-    } on FileSystemException {
-      _nvmrcVersion = '';
-      _nvmrcDir = '';
-    }
-
-    try {
-      final result = await Process.run(
-        'node',
-        ['--version'],
-        workingDirectory: _cwd,
-      );
-      if (result.exitCode == 0) {
-        _nodeVersion = (result.stdout as String).trim();
-      } else {
-        _nodeVersion = '';
+      if (requested != _nvmrcVersion) {
+        _nvmrcVersion = requested;
+        _nvmrcDir = found.substring(0, found.length - '.nvmrc'.length);
+        notifyListeners();
       }
-    } on ProcessException {
-      _nodeVersion = '';
+    } on FileSystemException {
+      if (_nvmrcVersion.isNotEmpty) {
+        _nvmrcVersion = '';
+        _nvmrcDir = '';
+        notifyListeners();
+      }
     }
-    notifyListeners();
+  }
+
+  /// Re-runs every file/command-based detector that could change
+  /// between commands. Called on every `PromptStart` (OSC 133;A)
+  /// so chips reflect the live state of the terminal after every
+  /// command, not just on cwd changes. Env-var-driven chips
+  /// (AWS / GCP / Docker / VIRTUAL_ENV / NODE_VERSION) are
+  /// already refreshed by `_handleOscEnv` on the same prompt.
+  void _refreshOnPrompt() {
+    if (_cwd.isEmpty) return;
+    _updateGitStatus();
+    _updateNvmStatus();
+    _updatePythonVenvStatus();
+    _updateTerraformStatus();
+    _updateKubeStatus();
   }
 
   /// Walks up the cwd ancestor chain for `pyvenv.cfg`. The directory
@@ -923,11 +964,16 @@ __bolan_cmd_start()    { printf '\e]133;C;%s\a' "$1"; }
 __bolan_cmd_end()      { local ec=$?; printf "\e]133;D;$ec\a"; }
 __bolan_osc7()         { printf '\e]7;file://%s%s\a' "$HOST" "$PWD"; }
 __bolan_env() {
-  printf '\e]7777;AWS_PROFILE=%s;GCP_PROJECT=%s;DOCKER_CONTEXT=%s;VIRTUAL_ENV=%s\a' \
+  local node_version=""
+  if command -v node >/dev/null 2>&1; then
+    node_version=$(node --version 2>/dev/null)
+  fi
+  printf '\e]7777;AWS_PROFILE=%s;GCP_PROJECT=%s;DOCKER_CONTEXT=%s;VIRTUAL_ENV=%s;NODE_VERSION=%s\a' \
     "${AWS_PROFILE:-}" \
     "${CLOUDSDK_CORE_PROJECT:-${GCP_PROJECT:-}}" \
     "${DOCKER_CONTEXT:-}" \
-    "${VIRTUAL_ENV:-}"
+    "${VIRTUAL_ENV:-}" \
+    "$node_version"
 }
 autoload -Uz add-zsh-hook
 add-zsh-hook precmd  __bolan_cmd_end
@@ -946,11 +992,16 @@ __bolan_cmd_start()    { printf '\e]133;C;%s\a' "$BASH_COMMAND"; }
 __bolan_cmd_end()      { local ec=$?; printf "\e]133;D;$ec\a"; }
 __bolan_osc7()         { printf '\e]7;file://%s%s\a' "$HOSTNAME" "$PWD"; }
 __bolan_env() {
-  printf '\e]7777;AWS_PROFILE=%s;GCP_PROJECT=%s;DOCKER_CONTEXT=%s;VIRTUAL_ENV=%s\a' \
+  local node_version=""
+  if command -v node >/dev/null 2>&1; then
+    node_version=$(node --version 2>/dev/null)
+  fi
+  printf '\e]7777;AWS_PROFILE=%s;GCP_PROJECT=%s;DOCKER_CONTEXT=%s;VIRTUAL_ENV=%s;NODE_VERSION=%s\a' \
     "${AWS_PROFILE:-}" \
     "${CLOUDSDK_CORE_PROJECT:-${GCP_PROJECT:-}}" \
     "${DOCKER_CONTEXT:-}" \
-    "${VIRTUAL_ENV:-}"
+    "${VIRTUAL_ENV:-}" \
+    "$node_version"
 }
 __bolan_preexec() { __bolan_prompt_end; __bolan_cmd_start; }
 __bolan_precmd() { __bolan_cmd_end; __bolan_prompt_start; __bolan_osc7; __bolan_env; }

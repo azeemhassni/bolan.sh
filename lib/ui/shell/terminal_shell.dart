@@ -259,13 +259,22 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     // Don't forward keys during tab rename
     if (tabRenameActive) return false;
 
-    // Don't steal keys when any text input already has focus —
-    // popovers, dialogs, settings forms, find bar, etc. The check
-    // looks at the leaf widget under the primary focus and bails if
-    // it's an EditableText (the underlying widget every Flutter text
-    // input is built on).
-    final primary = FocusManager.instance.primaryFocus;
-    if (primary != null && primary.context?.widget is EditableText) {
+    // Only redirect printable keystrokes to the prompt when NOTHING
+    // else currently owns focus. If any widget already has primary
+    // focus — popover search fields, dialog inputs, settings forms,
+    // find bar, xterm view, the prompt itself — Flutter's focus
+    // system will deliver the key there correctly; we must not call
+    // `requestFocus()` and yank focus away to the prompt.
+    //
+    // Previous attempts tried to detect "is focus inside a text
+    // input?" by inspecting the primary FocusNode's context/widget,
+    // but that's unreliable: when a TextField is given an explicit
+    // `focusNode:` (e.g. the branch / cwd / nvm picker search
+    // inputs), primaryFocus.context points at the wrapping `Focus`
+    // element, not `EditableText`, and a subtree walk doesn't always
+    // reach the `EditableText` either. Checking "is anything
+    // focused?" is both simpler and strictly correct.
+    if (FocusManager.instance.primaryFocus != null) {
       return false;
     }
 

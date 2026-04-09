@@ -16,7 +16,14 @@ class BranchPicker extends StatefulWidget {
   /// Currently checked-out branch, used to highlight the active row.
   final String currentBranch;
 
-  final void Function(String branch) onSelect;
+  /// Called with the picked branch. The picker passes the full
+  /// `_BranchEntry` info so the caller knows whether it's a local
+  /// or remote branch and can issue the appropriate git command:
+  ///
+  ///   - local  → `git checkout <name>`
+  ///   - remote → `git checkout -t <remote>/<branch>` (creates a
+  ///              tracking local branch with the right short name)
+  final void Function(BranchSelection selection) onSelect;
   final VoidCallback onDismiss;
 
   const BranchPicker({
@@ -31,15 +38,37 @@ class BranchPicker extends StatefulWidget {
   State<BranchPicker> createState() => _BranchPickerState();
 }
 
-class _BranchEntry {
-  final String displayName;
-  final String checkoutName;
+/// Result type passed to [BranchPicker.onSelect]. Tells the caller
+/// exactly how to check the branch out without Bolan ever having to
+/// guess which segment of a remote ref is the remote name vs the
+/// branch name (that assumption is unsafe — branch names can contain
+/// segments that coincidentally match a remote name).
+///
+/// For local branches, the caller runs `git checkout <localName>`.
+/// For remote branches, the caller runs `git checkout -t <remoteRef>`
+/// and lets git itself derive the tracking local name from the full
+/// ref, which is the only reliable way to do it.
+class BranchSelection {
+  /// Full ref as it appears in `git branch` / `git branch -r` output
+  /// (e.g. `main`, `origin/feature/foo`).
+  final String ref;
   final bool isRemote;
-  const _BranchEntry({
-    required this.displayName,
-    required this.checkoutName,
-    required this.isRemote,
-  });
+
+  const BranchSelection.local(this.ref) : isRemote = false;
+  const BranchSelection.remote(this.ref) : isRemote = true;
+}
+
+class _BranchEntry {
+  /// The ref exactly as git reports it. For locals this is just the
+  /// branch name; for remotes it's the full `<remote>/<branch>` ref.
+  final String ref;
+  final bool isRemote;
+
+  const _BranchEntry.local(this.ref) : isRemote = false;
+  const _BranchEntry.remote(this.ref) : isRemote = true;
+
+  BranchSelection toSelection() =>
+      isRemote ? BranchSelection.remote(ref) : BranchSelection.local(ref);
 }
 
 class _BranchPickerState extends State<BranchPicker> {
@@ -65,62 +94,69 @@ class _BranchPickerState extends State<BranchPicker> {
 
   Future<void> _loadBranches() async {
     try {
-      final result = await Process.run(
+      // Query local and remote branches SEPARATELY so we can tell
+      // them apart unambiguously. `git branch -a` produces output
+      // identical in shape for `feature/foo` (local) and
+      // `origin/feature/foo` (remote) — there's no way to parse the
+      // distinction post-hoc once both are mixed.
+      final localResult = await Process.run(
         'git',
-        ['branch', '-a', '--format=%(refname:short)'],
+        ['branch', '--format=%(refname:short)'],
         workingDirectory: widget.cwd,
       );
-      if (result.exitCode != 0) {
+      if (localResult.exitCode != 0) {
         if (mounted) {
           setState(() {
-            _error = (result.stderr as String).trim();
+            _error = (localResult.stderr as String).trim();
             _loading = false;
           });
         }
         return;
       }
-      final lines = (result.stdout as String)
+      final remoteResult = await Process.run(
+        'git',
+        ['branch', '-r', '--format=%(refname:short)'],
+        workingDirectory: widget.cwd,
+      );
+
+      final entries = <_BranchEntry>[];
+
+      // Local branches.
+      final locals = (localResult.stdout as String)
           .split('\n')
           .map((s) => s.trim())
           .where((s) => s.isNotEmpty);
-
-      final entries = <_BranchEntry>[];
-      for (final line in lines) {
-        // `git branch -a` includes a synthetic "origin/HEAD" pointer
-        // that isn't actually checkout-able. Drop it.
-        if (line.endsWith('/HEAD')) continue;
-        final isRemote =
-            line.contains('/') && !line.startsWith('refs/');
-        // For remotes, the checkout name is the part after the first
-        // `/` (e.g. `origin/main` → `main`). Local checkout of a
-        // remote-tracking branch creates a tracking local branch.
-        final checkoutName =
-            isRemote ? line.substring(line.indexOf('/') + 1) : line;
-        entries.add(_BranchEntry(
-          displayName: line,
-          checkoutName: checkoutName,
-          isRemote: isRemote,
-        ));
+      for (final name in locals) {
+        entries.add(_BranchEntry.local(name));
       }
 
-      // Local branches first, then remotes; alphabetical within each
-      // group. Drop remote duplicates of branches that already exist
-      // locally so the list isn't noisy.
-      final localNames =
-          entries.where((e) => !e.isRemote).map((e) => e.displayName).toSet();
-      final filtered = entries.where((e) {
-        if (e.isRemote && localNames.contains(e.checkoutName)) return false;
-        return true;
-      }).toList()
-        ..sort((a, b) {
-          if (a.isRemote != b.isRemote) return a.isRemote ? 1 : -1;
-          return a.displayName.toLowerCase()
-              .compareTo(b.displayName.toLowerCase());
-        });
+      // Remote branches. We intentionally do NOT try to strip a
+      // remote-name prefix to derive a "local name" — a segment of a
+      // branch name can coincidentally match a remote name, and any
+      // prefix-guessing heuristic will misfire on that. Instead we
+      // keep the full ref as-is and let `git checkout -t <ref>` on
+      // the caller side derive the correct tracking local name.
+      if (remoteResult.exitCode == 0) {
+        final remotes = (remoteResult.stdout as String)
+            .split('\n')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty);
+        for (final ref in remotes) {
+          // Drop the synthetic `origin/HEAD` pointer.
+          if (ref.endsWith('/HEAD')) continue;
+          entries.add(_BranchEntry.remote(ref));
+        }
+      }
+
+      // Local branches first, then remotes; alphabetical within each.
+      entries.sort((a, b) {
+        if (a.isRemote != b.isRemote) return a.isRemote ? 1 : -1;
+        return a.ref.toLowerCase().compareTo(b.ref.toLowerCase());
+      });
 
       if (mounted) {
         setState(() {
-          _branches = filtered;
+          _branches = entries;
           _loading = false;
         });
       }
@@ -138,12 +174,12 @@ class _BranchPickerState extends State<BranchPicker> {
     if (_filter.isEmpty) return _branches;
     final q = _filter.toLowerCase();
     return _branches
-        .where((b) => b.displayName.toLowerCase().contains(q))
+        .where((b) => b.ref.toLowerCase().contains(q))
         .toList();
   }
 
   void _select(_BranchEntry entry) {
-    widget.onSelect(entry.checkoutName);
+    widget.onSelect(entry.toSelection());
     widget.onDismiss();
   }
 
@@ -248,7 +284,7 @@ class _BranchPickerState extends State<BranchPicker> {
   }
 
   Widget _buildRow(BolonTheme theme, _BranchEntry entry) {
-    final isCurrent = entry.checkoutName == widget.currentBranch;
+    final isCurrent = !entry.isRemote && entry.ref == widget.currentBranch;
     return GestureDetector(
       onTap: () => _select(entry),
       child: MouseRegion(
@@ -270,7 +306,7 @@ class _BranchPickerState extends State<BranchPicker> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  entry.displayName,
+                  entry.ref,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: isCurrent ? theme.cursor : theme.foreground,

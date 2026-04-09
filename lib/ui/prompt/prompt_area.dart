@@ -103,8 +103,17 @@ class _PromptAreaState extends State<PromptArea> {
       child: BranchPicker(
         cwd: widget.session.cwd,
         currentBranch: widget.session.gitBranch,
-        onSelect: (branch) {
-          widget.session.writeInput("git checkout '${branch.replaceAll("'", "'\\''")}'\n");
+        onSelect: (selection) {
+          // For a remote branch we pass the full remote ref to
+          // `git checkout -t` and let git derive the tracking local
+          // name itself — attempting to strip a "remote prefix" in
+          // Bolan is unsafe because branch-name segments can
+          // coincidentally match real remote names.
+          final quoted = selection.ref.replaceAll("'", "'\\''");
+          final cmd = selection.isRemote
+              ? "git checkout -t '$quoted'\n"
+              : "git checkout '$quoted'\n";
+          widget.session.writeInput(cmd);
         },
         onDismiss: () => handle.dismiss(),
       ),
@@ -116,59 +125,78 @@ class _PromptAreaState extends State<PromptArea> {
   Future<void> _openNvmPicker() async {
     final versions = await _listNvmVersions();
     if (!mounted) return;
-    if (versions.isEmpty) {
-      widget.session.writeInput('nvm use\n');
-      return;
-    }
     final requested = widget.session.nvmrcVersion;
+    final activeRaw = widget.session.nodeVersion.replaceFirst('v', '');
+
     late AnchoredPopoverHandle handle;
     handle = showAnchoredPopover(
       context: context,
       anchorKey: _nvmChipKey,
-      maxWidth: 240,
-      maxHeight: 320,
-      child: PopoverMenuList(
-        items: [
-          for (final v in versions)
-            PopoverMenuItem(
-              icon: v == requested
-                  ? Icons.check_circle_outline
-                  : Icons.circle_outlined,
-              label: v == requested ? '$v  (.nvmrc)' : v,
-              onTap: () {
-                widget.session.writeInput('nvm use $v\n');
-                handle.dismiss();
-              },
+      maxWidth: 260,
+      maxHeight: 360,
+      child: versions.isEmpty
+          ? const _EmptyPopoverMessage(
+              text: 'No nvm versions installed.\n'
+                  'Install nvm and run `nvm install <v>`.',
+            )
+          : PopoverMenuList(
+              items: [
+                for (final v in versions)
+                  PopoverMenuItem(
+                    icon: v == activeRaw
+                        ? Icons.check
+                        : (v == requested
+                            ? Icons.bookmark_outline
+                            : Icons.circle_outlined),
+                    label: v == requested ? '$v  (.nvmrc)' : v,
+                    onTap: () {
+                      widget.session.writeInput('nvm use $v\n');
+                      handle.dismiss();
+                    },
+                  ),
+              ],
             ),
-        ],
-      ),
     );
   }
 
-  /// `nvm ls` parsed into a list of bare version strings (e.g.
-  /// `20.11.0`). Returns an empty list if nvm isn't installed or
-  /// the shell isn't sourced — the caller falls back to writing
-  /// `nvm use\n` directly.
+  /// Lists installed node versions by reading the directories under
+  /// `$NVM_DIR/versions/node/` (or `~/.nvm/versions/node/` if
+  /// `$NVM_DIR` is unset). This bypasses the `nvm` shell function,
+  /// which isn't available in non-interactive subshells.
+  ///
+  /// Returns versions sorted newest-first via a numeric semver
+  /// comparison. Empty list if no nvm install exists at all.
   Future<List<String>> _listNvmVersions() async {
-    final shell = Platform.environment['SHELL'] ?? '/bin/zsh';
+    final nvmDir = Platform.environment['NVM_DIR'] ??
+        '${Platform.environment['HOME'] ?? ''}/.nvm';
+    final dir = Directory('$nvmDir/versions/node');
+    if (!dir.existsSync()) return const [];
     try {
-      final result = await Process.run(
-        shell,
-        ['-l', '-c', 'nvm ls --no-colors --no-alias 2>/dev/null'],
-      );
-      if (result.exitCode != 0) return const [];
-      final out = result.stdout as String;
-      final versions = <String>[];
-      for (final line in out.split('\n')) {
-        final m = RegExp(r'v(\d+\.\d+\.\d+)').firstMatch(line);
-        if (m != null) versions.add(m.group(1)!);
-      }
-      // Dedupe while preserving order, newest last.
-      final seen = <String>{};
-      return versions.where((v) => seen.add(v)).toList();
-    } on ProcessException {
+      final entries = dir
+          .listSync(followLinks: false)
+          .whereType<Directory>()
+          .map((e) => e.path.split('/').last)
+          .map((name) => name.startsWith('v') ? name.substring(1) : name)
+          .where((v) => RegExp(r'^\d+\.\d+\.\d+').hasMatch(v))
+          .toList();
+      entries.sort((a, b) => _compareSemver(b, a)); // newest first
+      return entries;
+    } on FileSystemException {
       return const [];
     }
+  }
+
+  /// Numeric semver comparison: 20.11.0 > 18.20.4 > 18.17.1.
+  /// Falls back to string comparison if a version doesn't parse.
+  int _compareSemver(String a, String b) {
+    final aParts = a.split('.').map((s) => int.tryParse(s) ?? 0).toList();
+    final bParts = b.split('.').map((s) => int.tryParse(s) ?? 0).toList();
+    for (var i = 0; i < 3; i++) {
+      final ai = i < aParts.length ? aParts[i] : 0;
+      final bi = i < bParts.length ? bParts[i] : 0;
+      if (ai != bi) return ai - bi;
+    }
+    return 0;
   }
 
   /// Opens a popover listing all kubectl contexts. Selecting one
@@ -415,14 +443,22 @@ class _PromptAreaState extends State<PromptArea> {
 
       case PromptChipType.nvm:
         if (!widget.session.hasNvmrc) return [];
-        // Show the requested .nvmrc version. If `node --version`
-        // returned something different, prepend a small mismatch
-        // marker so the user knows they need to switch.
+        // Label rules:
+        //   - match: show the full active version (`v21.7.4`).
+        //   - mismatch: show the .nvmrc spec with a "≠active" hint
+        //     (`21 (≠22.13.0)`), tinted yellow so it's noticeable.
+        //   - no active version detected yet: show the .nvmrc spec.
         final requested = widget.session.nvmrcVersion;
         final active = widget.session.nodeVersion.replaceFirst('v', '');
-        final mismatch =
-            active.isNotEmpty && active != requested;
-        final label = mismatch ? '$requested (≠$active)' : 'v$requested';
+        final matches = widget.session.nvmVersionMatches;
+        final String label;
+        if (active.isEmpty) {
+          label = 'v$requested';
+        } else if (matches) {
+          label = 'v$active';
+        } else {
+          label = '$requested (≠$active)';
+        }
         return [
           GestureDetector(
             key: _nvmChipKey,
@@ -431,7 +467,7 @@ class _PromptAreaState extends State<PromptArea> {
               cursor: SystemMouseCursors.click,
               child: StatusChip(
                 text: label,
-                fg: mismatch ? theme.ansiYellow : theme.ansiGreen,
+                fg: matches ? theme.ansiGreen : theme.ansiYellow,
                 bg: theme.statusChipBg,
                 svgIcon: 'assets/icons/ic_nodejs.svg',
               ),
@@ -584,6 +620,35 @@ class _PromptAreaState extends State<PromptArea> {
             shareHistory: widget.aiEnabled && widget.shareHistory,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Centered dim message rendered inside an anchored popover when
+/// there are no items to show. Used by the nvm and kubectl pickers
+/// when their respective tools have nothing installed yet.
+class _EmptyPopoverMessage extends StatelessWidget {
+  final String text;
+  const _EmptyPopoverMessage({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = BolonTheme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: theme.dimForeground,
+            fontFamily: theme.fontFamily,
+            fontSize: 12,
+            height: 1.5,
+            decoration: TextDecoration.none,
+          ),
+        ),
       ),
     );
   }
