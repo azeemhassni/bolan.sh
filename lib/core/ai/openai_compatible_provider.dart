@@ -57,11 +57,6 @@ class OpenAiCompatibleProvider implements AiProvider {
 
   @override
   Future<String> generateContent(String prompt) async {
-    // ignore: avoid_print
-    print('[AI] provider=$_name model=$_model url=$_baseUrl');
-    // ignore: avoid_print
-    print('[AI] prompt:\n${prompt.length > 500 ? '${prompt.substring(0, 500)}...' : prompt}');
-
     final client = HttpClient();
     try {
       final uri = Uri.parse('$_baseUrl/v1/chat/completions');

@@ -53,10 +53,6 @@ class LocalLlmProvider implements AiProvider {
 
   @override
   Future<String> generateContent(String prompt) async {
-    // ignore: avoid_print
-    print('[AI] LocalLLM preferredSize=${_preferredSize.name} '
-        'activeSize=${ModelManager.downloadedSize()?.name}');
-
     // Try once; if the server died externally (killed in Activity
     // Monitor, OOM, etc.) the request will fail with a connection
     // error. Reset state and retry once before surfacing the error.

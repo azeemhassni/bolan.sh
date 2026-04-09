@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/pane/pane_node.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/session_provider.dart';
+import '../shared/anchored_popover.dart';
+import '../shared/popover_menu.dart';
 import 'pane_divider.dart';
 import 'session_view.dart';
 
@@ -56,6 +58,10 @@ class _LeafPaneWidget extends ConsumerStatefulWidget {
 
 class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
   DropPosition? _hoverPosition;
+  // GlobalKey gives the right-click handler access to the live
+  // terminal's selection state via SessionView's public State class.
+  final GlobalKey<SessionViewState> _sessionViewKey =
+      GlobalKey<SessionViewState>();
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +82,7 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
                     : Border.all(color: theme.blockBorder, width: 1),
               ),
         child: SessionView(
-          key: ValueKey(widget.leaf.id),
+          key: _sessionViewKey,
           session: widget.leaf.session,
           isFocusedPane: widget.isFocused,
           paneId: widget.leaf.id,
@@ -176,29 +182,6 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
     );
   }
 
-  PopupMenuItem<String> _menuItem(
-    String value,
-    String label,
-    String shortcut, {
-    bool enabled = true,
-  }) {
-    return PopupMenuItem<String>(
-      value: value,
-      enabled: enabled,
-      child: Row(
-        children: [
-          Expanded(child: Text(label)),
-          Text(
-            shortcut,
-            style: TextStyle(
-              color: BolonTheme.of(context).dimForeground,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _showContextMenu(
     BuildContext context,
@@ -206,57 +189,94 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
   ) async {
     final notifier = ref.read(sessionProvider.notifier);
     final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+    if (!context.mounted) return;
+
     final hasClipboard = clipboardData?.text?.isNotEmpty ?? false;
 
-    if (!context.mounted) return;
+    // Selection-aware Copy. Prefer the live terminal's xterm
+    // selection (made via Option+drag during a TUI session). If
+    // there's none, fall back to the last completed block's output.
+    final liveSelection = _sessionViewKey.currentState?.getSelectedText();
+    final lastBlock = widget.leaf.session.blocks.lastOrNull;
+    final hasLiveSelection =
+        liveSelection != null && liveSelection.isNotEmpty;
+    final hasBlockOutput =
+        lastBlock != null && lastBlock.hasOutput;
+    final canCopy = hasLiveSelection || hasBlockOutput;
 
     final mod = Platform.isMacOS ? '⌘' : 'Ctrl+';
     final shift = Platform.isMacOS ? '⇧' : 'Shift+';
 
-    final value = await showMenu<String>(
-      context: context,
-      popUpAnimationStyle: AnimationStyle.noAnimation,
-      constraints: const BoxConstraints(minWidth: 260),
-      position: RelativeRect.fromLTRB(
-        details.globalPosition.dx,
-        details.globalPosition.dy,
-        details.globalPosition.dx,
-        details.globalPosition.dy,
-      ),
-      items: [
-        _menuItem('copy', 'Copy', '${mod}C'),
-        _menuItem('paste', 'Paste', '${mod}V', enabled: hasClipboard),
-        const PopupMenuDivider(),
-        _menuItem('split_right', 'Split Right', '${mod}D'),
-        _menuItem('split_down', 'Split Down', '$mod${shift}D'),
-        if (!widget.isSinglePane) ...[
-          const PopupMenuDivider(),
-          _menuItem('close', 'Close Pane', '$mod${shift}W'),
-        ],
-      ],
-    );
-
-    if (value == null) return;
     notifier.setFocusedPane(widget.leaf.id);
 
-    switch (value) {
-      case 'copy':
-        final lastBlock = widget.leaf.session.blocks.lastOrNull;
-        if (lastBlock != null && lastBlock.hasOutput) {
-          await Clipboard.setData(ClipboardData(text: lastBlock.output));
-        }
-      case 'paste':
-        final text = clipboardData?.text;
-        if (text != null && text.isNotEmpty) {
-          widget.leaf.session.writeInput(text);
-        }
-      case 'split_right':
-        notifier.splitPane(Axis.horizontal);
-      case 'split_down':
-        notifier.splitPane(Axis.vertical);
-      case 'close':
-        notifier.closePane();
-    }
+    late AnchoredPopoverHandle handle;
+    handle = showAnchoredPopover(
+      context: context,
+      globalPosition: details.globalPosition,
+      maxWidth: 280,
+      maxHeight: 360,
+      child: PopoverMenuList(
+        items: [
+          PopoverMenuItem(
+            icon: Icons.content_copy_outlined,
+            label: 'Copy',
+            shortcut: '${mod}C',
+            enabled: canCopy,
+            onTap: () async {
+              if (hasLiveSelection) {
+                await Clipboard.setData(ClipboardData(text: liveSelection));
+                _sessionViewKey.currentState?.clearTerminalSelection();
+              } else if (hasBlockOutput) {
+                await Clipboard.setData(
+                    ClipboardData(text: lastBlock.output));
+              }
+              handle.dismiss();
+            },
+          ),
+          PopoverMenuItem(
+            icon: Icons.content_paste_outlined,
+            label: 'Paste',
+            shortcut: '${mod}V',
+            enabled: hasClipboard,
+            onTap: () {
+              final text = clipboardData?.text;
+              if (text != null && text.isNotEmpty) {
+                widget.leaf.session.writeInput(text);
+              }
+              handle.dismiss();
+            },
+          ),
+          PopoverMenuItem(
+            icon: Icons.vertical_split,
+            label: 'Split right',
+            shortcut: '${mod}D',
+            onTap: () {
+              notifier.splitPane(Axis.horizontal);
+              handle.dismiss();
+            },
+          ),
+          PopoverMenuItem(
+            icon: Icons.horizontal_split,
+            label: 'Split down',
+            shortcut: '$mod${shift}D',
+            onTap: () {
+              notifier.splitPane(Axis.vertical);
+              handle.dismiss();
+            },
+          ),
+          if (!widget.isSinglePane)
+            PopoverMenuItem(
+              icon: Icons.close,
+              label: 'Close pane',
+              shortcut: '$mod${shift}W',
+              onTap: () {
+                notifier.closePane();
+                handle.dismiss();
+              },
+            ),
+        ],
+      ),
+    );
   }
 }
 

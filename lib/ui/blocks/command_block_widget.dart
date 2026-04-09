@@ -9,6 +9,7 @@ import '../../core/ai/features/error_explain.dart';
 import '../../core/terminal/command_block.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../shared/anchored_popover.dart';
+import '../shared/popover_menu.dart';
 import 'ansi_text_parser.dart';
 import 'linkified_text.dart';
 import 'share_image_dialog.dart';
@@ -640,9 +641,9 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
       anchorKey: _moreMenuKey,
       maxWidth: 240,
       maxHeight: 240,
-      child: _BlockMenuList(
+      child: PopoverMenuList(
         items: [
-          _BlockMenuItem(
+          PopoverMenuItem(
             icon: Icons.content_paste_outlined,
             label: 'Copy command + output',
             onTap: () {
@@ -651,7 +652,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
             },
           ),
           if (hasOutput)
-            _BlockMenuItem(
+            PopoverMenuItem(
               icon: Icons.save_alt_outlined,
               label: 'Save output to file…',
               onTap: () {
@@ -659,7 +660,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                 handle.dismiss();
               },
             ),
-          _BlockMenuItem(
+          PopoverMenuItem(
             icon: Icons.image_outlined,
             label: 'Share as image…',
             onTap: () {
@@ -668,7 +669,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
             },
           ),
           if (canExplain)
-            _BlockMenuItem(
+            PopoverMenuItem(
               icon: Icons.auto_awesome,
               label: 'Explain error with AI',
               onTap: () {
@@ -832,94 +833,6 @@ class _BlockActionButtonState extends State<_BlockActionButton> {
             child: Center(
               child: Icon(widget.icon, size: 15, color: fg),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Single row in a `_BlockMenuList`. Plain data class, the visual
-/// rendering lives in the list widget.
-class _BlockMenuItem {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _BlockMenuItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-}
-
-/// Vertical list of menu items rendered inside an anchored popover.
-/// Used by the block "More actions" button.
-class _BlockMenuList extends StatelessWidget {
-  final List<_BlockMenuItem> items;
-
-  const _BlockMenuList({required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = BolonTheme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final item in items) _MenuRow(item: item, theme: theme),
-        ],
-      ),
-    );
-  }
-}
-
-class _MenuRow extends StatefulWidget {
-  final _BlockMenuItem item;
-  final BolonTheme theme;
-
-  const _MenuRow({required this.item, required this.theme});
-
-  @override
-  State<_MenuRow> createState() => _MenuRowState();
-}
-
-class _MenuRowState extends State<_MenuRow> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = widget.theme;
-    return GestureDetector(
-      onTap: widget.item.onTap,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: Container(
-          color: _hovered ? t.statusChipBg : Colors.transparent,
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              Icon(widget.item.icon,
-                  size: 14, color: t.dimForeground),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  widget.item.label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: t.foreground,
-                    fontFamily: t.fontFamily,
-                    fontSize: 12,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ),

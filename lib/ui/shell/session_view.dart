@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
 
@@ -35,16 +36,26 @@ class SessionView extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<SessionView> createState() => _SessionViewState();
+  ConsumerState<SessionView> createState() => SessionViewState();
 }
 
-class _SessionViewState extends ConsumerState<SessionView> {
+/// Public State class so external widgets (e.g. the pane right-click
+/// handler) can grab the live terminal selection through a GlobalKey.
+class SessionViewState extends ConsumerState<SessionView> {
   final _terminalController = TerminalController();
   final _scrollController = ScrollController();
   late final FocusNode _terminalFocusNode;
   final _promptKey = GlobalKey<PromptInputState>();
   bool _showToast = false;
   bool _wasRunning = false;
+
+  /// Saved value of `terminal.mouseMode` while Alt is held — used to
+  /// implement Option+drag-to-select while a TUI app (less, claude,
+  /// vim, top, etc.) has mouse tracking enabled. Holding Alt forces
+  /// the mode to [MouseMode.none] so xterm.dart's drag-to-select
+  /// takes over the gesture; releasing Alt restores the saved mode.
+  MouseMode? _savedMouseMode;
+  bool _altWasDown = false;
 
   // Find bar state
   final _findBarKey = GlobalKey<FindBarState>();
@@ -59,12 +70,52 @@ class _SessionViewState extends ConsumerState<SessionView> {
     super.initState();
     _terminalFocusNode = FocusNode(debugLabel: 'terminal-${widget.session.id}');
     widget.session.addListener(_onSessionChanged);
+    HardwareKeyboard.instance.addHandler(_handleAltForSelection);
     // Register prompt for global focus forwarding after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.paneId != null && _promptKey.currentState != null) {
         PaneFocusRegistry.register(widget.paneId!, _promptKey.currentState!);
       }
     });
+  }
+
+  /// Returns the currently selected text from the live terminal,
+  /// or `null` if there's no selection. Used by the pane-level
+  /// right-click handler to make Copy selection-aware.
+  String? getSelectedText() {
+    final selection = _terminalController.selection;
+    if (selection == null) return null;
+    return widget.session.terminal.buffer.getText(selection);
+  }
+
+  /// Clears the live terminal's text selection, if any.
+  void clearTerminalSelection() {
+    _terminalController.clearSelection();
+  }
+
+  /// Listens for Alt key state changes and toggles this session's
+  /// terminal mouse mode so the user can drag-select text while a
+  /// mouse-tracking TUI is running. Returns false to never consume
+  /// the event — every other handler still receives it.
+  bool _handleAltForSelection(KeyEvent event) {
+    final altNow = HardwareKeyboard.instance.isAltPressed;
+    if (altNow == _altWasDown) return false;
+    _altWasDown = altNow;
+    final term = widget.session.terminal;
+    if (altNow) {
+      // Save and override only if the app currently has mouse
+      // tracking on — otherwise selection already works.
+      if (term.mouseMode != MouseMode.none) {
+        _savedMouseMode = term.mouseMode;
+        term.setMouseMode(MouseMode.none);
+      }
+    } else {
+      if (_savedMouseMode != null) {
+        term.setMouseMode(_savedMouseMode!);
+        _savedMouseMode = null;
+      }
+    }
+    return false;
   }
 
   @override
@@ -80,6 +131,12 @@ class _SessionViewState extends ConsumerState<SessionView> {
   void dispose() {
     if (widget.paneId != null) PaneFocusRegistry.unregister(widget.paneId!);
     widget.session.removeListener(_onSessionChanged);
+    HardwareKeyboard.instance.removeHandler(_handleAltForSelection);
+    // Restore mouseMode if Alt was held when the pane closed.
+    if (_savedMouseMode != null) {
+      widget.session.terminal.setMouseMode(_savedMouseMode!);
+      _savedMouseMode = null;
+    }
     _terminalController.dispose();
     _scrollController.dispose();
     _terminalFocusNode.dispose();
@@ -142,7 +199,10 @@ class _SessionViewState extends ConsumerState<SessionView> {
       },
       child: Stack(
         children: [
-          // Two modes: full-screen terminal when running, blocks when idle
+          // Two modes: full-screen terminal when running, blocks when idle.
+          // Right-click on either is handled by the parent _LeafPaneWidget
+          // via onSecondaryTap so the context menu is consistent across
+          // both modes.
           if (isRunning)
             TerminalView(
               widget.session.terminal,
@@ -459,3 +519,4 @@ class _BlocksWithStickyPromptState extends State<_BlocksWithStickyPrompt> {
     );
   }
 }
+

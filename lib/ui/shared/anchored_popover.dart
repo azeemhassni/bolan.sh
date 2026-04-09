@@ -22,26 +22,42 @@ AnchoredPopoverHandle? _active;
 /// Tapping outside the popover or pressing Escape also dismisses it.
 AnchoredPopoverHandle showAnchoredPopover({
   required BuildContext context,
-  required GlobalKey anchorKey,
+  GlobalKey? anchorKey,
+  Offset? globalPosition,
   required Widget child,
   double maxWidth = 360,
   double maxHeight = 320,
   double gap = 8,
 }) {
+  assert(anchorKey != null || globalPosition != null,
+      'showAnchoredPopover needs either an anchorKey or a globalPosition');
+
   // Auto-dismiss any popover that's already open.
   _active?.dismiss();
 
   final overlay = Overlay.of(context);
   final theme = BolonTheme.of(context);
 
-  final renderBox =
-      anchorKey.currentContext?.findRenderObject() as RenderBox?;
-  if (renderBox == null) {
-    // Anchor not laid out yet — bail with a no-op handle.
-    return AnchoredPopoverHandle._(() {});
+  // Resolve a (top-left, size) bounding rect for the anchor. For a
+  // GlobalKey we use the laid-out widget's RenderBox. For a
+  // free-floating position (e.g. a right-click), we synthesize a
+  // zero-size rect at the click point.
+  final Offset anchorPos;
+  final Size anchorSize;
+  if (anchorKey != null) {
+    final renderBox =
+        anchorKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) {
+      // Anchor not laid out yet — bail with a no-op handle.
+      return AnchoredPopoverHandle._(() {});
+    }
+    anchorPos = renderBox.localToGlobal(Offset.zero);
+    anchorSize = renderBox.size;
+  } else {
+    anchorPos = globalPosition!;
+    anchorSize = Size.zero;
   }
-  final anchorPos = renderBox.localToGlobal(Offset.zero);
-  final anchorSize = renderBox.size;
+
   final screen = MediaQuery.of(context).size;
 
   // Decide whether to place above or below the anchor.
