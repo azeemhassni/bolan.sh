@@ -1,7 +1,16 @@
 import 'dart:io';
 
 /// Type of a completion item.
-enum CompletionType { command, builtin, file, directory }
+enum CompletionType {
+  command,
+  builtin,
+  file,
+  directory,
+  gitSubcommand,
+  gitBranch,
+  gitRemote,
+  gitTag,
+}
 
 /// A single completion candidate with metadata.
 class CompletionItem {
@@ -67,6 +76,13 @@ class CompletionEngine {
 
       if (isFirstWord && !currentWord.contains('/')) {
         items = await _completeCommand(currentWord);
+      } else if (words.isNotEmpty && words.first == 'git') {
+        items = await _completeGit(words, currentWord, cwd);
+        // Fall through to path completion for commands like `git add`
+        // where the user is completing a file path.
+        if (items.isEmpty && _gitCmdTakesFiles(words)) {
+          items = await _completePath(currentWord, cwd);
+        }
       } else {
         items = await _completePath(currentWord, cwd);
       }
@@ -223,6 +239,241 @@ class CompletionEngine {
         description: isBuiltin ? 'Shell builtin' : null,
       );
     }).toList();
+  }
+
+  // ── Git-aware completion ─────────────────────────────────────────
+
+  /// Common git subcommands, ordered roughly by frequency.
+  static const _gitSubcommands = <String, String>{
+    'add': 'Add file contents to the index',
+    'branch': 'List, create, or delete branches',
+    'checkout': 'Switch branches or restore files',
+    'cherry-pick': 'Apply changes from existing commits',
+    'clone': 'Clone a repository',
+    'commit': 'Record changes to the repository',
+    'diff': 'Show changes between commits or working tree',
+    'fetch': 'Download objects and refs from a remote',
+    'init': 'Create an empty git repository',
+    'log': 'Show commit logs',
+    'merge': 'Join two or more development histories',
+    'pull': 'Fetch from and merge with a remote',
+    'push': 'Update remote refs',
+    'rebase': 'Reapply commits on top of another base',
+    'remote': 'Manage set of tracked repositories',
+    'reset': 'Reset HEAD to a specified state',
+    'restore': 'Restore working tree files',
+    'revert': 'Revert some existing commits',
+    'show': 'Show various types of objects',
+    'stash': 'Stash changes in a dirty working directory',
+    'status': 'Show the working tree status',
+    'switch': 'Switch branches',
+    'tag': 'Create, list, delete, or verify tags',
+  };
+
+  /// Subcommands for `git remote`.
+  static const _gitRemoteSubcommands = <String, String>{
+    'add': 'Add a remote',
+    'remove': 'Remove a remote',
+    'rename': 'Rename a remote',
+    'show': 'Show information about a remote',
+    'prune': 'Remove stale tracking branches',
+    'set-url': 'Change the URL of a remote',
+  };
+
+  /// Subcommands for `git stash`.
+  static const _gitStashSubcommands = <String, String>{
+    'apply': 'Apply a stash without removing it',
+    'clear': 'Remove all stash entries',
+    'drop': 'Remove a single stash entry',
+    'list': 'List stash entries',
+    'pop': 'Apply and remove the latest stash',
+    'show': 'Show the changes in a stash',
+  };
+
+  /// Git subcommands whose arguments are typically files/paths.
+  static const _gitFileCommands = {'add', 'restore', 'rm', 'mv', 'diff'};
+
+  /// Git subcommands that take a branch/ref as their first argument.
+  static const _gitBranchCommands = {
+    'checkout', 'switch', 'merge', 'rebase', 'log',
+    'show', 'cherry-pick', 'revert', 'reset',
+  };
+
+  /// Git subcommands that take a remote as their first argument,
+  /// then a branch as the second.
+  static const _gitRemoteFirstCommands = {'push', 'pull', 'fetch'};
+
+  bool _gitCmdTakesFiles(List<String> words) {
+    return words.length >= 2 && _gitFileCommands.contains(words[1]);
+  }
+
+  Future<List<CompletionItem>> _completeGit(
+    List<String> words,
+    String partial,
+    String cwd,
+  ) async {
+    // `git <TAB>` → subcommands
+    if (words.length == 2) {
+      return _gitSubcommands.entries
+          .where((e) => e.key.startsWith(partial))
+          .map((e) => CompletionItem(
+                text: e.key,
+                type: CompletionType.gitSubcommand,
+                description: e.value,
+              ))
+          .toList();
+    }
+
+    final subCmd = words[1];
+
+    // `git remote <TAB>` → remote subcommands
+    if (subCmd == 'remote' && words.length == 3) {
+      return _gitRemoteSubcommands.entries
+          .where((e) => e.key.startsWith(partial))
+          .map((e) => CompletionItem(
+                text: e.key,
+                type: CompletionType.gitSubcommand,
+                description: e.value,
+              ))
+          .toList();
+    }
+
+    // `git stash <TAB>` → stash subcommands
+    if (subCmd == 'stash' && words.length == 3) {
+      return _gitStashSubcommands.entries
+          .where((e) => e.key.startsWith(partial))
+          .map((e) => CompletionItem(
+                text: e.key,
+                type: CompletionType.gitSubcommand,
+                description: e.value,
+              ))
+          .toList();
+    }
+
+    // `git push/pull/fetch <TAB>` → remotes
+    if (_gitRemoteFirstCommands.contains(subCmd) && words.length == 3) {
+      return _gitRemotes(partial, cwd);
+    }
+
+    // `git push/pull <remote> <TAB>` → branches, current branch first
+    if (_gitRemoteFirstCommands.contains(subCmd) && words.length == 4) {
+      return _gitBranches(partial, cwd, currentBranchFirst: true);
+    }
+
+    // `git checkout/switch/merge/rebase/... <TAB>` → branches
+    if (_gitBranchCommands.contains(subCmd) && words.length == 3) {
+      return _gitBranches(partial, cwd);
+    }
+
+    // `git branch -d/-D <TAB>` → branches
+    if (subCmd == 'branch' && words.length == 4 &&
+        (words[2] == '-d' || words[2] == '-D')) {
+      return _gitBranches(partial, cwd);
+    }
+
+    // `git tag <TAB>` after a flag like -d → tags
+    if (subCmd == 'tag' && words.length == 4 && words[2] == '-d') {
+      return _gitTags(partial, cwd);
+    }
+
+    return [];
+  }
+
+  Future<List<CompletionItem>> _gitBranches(
+    String partial,
+    String cwd, {
+    bool currentBranchFirst = false,
+  }) async {
+    try {
+      final result = await Process.run(
+        'git', ['branch', '-a', '--format=%(refname:short)'],
+        workingDirectory: cwd,
+      ).timeout(const Duration(seconds: 2));
+      if (result.exitCode != 0) return [];
+
+      String? currentBranch;
+      if (currentBranchFirst) {
+        final headResult = await Process.run(
+          'git', ['branch', '--show-current'],
+          workingDirectory: cwd,
+        ).timeout(const Duration(seconds: 2));
+        if (headResult.exitCode == 0) {
+          currentBranch = (headResult.stdout as String).trim();
+          if (currentBranch.isEmpty) currentBranch = null;
+        }
+      }
+
+      final q = partial.toLowerCase();
+      final items = (result.stdout as String)
+          .split('\n')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty && !s.endsWith('/HEAD'))
+          .where((s) => s.toLowerCase().startsWith(q))
+          .map((s) => CompletionItem(
+                text: s,
+                type: CompletionType.gitBranch,
+                description: s == currentBranch
+                    ? 'Current branch'
+                    : s.contains('/') ? 'Remote' : 'Local',
+              ))
+          .toList();
+
+      // Sort current branch to the top so it appears as the ghost
+      // text suggestion for `git push origin <TAB>` etc.
+      if (currentBranch != null) {
+        items.sort((a, b) {
+          if (a.text == currentBranch) return -1;
+          if (b.text == currentBranch) return 1;
+          return a.text.compareTo(b.text);
+        });
+      }
+
+      return items;
+    } on Exception {
+      return [];
+    }
+  }
+
+  Future<List<CompletionItem>> _gitRemotes(String partial, String cwd) async {
+    try {
+      final result = await Process.run(
+        'git', ['remote'],
+        workingDirectory: cwd,
+      ).timeout(const Duration(seconds: 2));
+      if (result.exitCode != 0) return [];
+      return (result.stdout as String)
+          .split('\n')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty && s.startsWith(partial))
+          .map((s) => CompletionItem(
+                text: s,
+                type: CompletionType.gitRemote,
+              ))
+          .toList();
+    } on Exception {
+      return [];
+    }
+  }
+
+  Future<List<CompletionItem>> _gitTags(String partial, String cwd) async {
+    try {
+      final result = await Process.run(
+        'git', ['tag', '-l'],
+        workingDirectory: cwd,
+      ).timeout(const Duration(seconds: 2));
+      if (result.exitCode != 0) return [];
+      return (result.stdout as String)
+          .split('\n')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty && s.startsWith(partial))
+          .map((s) => CompletionItem(
+                text: s,
+                type: CompletionType.gitTag,
+              ))
+          .toList();
+    } on Exception {
+      return [];
+    }
   }
 
   CompletionResult _empty(int cursorPos) {

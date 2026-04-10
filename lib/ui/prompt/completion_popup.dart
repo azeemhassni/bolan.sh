@@ -64,6 +64,10 @@ class _CompletionPopupState extends State<CompletionPopup> {
       CompletionType.builtin => Icons.code,
       CompletionType.file => Icons.insert_drive_file_outlined,
       CompletionType.directory => Icons.folder_outlined,
+      CompletionType.gitSubcommand => Icons.code,
+      CompletionType.gitBranch => Icons.call_split,
+      CompletionType.gitRemote => Icons.cloud_outlined,
+      CompletionType.gitTag => Icons.label_outline,
     };
   }
 
