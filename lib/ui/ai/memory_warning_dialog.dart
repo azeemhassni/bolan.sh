@@ -46,6 +46,7 @@ Future<bool> showMemoryWarningDialog(
             children: [
               BolanDialogButton(
                 label: 'Cancel',
+                autofocus: true,
                 onTap: () => Navigator.of(ctx).pop(false),
               ),
               const SizedBox(width: 10),

@@ -44,6 +44,7 @@ Future<ConfirmResult?> showConfirmDialog(
             children: [
               BolanDialogButton(
                 label: 'Cancel',
+                autofocus: true,
                 onTap: () => Navigator.of(ctx).pop(ConfirmResult.cancel),
               ),
               if (secondaryLabel != null) ...[

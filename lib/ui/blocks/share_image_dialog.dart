@@ -217,6 +217,7 @@ class _ShareImageDialogState extends State<_ShareImageDialog> {
             children: [
               BolanDialogButton(
                 label: 'Cancel',
+                autofocus: true,
                 onTap: () => Navigator.of(context).pop(),
               ),
               const SizedBox(width: 10),

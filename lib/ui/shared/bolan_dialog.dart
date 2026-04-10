@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/bolan_theme.dart';
 
@@ -145,49 +146,91 @@ enum BolanButtonKind {
 
 /// Standard dialog button. Use this for every button inside a
 /// [BolanDialog] so padding, radius, font, and colors all match.
-class BolanDialogButton extends StatelessWidget {
+///
+/// Supports keyboard navigation: Tab to focus, Enter/Space to
+/// activate. When focused, a 2px ring in the theme cursor color
+/// appears around the button.
+class BolanDialogButton extends StatefulWidget {
   final String label;
   final VoidCallback onTap;
   final BolanButtonKind kind;
+
+  /// Set to true on exactly one button per dialog (typically the
+  /// primary or danger action) so the keyboard lands there by
+  /// default.
+  final bool autofocus;
 
   const BolanDialogButton({
     super.key,
     required this.label,
     required this.onTap,
     this.kind = BolanButtonKind.secondary,
+    this.autofocus = false,
   });
+
+  @override
+  State<BolanDialogButton> createState() => _BolanDialogButtonState();
+}
+
+class _BolanDialogButtonState extends State<BolanDialogButton> {
+  bool _focused = false;
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
 
-    final bg = switch (kind) {
+    final bg = switch (widget.kind) {
       BolanButtonKind.secondary => theme.statusChipBg,
       BolanButtonKind.primary => theme.cursor,
       BolanButtonKind.danger => theme.exitFailureFg,
     };
-    final fg = kind == BolanButtonKind.secondary
+    final fg = widget.kind == BolanButtonKind.secondary
         ? theme.foreground
         : theme.background;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: fg,
-              fontFamily: theme.fontFamily,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              decoration: TextDecoration.none,
+    return Focus(
+      autofocus: widget.autofocus,
+      onFocusChange: (f) => setState(() => _focused = f),
+      onKeyEvent: (_, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        if (event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.space) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: _focused
+                  ? Color.alphaBlend(Colors.white.withAlpha(40), bg)
+                  : _hovered
+                      ? Color.alphaBlend(Colors.white.withAlpha(20), bg)
+                      : bg,
+              borderRadius: BorderRadius.circular(5),
+              border: _focused
+                  ? Border.all(
+                      color: theme.foreground.withAlpha(120), width: 1.5)
+                  : Border.all(color: Colors.transparent, width: 1.5),
+            ),
+            child: Text(
+              widget.label,
+              style: TextStyle(
+                color: fg,
+                fontFamily: theme.fontFamily,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                decoration: TextDecoration.none,
+              ),
             ),
           ),
         ),

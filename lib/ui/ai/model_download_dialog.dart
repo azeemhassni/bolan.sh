@@ -121,6 +121,7 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
           children: [
             BolanDialogButton(
               label: 'Not Now',
+              autofocus: true,
               onTap: widget.onDismiss,
             ),
             const SizedBox(width: 10),
@@ -185,6 +186,7 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
           children: [
             BolanDialogButton(
               label: 'Cancel',
+              autofocus: true,
               onTap: _cancel,
             ),
             const SizedBox(width: 10),
@@ -213,6 +215,7 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
         const SizedBox(height: 20),
         BolanDialogButton(
           label: 'Done',
+          autofocus: true,
           kind: BolanButtonKind.primary,
           onTap: () {
             ref.read(modelDownloadProvider).clearComplete();
@@ -239,7 +242,7 @@ class ModelDownloadDialogState extends ConsumerState<ModelDownloadDialog> {
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            BolanDialogButton(label: 'Close', onTap: widget.onDismiss),
+            BolanDialogButton(label: 'Close', autofocus: true, onTap: widget.onDismiss),
             const SizedBox(width: 10),
             BolanDialogButton(
               label: 'Retry',
