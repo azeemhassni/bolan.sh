@@ -36,6 +36,11 @@ const _gb = 1024 * 1024 * 1024;
 
 /// Model definitions for each size tier.
 const modelInfoMap = <ModelSize, ModelInfo>{
+  // RAM estimates are based on observed Activity Monitor RSS during
+  // inference. llamafile mmap's the GGUF weights so only the pages
+  // actually touched become resident — actual RSS is well below the
+  // file size.  Previous estimates (e.g. 3.2 GB for Large) were ~2.5x
+  // too high and triggered false memory warnings.
   ModelSize.small: ModelInfo(
     label: 'Small',
     modelName: 'Qwen2.5-Coder-0.5B-Instruct-GGUF',
@@ -43,8 +48,8 @@ const modelInfoMap = <ModelSize, ModelInfo>{
     downloadUrl:
         'https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q8_0.gguf',
     downloadSize: '~530 MB',
-    ramRequired: '~1.2 GB',
-    ramRequiredBytes: _gb + _gb ~/ 5, // 1.2 GB
+    ramRequired: '~600 MB',
+    ramRequiredBytes: _gb * 6 ~/ 10, // 0.6 GB
     description: 'Fastest, lowest resource usage',
   ),
   ModelSize.medium: ModelInfo(
@@ -54,8 +59,8 @@ const modelInfoMap = <ModelSize, ModelInfo>{
     downloadUrl:
         'https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf',
     downloadSize: '~1.0 GB',
-    ramRequired: '~1.8 GB',
-    ramRequiredBytes: _gb + (_gb * 4) ~/ 5, // 1.8 GB
+    ramRequired: '~1.0 GB',
+    ramRequiredBytes: _gb, // 1.0 GB
     description: 'Balanced speed and quality',
   ),
   ModelSize.large: ModelInfo(
@@ -65,8 +70,8 @@ const modelInfoMap = <ModelSize, ModelInfo>{
     downloadUrl:
         'https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf',
     downloadSize: '~1.9 GB',
-    ramRequired: '~3.2 GB',
-    ramRequiredBytes: _gb * 3 + _gb ~/ 5, // 3.2 GB
+    ramRequired: '~1.4 GB',
+    ramRequiredBytes: _gb + (_gb * 4) ~/ 10, // 1.4 GB (observed ~1.2 GB)
     description: 'Best quality, needs more RAM',
   ),
   ModelSize.xl: ModelInfo(
@@ -76,8 +81,8 @@ const modelInfoMap = <ModelSize, ModelInfo>{
     downloadUrl:
         'https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_k_m.gguf',
     downloadSize: '~4.7 GB',
-    ramRequired: '~6 GB',
-    ramRequiredBytes: _gb * 6, // 6 GB
+    ramRequired: '~3.5 GB',
+    ramRequiredBytes: _gb * 3 + _gb ~/ 2, // 3.5 GB
     description: 'Highest quality, best for complex tasks',
   ),
 };
