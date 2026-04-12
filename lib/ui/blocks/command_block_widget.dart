@@ -539,7 +539,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
     return GestureDetector(
       onSecondaryTapDown: widget.onSecondaryTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.only(top: 4, bottom: 12),
         child: textWidget,
       ),
     );
