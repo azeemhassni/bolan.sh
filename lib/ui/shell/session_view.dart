@@ -186,6 +186,7 @@ class SessionViewState extends ConsumerState<SessionView> {
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
     final fontSize = ref.watch(fontSizeProvider);
+    ref.watch(configVersionProvider); // rebuild on config file changes
     final configLoader = ref.watch(configLoaderProvider);
     final lineHeight = configLoader?.config.editor.lineHeight ?? 1.0;
     final fontFamily = configLoader?.config.editor.fontFamily ?? theme.fontFamily;
@@ -237,26 +238,29 @@ class SessionViewState extends ConsumerState<SessionView> {
                   cursorType: cursorType,
                   backgroundOpacity: 0,
                 ),
-                // Paint the character under the block cursor in
-                // inverted colors so it's visible through the
-                // opaque filled rectangle. Only needed for block
-                // cursor — underline and bar don't hide the glyph.
-                if (cursorType == TerminalCursorType.block)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: CustomPaint(
-                        painter: _CursorCharPainter(
-                          terminal: widget.session.terminal,
-                          focusNode: _terminalFocusNode,
-                          fontSize: fontSize,
-                          lineHeight: lineHeight,
-                          fontFamily: fontFamily,
-                          cursorColor: theme.cursor,
-                          bgColor: theme.background,
-                        ),
+                // Cursor overlay:
+                //  - Block: paints the character under the cursor
+                //    in inverted colors (xterm.dart's filled rect
+                //    hides the glyph).
+                //  - Underline / Bar: paints a thicker, more
+                //    visible cursor on top of xterm.dart's 1px line
+                //    which is nearly invisible.
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _CursorCharPainter(
+                        terminal: widget.session.terminal,
+                        focusNode: _terminalFocusNode,
+                        fontSize: fontSize,
+                        lineHeight: lineHeight,
+                        fontFamily: fontFamily,
+                        cursorColor: theme.cursor,
+                        bgColor: theme.background,
+                        cursorType: cursorType,
                       ),
                     ),
                   ),
+                ),
               ],
             )
           else
@@ -299,6 +303,7 @@ class SessionViewState extends ConsumerState<SessionView> {
                   promptChips: configLoader?.config.general.promptChips ??
                       const ['shell', 'cwd', 'gitBranch', 'gitChanges'],
                   promptInputKey: _promptKey,
+                  cursorStyle: cursorStyle,
                 ),
               ),
             ),
@@ -491,6 +496,7 @@ class _CursorCharPainter extends CustomPainter {
   final String fontFamily;
   final Color cursorColor;
   final Color bgColor;
+  final TerminalCursorType cursorType;
 
   /// TerminalView uses 8px padding on all sides.
   static const _padding = 8.0;
@@ -503,6 +509,7 @@ class _CursorCharPainter extends CustomPainter {
     required this.fontFamily,
     required this.cursorColor,
     required this.bgColor,
+    this.cursorType = TerminalCursorType.block,
   });
 
   @override
@@ -514,12 +521,8 @@ class _CursorCharPainter extends CustomPainter {
     final cursorX = terminal.buffer.cursorX;
     final cursorY = terminal.buffer.absoluteCursorY;
 
-    // Get the character under the cursor.
     if (cursorY < 0 || cursorY >= terminal.buffer.lines.length) return;
     final line = terminal.buffer.lines[cursorY];
-    if (cursorX < 0 || cursorX >= line.length) return;
-    final codePoint = line.getCodePoint(cursorX);
-    if (codePoint == 0 || codePoint < 0x20) return;
 
     // buffer.cursorY is already viewport-relative.
     final viewRow = terminal.buffer.cursorY;
@@ -528,24 +531,59 @@ class _CursorCharPainter extends CustomPainter {
     final x = _padding + cursorX * cellSize.width;
     final y = _padding + viewRow * cellSize.height;
 
-    // Draw the character in the background color so it contrasts
-    // against the cursor's fill.
-    final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
-      fontFamily: fontFamily,
-      fontSize: fontSize,
-      height: lineHeight,
-    ));
-    builder.pushStyle(ui.TextStyle(
-      color: bgColor,
-      fontFamily: fontFamily,
-      fontSize: fontSize,
-      height: lineHeight,
-    ));
-    builder.addText(String.fromCharCode(codePoint));
-    final paragraph = builder.build();
-    paragraph.layout(const ui.ParagraphConstraints(width: double.infinity));
-    canvas.drawParagraph(paragraph, Offset(x, y));
-    paragraph.dispose();
+    switch (cursorType) {
+      case TerminalCursorType.block:
+        // Draw the character under the cursor in the background
+        // color so it's visible through the opaque filled rect.
+        if (cursorX >= 0 && cursorX < line.length) {
+          final codePoint = line.getCodePoint(cursorX);
+          if (codePoint > 0x1F) {
+            final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
+              fontFamily: fontFamily,
+              fontSize: fontSize,
+              height: lineHeight,
+            ));
+            builder.pushStyle(ui.TextStyle(
+              color: bgColor,
+              fontFamily: fontFamily,
+              fontSize: fontSize,
+              height: lineHeight,
+            ));
+            builder.addText(String.fromCharCode(codePoint));
+            final paragraph = builder.build();
+            paragraph.layout(
+                const ui.ParagraphConstraints(width: double.infinity));
+            canvas.drawParagraph(paragraph, Offset(x, y));
+            paragraph.dispose();
+          }
+        }
+
+      case TerminalCursorType.underline:
+        // Draw a 2px underline at the bottom of the cell.
+        // xterm.dart draws 1px which is nearly invisible.
+        final paint = Paint()
+          ..color = cursorColor
+          ..strokeWidth = 2
+          ..style = PaintingStyle.stroke;
+        canvas.drawLine(
+          Offset(x, y + cellSize.height - 1),
+          Offset(x + cellSize.width, y + cellSize.height - 1),
+          paint,
+        );
+
+      case TerminalCursorType.verticalBar:
+        // Draw a 2px vertical bar at the left edge of the cell.
+        // xterm.dart draws 1px which is nearly invisible.
+        final paint = Paint()
+          ..color = cursorColor
+          ..strokeWidth = 2
+          ..style = PaintingStyle.stroke;
+        canvas.drawLine(
+          Offset(x, y),
+          Offset(x, y + cellSize.height),
+          paint,
+        );
+    }
   }
 
   Size _measureCell() {

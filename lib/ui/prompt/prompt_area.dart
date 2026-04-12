@@ -32,6 +32,7 @@ class PromptArea extends StatefulWidget {
   final bool shareHistory;
   final List<String> promptChips;
   final GlobalKey<PromptInputState>? promptInputKey;
+  final String cursorStyle;
 
   const PromptArea({
     super.key,
@@ -46,6 +47,7 @@ class PromptArea extends StatefulWidget {
     this.shareHistory = false,
     this.promptChips = const ['shell', 'cwd', 'gitBranch', 'gitChanges'],
     this.promptInputKey,
+    this.cursorStyle = 'bar',
   });
 
   @override
@@ -618,6 +620,7 @@ class _PromptAreaState extends State<PromptArea> {
             commandSuggestions: widget.aiEnabled && widget.commandSuggestions,
             smartHistorySearch: widget.aiEnabled && widget.smartHistorySearch,
             shareHistory: widget.aiEnabled && widget.shareHistory,
+            cursorStyle: widget.cursorStyle,
           ),
         ],
       ),

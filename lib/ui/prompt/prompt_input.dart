@@ -33,6 +33,7 @@ class PromptInput extends StatefulWidget {
   final bool commandSuggestions;
   final bool smartHistorySearch;
   final bool shareHistory;
+  final String cursorStyle;
 
   const PromptInput({
     super.key,
@@ -45,6 +46,7 @@ class PromptInput extends StatefulWidget {
     this.commandSuggestions = true,
     this.smartHistorySearch = true,
     this.shareHistory = false,
+    this.cursorStyle = 'bar',
   });
 
   @override
@@ -175,6 +177,65 @@ class PromptInputState extends State<PromptInput> {
   void _removeCompletionOverlay() {
     _completionOverlay?.remove();
     _completionOverlay = null;
+  }
+
+  Widget _buildPromptTextField(BolonTheme theme) {
+    final isUnderline = widget.cursorStyle == 'underline';
+    final cursorColor = _isAiMode ? theme.ansiMagenta : theme.cursor;
+
+    final textField = TextField(
+      controller: _controller,
+      focusNode: _focusNode,
+      autofocus: true,
+      maxLines: null,
+      minLines: 1,
+      contextMenuBuilder: (_, __) => const SizedBox.shrink(),
+      style: TextStyle(
+        color: theme.foreground,
+        fontFamily: theme.fontFamily,
+        fontSize: widget.fontSize,
+        height: 1.4,
+        decoration: TextDecoration.none,
+      ),
+      strutStyle: _promptStrutStyle(theme),
+      cursorColor: isUnderline ? Colors.transparent : cursorColor,
+      cursorWidth: widget.cursorStyle == 'block'
+          ? widget.fontSize * 0.6
+          : 2,
+      decoration: const InputDecoration(
+        border: InputBorder.none,
+        contentPadding: EdgeInsets.zero,
+        isDense: true,
+      ),
+    );
+
+    if (!isUnderline) return textField;
+
+    // For underline cursor: hide the native cursor (transparent) and
+    // paint a horizontal line at the cursor position via an overlay.
+    return Stack(
+      children: [
+        textField,
+        if (_focusNode.hasFocus)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  return CustomPaint(
+                    painter: _UnderlineCursorPainter(
+                      controller: _controller,
+                      fontSize: widget.fontSize,
+                      fontFamily: theme.fontFamily,
+                      color: cursorColor,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _buildCompletionOverlay() {
@@ -347,30 +408,7 @@ class PromptInputState extends State<PromptInput> {
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      autofocus: true,
-                      maxLines: null,
-                      minLines: 1,
-                      contextMenuBuilder: (_, __) => const SizedBox.shrink(),
-                      style: TextStyle(
-                        color: theme.foreground,
-                        fontFamily: theme.fontFamily,
-                        fontSize: widget.fontSize,
-                        height: 1.4,
-                        decoration: TextDecoration.none,
-                      ),
-                      strutStyle: _promptStrutStyle(theme),
-                      cursorColor:
-                          _isAiMode ? theme.ansiMagenta : theme.cursor,
-                      cursorWidth: 2,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                        isDense: true,
-                      ),
-                    ),
+                    child: _buildPromptTextField(theme),
                   ),
 
                   // AI mode indicator icon
@@ -1057,4 +1095,64 @@ class _GhostTextController extends TextEditingController {
       ],
     );
   }
+}
+
+/// Paints a horizontal underline cursor at the current selection
+/// position inside the prompt TextField. Used when cursor style is
+/// "underline" — Flutter's native TextField cursor only supports
+/// vertical bar, so we hide it and paint our own.
+class _UnderlineCursorPainter extends CustomPainter {
+  final TextEditingController controller;
+  final double fontSize;
+  final String fontFamily;
+  final Color color;
+
+  _UnderlineCursorPainter({
+    required this.controller,
+    required this.fontSize,
+    required this.fontFamily,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final offset = controller.selection.baseOffset;
+    if (offset < 0) return;
+
+    final textBefore = controller.text.substring(0, offset);
+    final tp = TextPainter(
+      text: TextSpan(
+        text: textBefore,
+        style: TextStyle(
+          fontFamily: fontFamily,
+          fontSize: fontSize,
+          height: 1.4,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    // Measure one character width for the underline length.
+    final charTp = TextPainter(
+      text: TextSpan(
+        text: 'M',
+        style: TextStyle(fontFamily: fontFamily, fontSize: fontSize),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final x = tp.width;
+    final y = tp.height - 1;
+    final charWidth = charTp.width;
+
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(Offset(x, y), Offset(x + charWidth, y), paint);
+  }
+
+  @override
+  bool shouldRepaint(_UnderlineCursorPainter old) => true;
 }

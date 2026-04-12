@@ -137,6 +137,9 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AiProviderHelper.configuredLocalModelSize = newSize;
       AiProviderHelper.dispose();
     }
+    // Bump the config version so widgets watching it rebuild with
+    // fresh values (cursor style, line height, etc.).
+    ref.read(configVersionProvider.notifier).state++;
   }
 
   /// Global key handler: forwards printable key presses to the focused pane's
