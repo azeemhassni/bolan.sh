@@ -944,7 +944,7 @@ class _Field extends StatelessWidget {
   }
 }
 
-class _Input extends StatelessWidget {
+class _Input extends StatefulWidget {
   final String value;
   final String hint;
   final BolonTheme theme;
@@ -960,38 +960,67 @@ class _Input extends StatelessWidget {
   });
 
   @override
+  State<_Input> createState() => _InputState();
+}
+
+class _InputState extends State<_Input> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value);
+  }
+
+  @override
+  void didUpdateWidget(_Input old) {
+    super.didUpdateWidget(old);
+    // Only reset text if the value changed externally (not from typing).
+    if (old.value != widget.value && _controller.text != widget.value) {
+      _controller.text = widget.value;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Material(
-      color: theme.statusChipBg,
+      color: widget.theme.statusChipBg,
       borderRadius: BorderRadius.circular(6),
       child: TextField(
-        controller: TextEditingController(text: value),
-        obscureText: obscure,
+        controller: _controller,
+        obscureText: widget.obscure,
         style: TextStyle(
-          color: theme.foreground,
-          fontFamily: theme.fontFamily,
+          color: widget.theme.foreground,
+          fontFamily: widget.theme.fontFamily,
           fontSize: 13,
         ),
         decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: theme.dimForeground, fontSize: 13),
+          hintText: widget.hint,
+          hintStyle: TextStyle(
+              color: widget.theme.dimForeground, fontSize: 13),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(color: theme.blockBorder),
+            borderSide: BorderSide(color: widget.theme.blockBorder),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(color: theme.blockBorder),
+            borderSide: BorderSide(color: widget.theme.blockBorder),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(color: theme.cursor),
+            borderSide: BorderSide(color: widget.theme.cursor),
           ),
           isDense: true,
         ),
-        onChanged: onChanged,
+        onChanged: widget.onChanged,
       ),
     );
   }

@@ -124,13 +124,18 @@ class SessionNotifier extends Notifier<SessionState> {
   PaneNode? _restorePaneFromLayout(PaneLayout layout) {
     switch (layout) {
       case LeafLayout():
+        final configLoader2 = ref.read(configLoaderProvider);
+        final general2 = configLoader2?.config.general;
+        final configShell2 = general2?.shell ?? '';
+        final configDir2 = general2?.workingDirectory ?? '';
         final cwd = layout.cwd.isNotEmpty &&
                 Directory(layout.cwd).existsSync()
             ? layout.cwd
-            : null;
+            : (configDir2.isNotEmpty ? configDir2 : null);
         final session = TerminalSession.start(
           id: _uuid.v4(),
           history: history,
+          shell: configShell2.isNotEmpty ? configShell2 : null,
           workingDirectory: cwd,
         );
         final leaf = LeafPane(id: _uuid.v4(), session: session);
@@ -342,17 +347,22 @@ class SessionNotifier extends Notifier<SessionState> {
   // --- Internal helpers ---
 
   TabState _createTab({String? workingDirectory}) {
+    final configLoader = ref.read(configLoaderProvider);
+    final general = configLoader?.config.general;
+    final configShell = general?.shell ?? '';
+    final configDir = general?.workingDirectory ?? '';
     final session = TerminalSession.start(
       id: _uuid.v4(),
       history: history,
-      workingDirectory: workingDirectory,
+      shell: configShell.isNotEmpty ? configShell : null,
+      workingDirectory: workingDirectory ??
+          (configDir.isNotEmpty ? configDir : null),
     );
     final leaf = LeafPane(id: _uuid.v4(), session: session);
     _attachSessionListener(session);
 
     // Run startup commands from config
-    final configLoader = ref.read(configLoaderProvider);
-    final startupCommands = configLoader?.config.general.startupCommands;
+    final startupCommands = general?.startupCommands;
     if (startupCommands != null && startupCommands.isNotEmpty) {
       session.runStartupCommands(startupCommands);
     }

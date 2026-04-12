@@ -120,22 +120,33 @@ class TerminalSession extends ChangeNotifier {
     required String id,
     required CommandHistory history,
     String? title,
+    String? shell,
     String? workingDirectory,
     int rows = 25,
     int columns = 80,
   }) {
-    final shell = _defaultShell();
+    final resolvedShell = (shell != null && shell.isNotEmpty)
+        ? shell
+        : _defaultShell();
 
     final terminal = Terminal(
       maxLines: 10000,
     );
 
+    // Expand ~ to the user's home directory.
+    var resolvedDir = workingDirectory ?? Platform.environment['HOME'] ?? '/';
+    final home = Platform.environment['HOME'] ?? '';
+    if (resolvedDir.startsWith('~/')) {
+      resolvedDir = '$home${resolvedDir.substring(1)}';
+    } else if (resolvedDir == '~') {
+      resolvedDir = home;
+    }
+
     final pty = Pty.start(
-      shell,
+      resolvedShell,
       columns: columns,
       rows: rows,
-      workingDirectory:
-          workingDirectory ?? Platform.environment['HOME'],
+      workingDirectory: resolvedDir,
       environment: {
         'TERM': 'xterm-256color',
         'TERM_PROGRAM': 'Bolan',
@@ -144,7 +155,7 @@ class TerminalSession extends ChangeNotifier {
 
     final session = TerminalSession._(
       id: id,
-      title: title ?? shell.split('/').last,
+      title: title ?? resolvedShell.split('/').last,
       terminal: terminal,
       pty: pty,
       history: history,
