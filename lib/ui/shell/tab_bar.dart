@@ -19,10 +19,9 @@ bool tabRenameActive = false;
 /// Matches Warp's tab style: compact height, tight spacing, gradient-fade
 /// only on overflow, status icons, hover close button.
 class BolonTabBar extends ConsumerStatefulWidget {
-  final VoidCallback? onSettings;
   final void Function(int index)? onCloseTab;
 
-  const BolonTabBar({super.key, this.onSettings, this.onCloseTab});
+  const BolonTabBar({super.key, this.onCloseTab});
 
   @override
   ConsumerState<BolonTabBar> createState() => _BolonTabBarState();
@@ -71,8 +70,29 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                 ),
                 itemBuilder: (context, index) {
                   final tab = sessionState.tabs[index];
-                  final session = tab.focusedSession;
                   final isActive = index == sessionState.activeTabIndex;
+
+                  if (tab.isSettings) {
+                    return _Tab(
+                      title: 'Settings',
+                      fullTitle: 'Settings',
+                      status: TabStatus.idle,
+                      isActive: isActive,
+                      isRenamed: false,
+                      icon: Icons.settings_outlined,
+                      canRename: false,
+                      theme: theme,
+                      onTap: () => ref
+                          .read(sessionProvider.notifier)
+                          .switchTab(index),
+                      onClose: () => ref
+                          .read(sessionProvider.notifier)
+                          .closeTab(index),
+                      onRename: (_) {},
+                    );
+                  }
+
+                  final session = tab.focusedSession;
                   final title = tab.customTitle ??
                       session?.tabTitle ??
                       'zsh';
@@ -120,14 +140,14 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                     onTap: () =>
                         ref.read(sessionProvider.notifier).createTab(),
                   ),
-                  if (widget.onSettings != null) ...[
-                    const SizedBox(width: 2),
-                    _IconButton(
-                      icon: Icons.settings_outlined,
-                      theme: theme,
-                      onTap: widget.onSettings!,
-                    ),
-                  ],
+                  const SizedBox(width: 2),
+                  _IconButton(
+                    icon: Icons.settings_outlined,
+                    theme: theme,
+                    onTap: () => ref
+                        .read(sessionProvider.notifier)
+                        .openSettingsTab(),
+                  ),
                 ],
               ),
             ),
@@ -144,6 +164,8 @@ class _Tab extends StatefulWidget {
   final TabStatus status;
   final bool isActive;
   final bool isRenamed;
+  final IconData? icon;
+  final bool canRename;
   final BolonTheme theme;
   final VoidCallback onTap;
   final VoidCallback onClose;
@@ -155,6 +177,8 @@ class _Tab extends StatefulWidget {
     required this.status,
     required this.isActive,
     this.isRenamed = false,
+    this.icon,
+    this.canRename = true,
     required this.theme,
     required this.onTap,
     required this.onClose,
@@ -253,18 +277,19 @@ class _TabState extends State<_Tab> {
         side: BorderSide(color: theme.blockBorder, width: 1),
       ),
       items: [
-        PopupMenuItem(
-          value: 'rename',
-          height: 32,
-          child: Text(
-            'Rename',
-            style: TextStyle(
-              color: theme.foreground,
-              fontFamily: theme.fontFamily,
-              fontSize: 12,
+        if (widget.canRename)
+          PopupMenuItem(
+            value: 'rename',
+            height: 32,
+            child: Text(
+              'Rename',
+              style: TextStyle(
+                color: theme.foreground,
+                fontFamily: theme.fontFamily,
+                fontSize: 12,
+              ),
             ),
           ),
-        ),
         if (widget.isRenamed)
           PopupMenuItem(
             value: 'reset',
@@ -364,11 +389,15 @@ class _TabState extends State<_Tab> {
                       : Row(
                           mainAxisSize: MainAxisSize.max,
                           children: [
-                            _StatusIcon(
-                              status: widget.status,
-                              showSuccess: _showSuccess,
-                              theme: t,
-                            ),
+                            if (widget.icon != null)
+                              Icon(widget.icon,
+                                  size: 12, color: fg)
+                            else
+                              _StatusIcon(
+                                status: widget.status,
+                                showSuccess: _showSuccess,
+                                theme: t,
+                              ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Center(

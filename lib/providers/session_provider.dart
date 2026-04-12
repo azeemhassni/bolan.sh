@@ -16,20 +16,33 @@ export '../core/pane/pane_node.dart' show DropPosition;
 
 const _uuid = Uuid();
 
+/// Distinguishes terminal tabs (with panes/sessions) from special
+/// tabs like Settings that render a standalone widget.
+enum TabType { terminal, settings }
+
 /// State for a single tab — a tree of panes with a focused pane.
+/// For non-terminal tabs (e.g. settings), [rootPane] and
+/// [focusedPaneId] are null.
 class TabState {
-  final PaneNode rootPane;
-  final String focusedPaneId;
+  final TabType type;
+  final PaneNode? rootPane;
+  final String? focusedPaneId;
   final String? customTitle;
 
   const TabState({
-    required this.rootPane,
-    required this.focusedPaneId,
+    this.type = TabType.terminal,
+    this.rootPane,
+    this.focusedPaneId,
     this.customTitle,
   });
 
-  LeafPane? get focusedLeaf =>
-      PaneManager.findLeaf(rootPane, focusedPaneId);
+  bool get isTerminal => type == TabType.terminal;
+  bool get isSettings => type == TabType.settings;
+
+  LeafPane? get focusedLeaf {
+    if (rootPane == null || focusedPaneId == null) return null;
+    return PaneManager.findLeaf(rootPane!, focusedPaneId!);
+  }
 
   TerminalSession? get focusedSession => focusedLeaf?.session;
 
@@ -40,6 +53,7 @@ class TabState {
     bool clearCustomTitle = false,
   }) {
     return TabState(
+      type: type,
       rootPane: rootPane ?? this.rootPane,
       focusedPaneId: focusedPaneId ?? this.focusedPaneId,
       customTitle: clearCustomTitle ? null : (customTitle ?? this.customTitle),
@@ -62,10 +76,13 @@ class SessionState {
   /// The focused session in the active tab (for tab bar title, etc.)
   TerminalSession? get activeSession => activeTab?.focusedSession;
 
+  bool get activeTabIsSettings => activeTab?.isSettings ?? false;
+
   /// All sessions across all tabs (for backward compat).
   List<TerminalSession> get allSessions {
     return tabs
-        .expand((tab) => PaneManager.allLeaves(tab.rootPane))
+        .where((tab) => tab.rootPane != null)
+        .expand((tab) => PaneManager.allLeaves(tab.rootPane!))
         .map((leaf) => leaf.session)
         .toList();
   }
@@ -82,7 +99,7 @@ class SessionNotifier extends Notifier<SessionState> {
     ref.onDispose(() {
       _saveLayout();
       for (final t in state.tabs) {
-        PaneManager.disposeAll(t.rootPane);
+        if (t.rootPane != null) PaneManager.disposeAll(t.rootPane!);
       }
     });
 
@@ -169,9 +186,12 @@ class SessionNotifier extends Notifier<SessionState> {
     if (configLoader == null) return;
     if (!configLoader.config.general.restoreSessions) return;
 
-    final tabs = state.tabs.map((tab) {
+    // Only persist terminal tabs — settings tabs are transient.
+    final tabs = state.tabs
+        .where((tab) => tab.isTerminal && tab.rootPane != null)
+        .map((tab) {
       return TabLayout(
-        rootPane: _serializePane(tab.rootPane),
+        rootPane: _serializePane(tab.rootPane!),
         focusedPaneId: tab.focusedPaneId,
       );
     }).toList();
@@ -198,6 +218,22 @@ class SessionNotifier extends Notifier<SessionState> {
 
   // --- Tab operations ---
 
+  /// Opens the settings tab. If one already exists, switches to it
+  /// (singleton). Otherwise creates a new settings tab.
+  void openSettingsTab() {
+    final existing = state.tabs.indexWhere((t) => t.isSettings);
+    if (existing >= 0) {
+      switchTab(existing);
+      return;
+    }
+    final tab = const TabState(
+      type: TabType.settings,
+      customTitle: 'Settings',
+    );
+    final tabs = [...state.tabs, tab];
+    state = SessionState(tabs: tabs, activeTabIndex: tabs.length - 1);
+  }
+
   void createTab({String? workingDirectory}) {
     final tab = _createTab(workingDirectory: workingDirectory);
     _attachTabListeners(tab);
@@ -223,7 +259,10 @@ class SessionNotifier extends Notifier<SessionState> {
 
   void closeTab(int index) {
     if (index < 0 || index >= state.tabs.length) return;
-    PaneManager.disposeAll(state.tabs[index].rootPane);
+    final closing = state.tabs[index];
+    if (closing.rootPane != null) {
+      PaneManager.disposeAll(closing.rootPane!);
+    }
     final tabs = [...state.tabs]..removeAt(index);
 
     if (tabs.isEmpty) {
@@ -267,11 +306,11 @@ class SessionNotifier extends Notifier<SessionState> {
 
   void splitPane(Axis axis) {
     final tab = state.activeTab;
-    if (tab == null) return;
+    if (tab == null || !tab.isTerminal) return;
 
-    final currentFocusId = tab.focusedPaneId;
+    final currentFocusId = tab.focusedPaneId!;
     final (newRoot, newLeaf) =
-        PaneManager.split(tab.rootPane, currentFocusId, axis, history);
+        PaneManager.split(tab.rootPane!, currentFocusId, axis, history);
     _attachSessionListener(newLeaf.session);
 
     // Focus the newly created pane
@@ -283,9 +322,9 @@ class SessionNotifier extends Notifier<SessionState> {
 
   void closePane() {
     final tab = state.activeTab;
-    if (tab == null) return;
+    if (tab == null || !tab.isTerminal) return;
 
-    final newRoot = PaneManager.close(tab.rootPane, tab.focusedPaneId);
+    final newRoot = PaneManager.close(tab.rootPane!, tab.focusedPaneId!);
     if (newRoot == null) {
       // Last pane — close the tab
       closeTab(state.activeTabIndex);
@@ -299,7 +338,7 @@ class SessionNotifier extends Notifier<SessionState> {
 
   void setFocusedPane(String paneId) {
     final tab = state.activeTab;
-    if (tab == null || tab.focusedPaneId == paneId) return;
+    if (tab == null || !tab.isTerminal || tab.focusedPaneId == paneId) return;
     _updateActiveTab(TabState(
       rootPane: tab.rootPane,
       focusedPaneId: paneId,
@@ -308,11 +347,11 @@ class SessionNotifier extends Notifier<SessionState> {
 
   void navigatePane(AxisDirection direction) {
     final tab = state.activeTab;
-    if (tab == null) return;
+    if (tab == null || !tab.isTerminal) return;
 
     final targetId = PaneManager.findAdjacentPane(
-      tab.rootPane,
-      tab.focusedPaneId,
+      tab.rootPane!,
+      tab.focusedPaneId!,
       direction,
     );
     if (targetId != null) setFocusedPane(targetId);
@@ -320,10 +359,10 @@ class SessionNotifier extends Notifier<SessionState> {
 
   void movePane(String sourceId, String targetId, DropPosition position) {
     final tab = state.activeTab;
-    if (tab == null || sourceId == targetId) return;
+    if (tab == null || !tab.isTerminal || sourceId == targetId) return;
 
     final newRoot = PaneManager.movePane(
-      tab.rootPane, sourceId, targetId, position,
+      tab.rootPane!, sourceId, targetId, position,
     );
     if (newRoot == null) return;
 
@@ -335,8 +374,8 @@ class SessionNotifier extends Notifier<SessionState> {
 
   void updateSplitRatio(String splitPaneId, double ratio) {
     final tab = state.activeTab;
-    if (tab == null) return;
-    _updateRatio(tab.rootPane, splitPaneId, ratio);
+    if (tab == null || tab.rootPane == null) return;
+    _updateRatio(tab.rootPane!, splitPaneId, ratio);
     // Trigger rebuild
     state = SessionState(
       tabs: state.tabs,
@@ -371,7 +410,8 @@ class SessionNotifier extends Notifier<SessionState> {
   }
 
   void _attachTabListeners(TabState tab) {
-    for (final leaf in PaneManager.allLeaves(tab.rootPane)) {
+    if (tab.rootPane == null) return;
+    for (final leaf in PaneManager.allLeaves(tab.rootPane!)) {
       _attachSessionListener(leaf.session);
     }
   }

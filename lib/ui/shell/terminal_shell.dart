@@ -242,9 +242,9 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
 
     final s = ref.read(sessionProvider);
     final tab = s.activeTab;
-    if (tab == null) return false;
+    if (tab == null || !tab.isTerminal) return false;
 
-    final promptState = PaneFocusRegistry.get(tab.focusedPaneId);
+    final promptState = PaneFocusRegistry.get(tab.focusedPaneId!);
     if (promptState == null) return false;
 
     // Cmd+L — focus prompt and select all
@@ -301,23 +301,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   }
 
   void _openSettings() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => Consumer(
-          builder: (ctx, ref, _) {
-            // Watch (not read) so the wrapper rebuilds whenever the
-            // active theme changes — including from inside Settings
-            // itself. Without this, Settings is frozen to whatever
-            // theme was active when the route was pushed.
-            final theme = ref.watch(activeThemeProvider);
-            return BolonThemeProvider(
-              theme: theme,
-              child: SettingsScreen(configLoader: _configLoader),
-            );
-          },
-        ),
-      ),
-    );
+    ref.read(sessionProvider.notifier).openSettingsTab();
   }
 
   /// Checks if any session across all tabs has a running command.
@@ -336,7 +320,13 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       return;
     }
 
-    final leaves = PaneManager.allLeaves(tab.rootPane);
+    // Settings tab — just close it, no confirmation needed.
+    if (tab.isSettings) {
+      ref.read(sessionProvider.notifier).closeTab(s.activeTabIndex);
+      return;
+    }
+
+    final leaves = PaneManager.allLeaves(tab.rootPane!);
     final hasMultiplePanes = leaves.length > 1;
     final hasRunning = leaves.any((l) => l.session.isCommandRunning);
 
@@ -529,8 +519,8 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         callback: () {
           final s = ref.read(sessionProvider);
           final tab = s.activeTab;
-          if (tab == null) return;
-          PaneFocusRegistry.get(tab.focusedPaneId)?.requestFocus();
+          if (tab == null || tab.focusedPaneId == null) return;
+          PaneFocusRegistry.get(tab.focusedPaneId!)?.requestFocus();
         },
       ),
       AppAction(
@@ -592,11 +582,14 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       _lastFocusedPaneId = tab.focusedPaneId;
       _lastActiveTabIndex = sessionState.activeTabIndex;
 
+      // Settings tab has no pane to focus.
+      if (!tab.isTerminal || tab.focusedPaneId == null) return;
+
       // Don't steal focus from running commands
       final session = tab.focusedSession;
       if (session != null && session.isCommandRunning) return;
 
-      _requestFocusOnPane(tab.focusedPaneId);
+      _requestFocusOnPane(tab.focusedPaneId!);
     }
   }
 
@@ -647,7 +640,6 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
               child: Column(
                 children: [
                   BolonTabBar(
-                    onSettings: _openSettings,
                     onCloseTab: (_) => _closeTabWithConfirm(),
                   ),
                   Expanded(
@@ -662,13 +654,18 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                               for (var i = 0;
                                   i < sessionState.tabs.length;
                                   i++)
-                                PaneTreeWidget(
-                                  node: sessionState.tabs[i].rootPane,
-                                  focusedPaneId:
-                                      sessionState.tabs[i].focusedPaneId,
-                                  isSinglePane: sessionState.tabs[i].rootPane
-                                      is LeafPane,
-                                ),
+                                if (sessionState.tabs[i].isSettings)
+                                  SettingsScreen(
+                                      configLoader: _configLoader)
+                                else
+                                  PaneTreeWidget(
+                                    node: sessionState.tabs[i].rootPane!,
+                                    focusedPaneId:
+                                        sessionState.tabs[i].focusedPaneId!,
+                                    isSinglePane:
+                                        sessionState.tabs[i].rootPane
+                                            is LeafPane,
+                                  ),
                             ],
                           ),
                   ),

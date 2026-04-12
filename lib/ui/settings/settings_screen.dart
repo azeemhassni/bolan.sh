@@ -1,6 +1,5 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/ai/ai_provider_helper.dart';
@@ -50,12 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
 
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape):
-            () => Navigator.of(context).pop(),
-      },
-      child: Focus(
+    return Focus(
         autofocus: true,
         child: Scaffold(
           backgroundColor: theme.background,
@@ -113,17 +107,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Expanded(
                 child: Column(
                   children: [
-                    // Top bar with close button
-                    Container(
-                      height: 48,
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 12),
-                      child: IconButton(
-                        icon: Icon(Icons.close,
-                            color: theme.foreground, size: 18),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ),
+                    const SizedBox(height: 48),
                     // Settings content
                     Expanded(
                       child: Center(
@@ -144,7 +128,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 
