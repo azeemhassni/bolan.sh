@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -204,28 +206,50 @@ class SessionViewState extends ConsumerState<SessionView> {
           // via onSecondaryTap so the context menu is consistent across
           // both modes.
           if (isRunning)
-            TerminalView(
-              widget.session.terminal,
-              controller: _terminalController,
-              theme: bolonToXtermTheme(theme),
-              textStyle: TerminalStyle(
-                fontSize: fontSize,
-                height: 1.2,
-                fontFamily: fontFamily,
-                fontFamilyFallback: const [
-                  'JetBrains Mono',
-                  'Menlo',
-                  'Monaco',
-                  'Consolas',
-                  'Liberation Mono',
-                  'Courier New',
-                ],
-              ),
-              padding: const EdgeInsets.all(8),
-              focusNode: _terminalFocusNode,
-              autofocus: true,
-              cursorType: TerminalCursorType.block,
-              backgroundOpacity: 0,
+            Stack(
+              children: [
+                TerminalView(
+                  widget.session.terminal,
+                  controller: _terminalController,
+                  theme: bolonToXtermTheme(theme),
+                  textStyle: TerminalStyle(
+                    fontSize: fontSize,
+                    height: 1.2,
+                    fontFamily: fontFamily,
+                    fontFamilyFallback: const [
+                      'JetBrains Mono',
+                      'Menlo',
+                      'Monaco',
+                      'Consolas',
+                      'Liberation Mono',
+                      'Courier New',
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  focusNode: _terminalFocusNode,
+                  autofocus: true,
+                  cursorType: TerminalCursorType.block,
+                  backgroundOpacity: 0,
+                ),
+                // Paint the character under the cursor in inverted
+                // colors so it's visible through the block cursor.
+                // xterm.dart draws the cursor as an opaque filled
+                // rectangle that hides the glyph underneath.
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _CursorCharPainter(
+                        terminal: widget.session.terminal,
+                        focusNode: _terminalFocusNode,
+                        fontSize: fontSize,
+                        fontFamily: fontFamily,
+                        cursorColor: theme.cursor,
+                        bgColor: theme.background,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             )
           else
             GestureDetector(
@@ -443,6 +467,104 @@ class _FindMatch {
 /// Uses a Stack: the prompt is rendered both inline (inside the
 /// scrollable column) and pinned (at the bottom of the Stack).
 /// Only one is visible at a time based on whether content overflows.
+/// Paints the character that sits under the terminal's block cursor
+/// in the background color, so the glyph is visible through the
+/// opaque cursor rectangle. xterm.dart 4.0.0 draws the cursor as a
+/// plain filled rect and doesn't repaint the glyph on top, which
+/// makes the character invisible. This overlay fixes that.
+///
+/// Only draws when the cursor is visible, the terminal has focus,
+/// and the cell under the cursor contains a non-empty character.
+class _CursorCharPainter extends CustomPainter {
+  final Terminal terminal;
+  final FocusNode focusNode;
+  final double fontSize;
+  final String fontFamily;
+  final Color cursorColor;
+  final Color bgColor;
+
+  /// TerminalView uses 8px padding on all sides.
+  static const _padding = 8.0;
+
+  _CursorCharPainter({
+    required this.terminal,
+    required this.focusNode,
+    required this.fontSize,
+    required this.fontFamily,
+    required this.cursorColor,
+    required this.bgColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!focusNode.hasFocus) return;
+    if (!terminal.cursorVisibleMode) return;
+
+    final cellSize = _measureCell();
+    final cursorX = terminal.buffer.cursorX;
+    final cursorY = terminal.buffer.absoluteCursorY;
+
+    // Get the character under the cursor.
+    if (cursorY < 0 || cursorY >= terminal.buffer.lines.length) return;
+    final line = terminal.buffer.lines[cursorY];
+    if (cursorX < 0 || cursorX >= line.length) return;
+    final codePoint = line.getCodePoint(cursorX);
+    if (codePoint == 0 || codePoint < 0x20) return;
+
+    // buffer.cursorY is already viewport-relative.
+    final viewRow = terminal.buffer.cursorY;
+    if (viewRow < 0 || viewRow >= terminal.viewHeight) return;
+
+    final x = _padding + cursorX * cellSize.width;
+    final y = _padding + viewRow * cellSize.height;
+
+    // Draw the character in the background color so it contrasts
+    // against the cursor's fill.
+    final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
+      fontFamily: fontFamily,
+      fontSize: fontSize,
+      height: 1.2,
+    ));
+    builder.pushStyle(ui.TextStyle(
+      color: bgColor,
+      fontFamily: fontFamily,
+      fontSize: fontSize,
+      height: 1.2,
+    ));
+    builder.addText(String.fromCharCode(codePoint));
+    final paragraph = builder.build();
+    paragraph.layout(const ui.ParagraphConstraints(width: double.infinity));
+    canvas.drawParagraph(paragraph, Offset(x, y));
+    paragraph.dispose();
+  }
+
+  Size _measureCell() {
+    const test = 'mmmmmmmmmm';
+    final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
+      fontFamily: fontFamily,
+      fontSize: fontSize,
+      height: 1.2,
+    ));
+    builder.pushStyle(ui.TextStyle(
+      fontFamily: fontFamily,
+      fontSize: fontSize,
+      height: 1.2,
+    ));
+    builder.addText(test);
+    final paragraph = builder.build();
+    paragraph.layout(const ui.ParagraphConstraints(width: double.infinity));
+    final result = Size(
+      paragraph.maxIntrinsicWidth / test.length,
+      paragraph.height,
+    );
+    paragraph.dispose();
+    return result;
+  }
+
+  @override
+  bool shouldRepaint(_CursorCharPainter old) => true;
+}
+
 class _BlocksWithStickyPrompt extends StatefulWidget {
   final ScrollController scrollController;
   final List<Widget> blocks;

@@ -89,6 +89,15 @@ class TerminalSession extends ChangeNotifier {
   // (file-based, no shell hook needed).
   String _terraformWorkspace = '';
 
+  // xterm.dart insert-mode workaround. xterm.dart 4.0.0 stores
+  // insertMode when it sees CSI 4h/4l but its writeChar ignores it
+  // — characters always overwrite instead of shifting right. We
+  // track the mode ourselves and inject CSI @ (ICH) before each
+  // printable character while insert mode is active, which correctly
+  // shifts existing characters right. nano relies on this for every
+  // keystroke.
+  bool _termInsertMode = false;
+
   // Buffer for capturing command output between C and D markers
   final StringBuffer _outputCapture = StringBuffer();
 
@@ -388,7 +397,8 @@ class TerminalSession extends ChangeNotifier {
       // Strip private CSI sequences that xterm.dart can't handle and
       // misinterprets. \e[>4m (XTMODKEYS) gets parsed as \e[4m (underline).
       // \e[<u (kitty keyboard restore) also causes issues.
-      final cleaned = _stripUnsupportedCsi(decoded);
+      var cleaned = _stripUnsupportedCsi(decoded);
+      cleaned = _patchInsertMode(cleaned);
 
       // xterm.dart 4.0.0 has a buffer-line resize race: when the
       // terminal column count changes (window/pane resize or zoom),
@@ -611,6 +621,58 @@ class TerminalSession extends ChangeNotifier {
 
   static String _stripUnsupportedCsi(String input) {
     return input.replaceAll(_unsupportedEscapeRe, '');
+  }
+
+  /// Workaround for xterm.dart's broken insert mode. When `\e[4h`
+  /// (Set Insert Mode) is seen, we track the state. While insert mode
+  /// is active, we inject `\e[@` (Insert Character, shifts existing
+  /// chars right by 1) before each printable character. This makes
+  /// nano work correctly — without it, characters overwrite instead
+  /// of inserting because xterm.dart's `writeChar` ignores insertMode.
+  ///
+  /// State is maintained across chunks so split sequences work.
+  String _patchInsertMode(String input) {
+    final buf = StringBuffer();
+    var i = 0;
+    while (i < input.length) {
+      // Check for ESC
+      if (input.codeUnitAt(i) == 0x1B && i + 1 < input.length) {
+        // Look for CSI: ESC [
+        if (input.codeUnitAt(i + 1) == 0x5B) {
+          // Find the end of the CSI sequence
+          var j = i + 2;
+          while (j < input.length) {
+            final c = input.codeUnitAt(j);
+            if (c >= 0x40 && c <= 0x7E) break; // final byte
+            j++;
+          }
+          if (j < input.length) {
+            final seq = input.substring(i, j + 1);
+            if (seq == '\x1b[4h') {
+              _termInsertMode = true;
+            } else if (seq == '\x1b[4l') {
+              _termInsertMode = false;
+            }
+            buf.write(seq);
+            i = j + 1;
+            continue;
+          }
+        }
+        // Non-CSI escape — pass through
+        buf.write(input[i]);
+        i++;
+        continue;
+      }
+
+      final c = input.codeUnitAt(i);
+      // Printable character while insert mode is on → inject ICH
+      if (_termInsertMode && c >= 0x20 && c != 0x7F) {
+        buf.write('\x1b[@');
+      }
+      buf.write(input[i]);
+      i++;
+    }
+    return buf.toString();
   }
 
   /// Matches in-place redraw CSI sequences. Catches:
