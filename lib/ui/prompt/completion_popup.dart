@@ -68,6 +68,9 @@ class _CompletionPopupState extends State<CompletionPopup> {
       CompletionType.gitBranch => Icons.call_split,
       CompletionType.gitRemote => Icons.cloud_outlined,
       CompletionType.gitTag => Icons.label_outline,
+      CompletionType.npmSubcommand => Icons.code,
+      CompletionType.npmScript => Icons.play_arrow,
+      CompletionType.npmPackage => Icons.inventory_2_outlined,
     };
   }
 
@@ -166,17 +169,20 @@ class _CompletionPopupState extends State<CompletionPopup> {
                           ),
                         ),
                       ),
-                      // Inline description tag for builtins
+                      // Inline description tag
                       if (item.description != null)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: Text(
-                            item.description!,
-                            style: TextStyle(
-                              color: theme.dimForeground,
-                              fontFamily: theme.fontFamily,
-                              fontSize: widget.fontSize - 2,
-                              decoration: TextDecoration.none,
+                        Flexible(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: Text(
+                              item.description!,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: theme.dimForeground,
+                                fontFamily: theme.fontFamily,
+                                fontSize: widget.fontSize - 2,
+                                decoration: TextDecoration.none,
+                              ),
                             ),
                           ),
                         ),

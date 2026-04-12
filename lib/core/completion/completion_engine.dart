@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 /// Type of a completion item.
@@ -10,6 +11,9 @@ enum CompletionType {
   gitBranch,
   gitRemote,
   gitTag,
+  npmSubcommand,
+  npmScript,
+  npmPackage,
 }
 
 /// A single completion candidate with metadata.
@@ -83,6 +87,10 @@ class CompletionEngine {
         if (items.isEmpty && _gitCmdTakesFiles(words)) {
           items = await _completePath(currentWord, cwd);
         }
+      } else if (words.isNotEmpty &&
+          (words.first == 'npm' || words.first == 'npx' ||
+           words.first == 'pnpm' || words.first == 'yarn')) {
+        items = await _completeNpm(words, currentWord, cwd);
       } else {
         items = await _completePath(currentWord, cwd);
       }
@@ -475,6 +483,214 @@ class CompletionEngine {
       return [];
     }
   }
+
+  // ── npm / pnpm / yarn / npx completion ──────────────────────────
+
+  static const _npmSubcommands = <String, String>{
+    'access': 'Set access level on published packages',
+    'adduser': 'Add a registry user account',
+    'audit': 'Run a security audit',
+    'bugs': 'Report bugs for a package',
+    'cache': 'Manipulates the packages cache',
+    'ci': 'Clean install from lock file',
+    'config': 'Manage npm configuration',
+    'dedupe': 'Reduce duplication in the package tree',
+    'deprecate': 'Deprecate a package version',
+    'diff': 'Show diff of package files',
+    'dist-tag': 'Modify package distribution tags',
+    'docs': 'Open documentation for a package',
+    'doctor': 'Check environment',
+    'edit': 'Edit an installed package',
+    'exec': 'Run a command from a package',
+    'explain': 'Explain installed packages',
+    'explore': 'Browse an installed package',
+    'find-dupes': 'Find duplicates in the package tree',
+    'fund': 'Show funding information',
+    'help': 'Get help on npm',
+    'init': 'Create a package.json file',
+    'install': 'Install a package',
+    'install-ci-test': 'Install and run tests',
+    'install-test': 'Install and run tests',
+    'link': 'Symlink a package folder',
+    'login': 'Log in to the registry',
+    'logout': 'Log out of the registry',
+    'ls': 'List installed packages',
+    'outdated': 'Check for outdated packages',
+    'owner': 'Manage package owners',
+    'pack': 'Create a tarball from a package',
+    'pkg': 'Manage package.json',
+    'prefix': 'Display prefix',
+    'profile': 'Manage registry profile',
+    'prune': 'Remove extraneous packages',
+    'publish': 'Publish a package',
+    'rebuild': 'Rebuild a package',
+    'repo': 'Open package repository in browser',
+    'restart': 'Restart a package',
+    'root': 'Display npm root',
+    'run': 'Run arbitrary package scripts',
+    'run-script': 'Run arbitrary package scripts',
+    'search': 'Search for packages',
+    'set': 'Set a config key',
+    'shrinkwrap': 'Lock down dependency versions',
+    'star': 'Mark favourite packages',
+    'stars': 'View starred packages',
+    'start': 'Start a package',
+    'stop': 'Stop a package',
+    'test': 'Test a package',
+    'token': 'Manage authentication tokens',
+    'uninstall': 'Remove a package',
+    'unpublish': 'Remove a package from the registry',
+    'unstar': 'Remove star from a package',
+    'update': 'Update packages',
+    'version': 'Bump a package version',
+    'view': 'View registry info',
+    'whoami': 'Display npm username',
+  };
+
+  Future<List<CompletionItem>> _completeNpm(
+    List<String> words,
+    String partial,
+    String cwd,
+  ) async {
+    final pm = words.first; // npm, pnpm, yarn, npx
+
+    // `npx <TAB>` → installed binaries from node_modules/.bin
+    if (pm == 'npx' && words.length == 2) {
+      return _npmBinaries(partial, cwd);
+    }
+
+    // `npm <TAB>` → subcommands
+    if (words.length == 2) {
+      return _npmSubcommands.entries
+          .where((e) => e.key.startsWith(partial))
+          .map((e) => CompletionItem(
+                text: e.key,
+                type: CompletionType.npmSubcommand,
+                description: e.value,
+              ))
+          .toList();
+    }
+
+    final subCmd = words[1];
+
+    // `npm run <TAB>` / `npm run-script <TAB>` → scripts
+    if ((subCmd == 'run' || subCmd == 'run-script') && words.length == 3) {
+      return _npmScripts(partial, cwd);
+    }
+
+    // `pnpm <script>` / `yarn <script>` — these can run scripts
+    // directly as subcommands, so also check package.json scripts
+    // when the subcommand isn't a known npm command.
+    if ((pm == 'pnpm' || pm == 'yarn') &&
+        words.length == 2 &&
+        !_npmSubcommands.containsKey(partial)) {
+      final scripts = await _npmScripts(partial, cwd);
+      if (scripts.isNotEmpty) return scripts;
+    }
+
+    // `npm uninstall <TAB>` / `npm remove <TAB>` → installed packages
+    if ((subCmd == 'uninstall' || subCmd == 'remove' || subCmd == 'rm' ||
+            subCmd == 'un') &&
+        words.length == 3) {
+      return _npmInstalledPackages(partial, cwd);
+    }
+
+    return [];
+  }
+
+  /// Reads scripts from the nearest package.json.
+  Future<List<CompletionItem>> _npmScripts(String partial, String cwd) async {
+    try {
+      final file = File('$cwd/package.json');
+      if (!await file.exists()) return [];
+      final content = await file.readAsString();
+      // Lightweight JSON parse — just extract the "scripts" keys.
+      // Full dart:convert is fine here; package.json is always small.
+      final map = _parseJsonMap(content);
+      final scripts = map['scripts'];
+      if (scripts is! Map) return [];
+      return scripts.keys
+          .where((k) => k is String && k.startsWith(partial))
+          .map((k) => CompletionItem(
+                text: k as String,
+                type: CompletionType.npmScript,
+                description: _truncate(scripts[k]?.toString() ?? '', 60),
+              ))
+          .toList();
+    } on Exception {
+      return [];
+    }
+  }
+
+  /// Lists top-level packages in node_modules (for uninstall completion).
+  Future<List<CompletionItem>> _npmInstalledPackages(
+    String partial,
+    String cwd,
+  ) async {
+    try {
+      final dir = Directory('$cwd/node_modules');
+      if (!await dir.exists()) return [];
+      final items = <CompletionItem>[];
+      await for (final entity in dir.list()) {
+        final name = entity.path.split('/').last;
+        if (name.startsWith('.')) continue;
+        // Scoped packages: @scope/pkg lives as node_modules/@scope/pkg
+        if (name.startsWith('@') && entity is Directory) {
+          await for (final scoped in entity.list()) {
+            final scopedName = '$name/${scoped.path.split('/').last}';
+            if (scopedName.startsWith(partial)) {
+              items.add(CompletionItem(
+                text: scopedName,
+                type: CompletionType.npmPackage,
+              ));
+            }
+          }
+        } else if (name.startsWith(partial)) {
+          items.add(CompletionItem(
+            text: name,
+            type: CompletionType.npmPackage,
+          ));
+        }
+      }
+      items.sort((a, b) => a.text.compareTo(b.text));
+      return items;
+    } on Exception {
+      return [];
+    }
+  }
+
+  /// Lists executables in node_modules/.bin (for npx completion).
+  Future<List<CompletionItem>> _npmBinaries(String partial, String cwd) async {
+    try {
+      final dir = Directory('$cwd/node_modules/.bin');
+      if (!await dir.exists()) return [];
+      final items = <CompletionItem>[];
+      await for (final entity in dir.list()) {
+        final name = entity.path.split('/').last;
+        if (name.startsWith(partial)) {
+          items.add(CompletionItem(
+            text: name,
+            type: CompletionType.npmSubcommand,
+            description: 'Local binary',
+          ));
+        }
+      }
+      items.sort((a, b) => a.text.compareTo(b.text));
+      return items;
+    } on Exception {
+      return [];
+    }
+  }
+
+  /// Minimal JSON object parser — avoids importing dart:convert in this
+  /// file just for one call. Only handles the top level of a JSON object.
+  static Map<String, dynamic> _parseJsonMap(String json) {
+    // dart:convert is fine, just use it inline.
+    return (const JsonDecoder().convert(json) as Map).cast<String, dynamic>();
+  }
+
+  static String _truncate(String s, int max) =>
+      s.length <= max ? s : '${s.substring(0, max)}...';
 
   CompletionResult _empty(int cursorPos) {
     return CompletionResult(

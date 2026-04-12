@@ -414,6 +414,23 @@ class PromptInputState extends State<PromptInput> {
     if (_completions.length > 1) {
       switch (event.logicalKey) {
         case LogicalKeyboardKey.tab:
+          if (shift) {
+            // Shift+Tab — previous item
+            setState(() {
+              _completionIndex =
+                  (_completionIndex - 1 + _completions.length) %
+                      _completions.length;
+            });
+          } else {
+            // Tab — next item
+            setState(() {
+              _completionIndex =
+                  (_completionIndex + 1) % _completions.length;
+            });
+          }
+          _updateCompletionOverlay();
+          return KeyEventResult.handled;
+
         case LogicalKeyboardKey.arrowDown:
           setState(() {
             _completionIndex =
