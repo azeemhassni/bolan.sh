@@ -189,6 +189,12 @@ class SessionViewState extends ConsumerState<SessionView> {
     final configLoader = ref.watch(configLoaderProvider);
     final lineHeight = configLoader?.config.editor.lineHeight ?? 1.0;
     final fontFamily = configLoader?.config.editor.fontFamily ?? theme.fontFamily;
+    final cursorStyle = configLoader?.config.editor.cursorStyle ?? 'block';
+    final cursorType = switch (cursorStyle) {
+      'underline' => TerminalCursorType.underline,
+      'bar' => TerminalCursorType.verticalBar,
+      _ => TerminalCursorType.block,
+    };
     final blocks = widget.session.blocks;
     final isRunning = widget.session.isCommandRunning;
 
@@ -214,7 +220,7 @@ class SessionViewState extends ConsumerState<SessionView> {
                   theme: bolonToXtermTheme(theme),
                   textStyle: TerminalStyle(
                     fontSize: fontSize,
-                    height: 1.2,
+                    height: lineHeight,
                     fontFamily: fontFamily,
                     fontFamilyFallback: const [
                       'JetBrains Mono',
@@ -228,27 +234,29 @@ class SessionViewState extends ConsumerState<SessionView> {
                   padding: const EdgeInsets.all(8),
                   focusNode: _terminalFocusNode,
                   autofocus: true,
-                  cursorType: TerminalCursorType.block,
+                  cursorType: cursorType,
                   backgroundOpacity: 0,
                 ),
-                // Paint the character under the cursor in inverted
-                // colors so it's visible through the block cursor.
-                // xterm.dart draws the cursor as an opaque filled
-                // rectangle that hides the glyph underneath.
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(
-                      painter: _CursorCharPainter(
-                        terminal: widget.session.terminal,
-                        focusNode: _terminalFocusNode,
-                        fontSize: fontSize,
-                        fontFamily: fontFamily,
-                        cursorColor: theme.cursor,
-                        bgColor: theme.background,
+                // Paint the character under the block cursor in
+                // inverted colors so it's visible through the
+                // opaque filled rectangle. Only needed for block
+                // cursor — underline and bar don't hide the glyph.
+                if (cursorType == TerminalCursorType.block)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _CursorCharPainter(
+                          terminal: widget.session.terminal,
+                          focusNode: _terminalFocusNode,
+                          fontSize: fontSize,
+                          lineHeight: lineHeight,
+                          fontFamily: fontFamily,
+                          cursorColor: theme.cursor,
+                          bgColor: theme.background,
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             )
           else
@@ -479,6 +487,7 @@ class _CursorCharPainter extends CustomPainter {
   final Terminal terminal;
   final FocusNode focusNode;
   final double fontSize;
+  final double lineHeight;
   final String fontFamily;
   final Color cursorColor;
   final Color bgColor;
@@ -490,6 +499,7 @@ class _CursorCharPainter extends CustomPainter {
     required this.terminal,
     required this.focusNode,
     required this.fontSize,
+    required this.lineHeight,
     required this.fontFamily,
     required this.cursorColor,
     required this.bgColor,
@@ -523,13 +533,13 @@ class _CursorCharPainter extends CustomPainter {
     final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
       fontFamily: fontFamily,
       fontSize: fontSize,
-      height: 1.2,
+      height: lineHeight,
     ));
     builder.pushStyle(ui.TextStyle(
       color: bgColor,
       fontFamily: fontFamily,
       fontSize: fontSize,
-      height: 1.2,
+      height: lineHeight,
     ));
     builder.addText(String.fromCharCode(codePoint));
     final paragraph = builder.build();
@@ -543,12 +553,12 @@ class _CursorCharPainter extends CustomPainter {
     final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
       fontFamily: fontFamily,
       fontSize: fontSize,
-      height: 1.2,
+      height: lineHeight,
     ));
     builder.pushStyle(ui.TextStyle(
       fontFamily: fontFamily,
       fontSize: fontSize,
-      height: 1.2,
+      height: lineHeight,
     ));
     builder.addText(test);
     final paragraph = builder.build();
