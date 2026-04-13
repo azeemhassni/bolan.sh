@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -78,14 +77,27 @@ class LinkifiedText {
             style: span.style,
           ));
         }
-        result.add(TextSpan(
-          text: link.text,
-          style: span.style?.copyWith(
-            color: link.color,
-            decoration: TextDecoration.underline,
-            decorationColor: link.color.withAlpha(120),
+        final linkStyle = span.style?.copyWith(
+          color: link.color,
+          decoration: TextDecoration.underline,
+          decorationColor: link.color.withAlpha(120),
+        );
+        result.add(WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          child: Tooltip(
+            message: Platform.isMacOS
+                ? '\u2318+Click to open'
+                : 'Ctrl+Click to open',
+            waitDuration: const Duration(milliseconds: 400),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: link.onTap,
+                child: Text(link.text, style: linkStyle),
+              ),
+            ),
           ),
-          recognizer: TapGestureRecognizer()..onTap = link.onTap,
         ));
         lastEnd = link.end;
       }
