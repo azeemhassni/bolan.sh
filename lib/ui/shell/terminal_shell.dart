@@ -62,15 +62,20 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _configLoader.addListener(_onConfigChanged);
-    _configLoader.load();
-    _configLoader.startWatching();
-    AiProviderHelper.configuredLocalModelSize =
-        _configLoader.config.ai.localModelSize;
     HardwareKeyboard.instance.addHandler(_globalKeyHandler);
     LocalLlmProvider.memoryConfirmCallback = _confirmHighMemoryLoad;
     // Sweep up any orphan llamafile server left from a previous Bolan
     // run that was force-quit, crashed, or interrupted by reboot.
     LocalLlmProvider.killStaleLocalLlmServer();
+    _initAsync();
+  }
+
+  Future<void> _initAsync() async {
+    await _configLoader.load();
+    _configLoader.startWatching();
+    AiProviderHelper.configuredLocalModelSize =
+        _configLoader.config.ai.localModelSize;
+    if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(configLoaderProvider.notifier).state = _configLoader;
       ref.read(notificationServiceProvider.notifier).state =

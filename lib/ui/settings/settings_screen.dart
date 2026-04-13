@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,9 +28,16 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen>
+    with SingleTickerProviderStateMixin {
   late AppConfig _config;
   int _selectedTab = 0;
+  late final AnimationController _toastController;
+  late final Animation<double> _toastOpacity;
+  Timer? _toastTimer;
+  Timer? _saveDebounce;
+  String? _shellError;
+  String? _workingDirError;
 
   static const _tabs = ['General', 'Editor', 'Appearance', 'AI', 'Prompt'];
   static const _tabIcons = [
@@ -43,6 +53,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _config = widget.configLoader.config;
+    _toastController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _toastOpacity =
+        CurvedAnimation(parent: _toastController, curve: Curves.easeOut);
+  }
+
+  @override
+  void dispose() {
+    _toastTimer?.cancel();
+    _saveDebounce?.cancel();
+    _toastController.dispose();
+    super.dispose();
+  }
+
+  void _showSavedToast() {
+    _toastTimer?.cancel();
+    _toastController.forward(from: 0);
+    _toastTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) _toastController.reverse();
+    });
+  }
+
+  void _save() {
+    widget.configLoader.save(_config);
+    // Debounce the toast so it doesn't flash on every keystroke
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(milliseconds: 800), _showSavedToast);
+  }
+
+  /// Resolves a shell name to a full path and validates it exists.
+  /// Returns null if valid, or an error message string.
+  String? _validateShell(String value) {
+    if (value.isEmpty) return null; // empty = use $SHELL default
+    var path = value;
+    if (!path.contains('/')) {
+      try {
+        final result = Process.runSync('which', [path]);
+        if (result.exitCode == 0) {
+          path = (result.stdout as String).trim();
+        }
+      } on ProcessException {
+        // ignore
+      }
+    }
+    if (!File(path).existsSync()) {
+      return 'Shell not found: $value';
+    }
+    return null;
+  }
+
+  /// Validates a working directory path exists.
+  String? _validateWorkingDir(String value) {
+    if (value.isEmpty) return null; // empty = use $HOME
+    var path = value;
+    final home = Platform.environment['HOME'] ?? '';
+    if (path.startsWith('~/')) {
+      path = '$home${path.substring(1)}';
+    } else if (path == '~') {
+      path = home;
+    }
+    if (!Directory(path).existsSync()) {
+      return 'Directory not found: $value';
+    }
+    return null;
   }
 
   @override
@@ -105,19 +181,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               // Content
               Expanded(
-                child: Column(
+                child: Stack(
                   children: [
-                    const SizedBox(height: 48),
-                    // Settings content
-                    Expanded(
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                              maxWidth: _maxContentWidth),
-                          child: ListView(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 32, vertical: 8),
-                            children: _buildTabContent(theme),
+                    Column(
+                      children: [
+                        const SizedBox(height: 48),
+                        Expanded(
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                  maxWidth: _maxContentWidth),
+                              child: ListView(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 32, vertical: 8),
+                                children: _buildTabContent(theme),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Positioned(
+                      top: 16,
+                      right: 24,
+                      child: FadeTransition(
+                        opacity: _toastOpacity,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: theme.blockBackground,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: theme.blockBorder, width: 1),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check, size: 13,
+                                  color: theme.ansiGreen),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Saved',
+                                style: TextStyle(
+                                  color: theme.dimForeground,
+                                  fontFamily: theme.fontFamily,
+                                  fontSize: 12,
+                                  decoration: TextDecoration.none,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -174,14 +287,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               currentTheme: theme,
               onTap: () {
                 setState(() {
-                  _config = AppConfig(
-                    general: _config.general,
-                    editor: _config.editor,
-                    ai: _config.ai,
-                    activeTheme: t.name,
-                  );
+                  _config = _config.copyWith(activeTheme: t.name);
                 });
-                widget.configLoader.save(_config);
+                _save();
               },
             ),
         ],
@@ -249,14 +357,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final copy = await _registry.duplicateTheme(source, newName, displayName);
     if (!mounted) return;
     setState(() {
-      _config = AppConfig(
-        general: _config.general,
-        editor: _config.editor,
-        ai: _config.ai,
-        activeTheme: copy.name,
-      );
+      _config = _config.copyWith(activeTheme: copy.name);
     });
-    await widget.configLoader.save(_config);
+    _save();
   }
 
   Future<void> _exportTheme(BolonTheme theme) async {
@@ -286,14 +389,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = await _registry.importTheme(file.path);
     if (theme != null && mounted) {
       setState(() {
-        _config = AppConfig(
-          general: _config.general,
-          editor: _config.editor,
-          ai: _config.ai,
-          activeTheme: theme.name,
-        );
+        _config = _config.copyWith(activeTheme: theme.name);
       });
-      await widget.configLoader.save(_config);
+      _save();
     }
   }
 
@@ -380,28 +478,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _registry.saveCustomTheme(renamed);
     if (!mounted) return;
     setState(() {
-      _config = AppConfig(
-        general: _config.general,
-        editor: _config.editor,
-        ai: _config.ai,
-        activeTheme: slug,
-      );
+      _config = _config.copyWith(activeTheme: slug);
     });
-    await widget.configLoader.save(_config);
+    _save();
   }
 
   Future<void> _deleteTheme(BolonTheme theme) async {
     await _registry.removeCustomTheme(theme.name);
     if (!mounted) return;
     setState(() {
-      _config = AppConfig(
-        general: _config.general,
-        editor: _config.editor,
-        ai: _config.ai,
-        activeTheme: 'default-dark',
-      );
+      _config = _config.copyWith(activeTheme: 'default-dark');
     });
-    await widget.configLoader.save(_config);
+    _save();
   }
 
   // ---- Prompt Tab ----
@@ -412,19 +500,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         activeChipIds: _config.general.promptChips,
         onChanged: (chips) {
           setState(() {
-            _config = AppConfig(
+            _config = _config.copyWith(
               general: GeneralConfig(
                 shell: _config.general.shell,
                 workingDirectory: _config.general.workingDirectory,
                 restoreSessions: _config.general.restoreSessions,
+                confirmOnQuit: _config.general.confirmOnQuit,
+                notifyLongRunning: _config.general.notifyLongRunning,
+                longRunningThresholdSeconds:
+                    _config.general.longRunningThresholdSeconds,
+                startupCommands: _config.general.startupCommands,
                 promptChips: chips,
               ),
-              editor: _config.editor,
-              ai: _config.ai,
-              activeTheme: _config.activeTheme,
             );
           });
-          widget.configLoader.save(_config);
+          _save();
         },
       ),
     ];
@@ -437,23 +527,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _Field(
         label: 'Shell',
         help: 'Leave empty to use \$SHELL',
+        error: _shellError,
         theme: theme,
         child: _Input(
           value: _config.general.shell,
           hint: '/bin/zsh',
           theme: theme,
-          onChanged: (v) => _updateGeneral(shell: v),
+          onChanged: (v) {
+            setState(() => _shellError = _validateShell(v));
+            _updateGeneral(shell: v);
+          },
         ),
       ),
       _Field(
         label: 'Working Directory',
         help: 'Default directory for new tabs',
+        error: _workingDirError,
         theme: theme,
         child: _Input(
           value: _config.general.workingDirectory,
           hint: '~ (home)',
           theme: theme,
-          onChanged: (v) => _updateGeneral(workingDirectory: v),
+          onChanged: (v) {
+            setState(() => _workingDirError = _validateWorkingDir(v));
+            _updateGeneral(workingDirectory: v);
+          },
         ),
       ),
       _Toggle(
@@ -732,7 +830,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? notifyLongRunning,
   }) {
     setState(() {
-      _config = AppConfig(
+      _config = _config.copyWith(
         general: GeneralConfig(
           shell: shell ?? _config.general.shell,
           workingDirectory:
@@ -747,12 +845,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           promptChips: _config.general.promptChips,
           startupCommands: _config.general.startupCommands,
         ),
-        editor: _config.editor,
-        ai: _config.ai,
-        activeTheme: _config.activeTheme,
       );
     });
-    widget.configLoader.save(_config);
+    _save();
   }
 
   void _updateUpdate({bool? autoCheck}) {
@@ -763,7 +858,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
     });
-    widget.configLoader.save(_config);
+    _save();
   }
 
   void _updateEditor({
@@ -776,8 +871,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? ligatures,
   }) {
     setState(() {
-      _config = AppConfig(
-        general: _config.general,
+      _config = _config.copyWith(
         editor: EditorConfig(
           fontFamily: fontFamily ?? _config.editor.fontFamily,
           fontSize: fontSize ?? _config.editor.fontSize,
@@ -789,11 +883,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           scrollableBlocks: _config.editor.scrollableBlocks,
           ligatures: ligatures ?? _config.editor.ligatures,
         ),
-        ai: _config.ai,
-        activeTheme: _config.activeTheme,
       );
     });
-    widget.configLoader.save(_config);
+    _save();
   }
 
   void _updateAi({
@@ -815,9 +907,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // away from Settings.
     if (!mounted) return;
     setState(() {
-      _config = AppConfig(
-        general: _config.general,
-        editor: _config.editor,
+      _config = _config.copyWith(
         ai: AiConfig(
           provider: provider ?? _config.ai.provider,
           localModelSize: localModelSize ?? _config.ai.localModelSize,
@@ -834,10 +924,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               smartHistorySearch ?? _config.ai.smartHistorySearch,
           shareHistory: shareHistory ?? _config.ai.shareHistory,
         ),
-        activeTheme: _config.activeTheme,
       );
     });
-    widget.configLoader.save(_config);
+    _save();
   }
 }
 
@@ -898,12 +987,14 @@ class _SidebarTab extends StatelessWidget {
 class _Field extends StatelessWidget {
   final String label;
   final String? help;
+  final String? error;
   final BolonTheme theme;
   final Widget child;
 
   const _Field({
     required this.label,
     this.help,
+    this.error,
     required this.theme,
     required this.child,
   });
@@ -925,12 +1016,24 @@ class _Field extends StatelessWidget {
               decoration: TextDecoration.none,
             ),
           ),
-          if (help != null) ...[
+          if (help != null && error == null) ...[
             const SizedBox(height: 2),
             Text(
               help!,
               style: TextStyle(
                 color: theme.dimForeground,
+                fontFamily: theme.fontFamily,
+                fontSize: 11,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ],
+          if (error != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              error!,
+              style: TextStyle(
+                color: theme.exitFailureFg,
                 fontFamily: theme.fontFamily,
                 fontSize: 11,
                 decoration: TextDecoration.none,

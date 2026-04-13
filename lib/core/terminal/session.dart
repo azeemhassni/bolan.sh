@@ -107,13 +107,17 @@ class TerminalSession extends ChangeNotifier {
   /// Shared command history — persisted across sessions.
   final CommandHistory history;
 
+  final String _resolvedShell;
+
   TerminalSession._({
     required this.id,
     required this.title,
     required this.terminal,
     required Pty pty,
     required this.history,
-  }) : _pty = pty;
+    required String resolvedShell,
+  })  : _pty = pty,
+        _resolvedShell = resolvedShell;
 
   /// Creates a new terminal session by spawning a shell process.
   factory TerminalSession.start({
@@ -125,9 +129,28 @@ class TerminalSession extends ChangeNotifier {
     int rows = 25,
     int columns = 80,
   }) {
-    final resolvedShell = (shell != null && shell.isNotEmpty)
+    var resolvedShell = (shell != null && shell.isNotEmpty)
         ? shell
         : _defaultShell();
+
+    // Resolve bare names (e.g. "fish") to full paths via `which`.
+    if (!resolvedShell.contains('/')) {
+      try {
+        final result = Process.runSync('which', [resolvedShell]);
+        if (result.exitCode == 0) {
+          resolvedShell = (result.stdout as String).trim();
+        }
+      } on ProcessException {
+        // ignore
+      }
+    }
+
+    // Validate the shell exists before spawning.
+    if (!File(resolvedShell).existsSync()) {
+      final fallback = _defaultShell();
+      debugPrint('Shell not found: $resolvedShell — falling back to $fallback');
+      resolvedShell = fallback;
+    }
 
     final terminal = Terminal(
       maxLines: 10000,
@@ -159,6 +182,7 @@ class TerminalSession extends ChangeNotifier {
       terminal: terminal,
       pty: pty,
       history: history,
+      resolvedShell: resolvedShell,
     );
 
     // Initialize CWD so completions work before the first OSC 7
@@ -182,6 +206,12 @@ class TerminalSession extends ChangeNotifier {
 
   /// Whether a command is currently executing.
   bool get isCommandRunning => _commandRunning;
+
+  /// Whether shell integration (OSC 133) is active.
+  /// False for unsupported shells (fish, nushell, etc.) — the UI
+  /// should show a raw terminal instead of blocks + prompt.
+  bool get hasShellIntegration => _hasShellIntegration;
+  bool _hasShellIntegration = false;
 
   /// Current working directory, updated via OSC 7 or shell integration.
   String get cwd => _cwd;
@@ -1048,7 +1078,7 @@ class TerminalSession extends ChangeNotifier {
   }
 
   void _injectShellIntegration() {
-    final shellName = _defaultShell().split('/').last;
+    final shellName = _resolvedShell.split('/').last;
     String? script;
 
     if (shellName == 'zsh') {
@@ -1121,6 +1151,10 @@ __bolan_preexec_invoke() {
   if [[ "$__bolan_inside_precmd" -eq 1 ]]; then return; fi
   # Skip readline completion machinery.
   if [[ -n "$COMP_LINE" ]]; then return; fi
+  # Skip our own internal functions.
+  case "$BASH_COMMAND" in
+    __bolan_*) return ;;
+  esac
   __bolan_prompt_end
   __bolan_cmd_start
 }
@@ -1137,8 +1171,12 @@ PROMPT_COMMAND="__bolan_precmd_invoke${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 """;
     }
 
-    if (script == null) return;
+    if (script == null) {
+      _hasShellIntegration = false;
+      return;
+    }
 
+    _hasShellIntegration = true;
     Future<void>.delayed(const Duration(milliseconds: 300), () async {
       if (_disposed) return;
       final tmpDir = Directory.systemTemp;

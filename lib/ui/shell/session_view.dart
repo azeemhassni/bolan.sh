@@ -218,11 +218,11 @@ class SessionViewState extends ConsumerState<SessionView> {
       },
       child: Stack(
         children: [
-          // Two modes: full-screen terminal when running, blocks when idle.
-          // Right-click on either is handled by the parent _LeafPaneWidget
-          // via onSecondaryTap so the context menu is consistent across
-          // both modes.
-          if (isRunning)
+          // Three modes:
+          // 1. No shell integration (fish, nushell, etc.) → always raw terminal
+          // 2. Command running → full-screen terminal
+          // 3. Idle → blocks + Bolan prompt
+          if (!widget.session.hasShellIntegration || isRunning)
             Stack(
               children: [
                 TerminalView(
