@@ -1,7 +1,7 @@
 name: bolan
 description: 'Open-source AI-powered terminal emulator'
 publish_to: 'none'
-version: 0.3.3
+version: 0.3.4
 
 environment:
   sdk: ^3.9.2
