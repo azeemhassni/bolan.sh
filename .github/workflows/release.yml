@@ -98,6 +98,11 @@ jobs:
           name: bolan-linux-arm64
           path: artifacts/
 
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum *.tar.gz > checksums-${{ github.ref_name }}.sha256
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

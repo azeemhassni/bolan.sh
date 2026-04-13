@@ -10,6 +10,7 @@ class ConfigValidator {
       general: _validateGeneral(raw['general'] as Map<String, dynamic>?),
       editor: _validateEditor(raw['editor'] as Map<String, dynamic>?),
       ai: _validateAi(raw['ai'] as Map<String, dynamic>?),
+      update: _validateUpdate(raw['updates'] as Map<String, dynamic>?),
       activeTheme: _string(raw['theme'], 'default-dark'),
     );
   }
@@ -34,8 +35,8 @@ class ConfigValidator {
     if (raw == null) return const EditorConfig();
     return EditorConfig(
       fontFamily: _string(raw['font_family'], 'JetBrains Mono'),
-      fontSize: _double(raw['font_size'], 13.0, min: 8, max: 32),
-      lineHeight: _double(raw['line_height'], 1.2, min: 1.0, max: 2.5),
+      fontSize: _double(raw['font_size'], 16.0, min: 8, max: 32),
+      lineHeight: _double(raw['line_height'], 1.3, min: 1.0, max: 2.5),
       cursorStyle: _oneOf(raw['cursor_style'], ['block', 'underline', 'bar'], 'block'),
       cursorBlink: _bool(raw['cursor_blink'], true),
       scrollbackLines: _int(raw['scrollback_lines'], 10000, min: 100, max: 100000),
@@ -60,6 +61,15 @@ class ConfigValidator {
       commandSuggestions: _bool(raw['command_suggestions'], true),
       smartHistorySearch: _bool(raw['smart_history_search'], true),
       shareHistory: _bool(raw['share_history'], false),
+    );
+  }
+
+  UpdateConfig _validateUpdate(Map<String, dynamic>? raw) {
+    if (raw == null) return const UpdateConfig();
+    return UpdateConfig(
+      autoCheck: _bool(raw['auto_check'], true),
+      lastCheckTime: _string(raw['last_check_time'], ''),
+      skippedVersion: _string(raw['skipped_version'], ''),
     );
   }
 

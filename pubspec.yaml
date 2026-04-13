@@ -35,6 +35,9 @@ dependencies:
   # Network / AI
   dio: ^5.7.0
 
+  # Crypto (SHA256 for update verification)
+  crypto: ^3.0.0
+
   # Fonts
   google_fonts: ^6.2.0
 
@@ -69,7 +72,7 @@ flutter:
     - assets/logo-text.svg
 
   fonts:
-    - family: JetBrainsMono
+    - family: JetBrains Mono
       fonts:
         - asset: assets/fonts/JetBrainsMono/JetBrainsMono-Regular.ttf
         - asset: assets/fonts/JetBrainsMono/JetBrainsMono-Bold.ttf

@@ -35,34 +35,29 @@ class SystemFonts {
     return sorted;
   }
 
-  /// Uses `system_profiler` on macOS to list monospace fonts.
+  /// Uses CoreText via Swift to list monospace fonts on macOS.
+  ///
+  /// Swift is guaranteed on macOS (ships with Xcode CLI tools).
   static Future<List<String>> _macOSMonospaceFonts() async {
     try {
-      // Use CoreText via python to get monospace fonts
-      final result = await Process.run('python3', [
-        '-c',
+      final result = await Process.run('swift', [
+        '-e',
         '''
-import CoreText, CoreFoundation
-desc = CoreText.CTFontDescriptorCreateWithAttributes(
-    CoreFoundation.CFDictionaryCreate(None,
-        [CoreText.kCTFontMonoSpaceTrait],
-        [CoreFoundation.kCFBooleanTrue], 1,
-        CoreFoundation.kCFTypeDictionaryKeyCallBacks,
-        CoreFoundation.kCFTypeDictionaryValueCallBacks))
-descs = CoreText.CTFontDescriptorCreateMatchingFontDescriptors(
-    CoreText.CTFontDescriptorCreateWithAttributes(
-        {CoreText.kCTFontTraitsAttribute: {CoreText.kCTFontSymbolicTrait: CoreText.kCTFontMonoSpaceTrait}}),
-    None)
-if descs:
-    seen = set()
-    for i in range(CoreFoundation.CFArrayGetCount(descs)):
-        d = CoreFoundation.CFArrayGetValueAtIndex(descs, i)
-        name = CoreText.CTFontDescriptorCopyAttribute(d, CoreText.kCTFontFamilyNameAttribute)
-        if name and name not in seen:
-            seen.add(name)
-            print(name)
+import CoreText
+let attrs: [CFString: Any] = [
+  kCTFontTraitsAttribute: [kCTFontSymbolicTrait: CTFontSymbolicTraits.traitMonoSpace.rawValue]
+]
+let desc = CTFontDescriptorCreateWithAttributes(attrs as CFDictionary)
+guard let matches = CTFontDescriptorCreateMatchingFontDescriptors(desc, nil) as? [CTFontDescriptor] else { exit(0) }
+var seen = Set<String>()
+for d in matches {
+  guard let name = CTFontDescriptorCopyAttribute(d, kCTFontFamilyNameAttribute) as? String else { continue }
+  if name.hasPrefix(".") { continue }
+  if name.lowercased().contains("emoji") { continue }
+  if seen.insert(name).inserted { print(name) }
+}
 ''',
-      ]).timeout(const Duration(seconds: 5));
+      ]).timeout(const Duration(seconds: 10));
 
       if (result.exitCode == 0) {
         final fonts = (result.stdout as String)
@@ -73,11 +68,10 @@ if descs:
         if (fonts.isNotEmpty) return fonts;
       }
     } on Exception {
-      // Fall through to fc-list
+      // Fall through to fallback list
     }
 
-    // Fallback: use fc-list if available
-    return _fcListMonospace();
+    return _fallbackFonts;
   }
 
   /// Uses `fc-list` on Linux to list monospace fonts.

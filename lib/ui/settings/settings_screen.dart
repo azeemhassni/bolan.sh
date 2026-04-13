@@ -477,6 +477,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         theme: theme,
         onChanged: (v) => _updateGeneral(notifyLongRunning: v),
       ),
+      _Toggle(
+        label: 'Auto-Check for Updates',
+        help: 'Check for new versions on startup',
+        value: _config.update.autoCheck,
+        theme: theme,
+        onChanged: (v) => _updateUpdate(autoCheck: v),
+      ),
       Padding(
         padding: const EdgeInsets.only(top: 16),
         child: Text(
@@ -743,6 +750,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         editor: _config.editor,
         ai: _config.ai,
         activeTheme: _config.activeTheme,
+      );
+    });
+    widget.configLoader.save(_config);
+  }
+
+  void _updateUpdate({bool? autoCheck}) {
+    setState(() {
+      _config = _config.copyWith(
+        update: _config.update.copyWith(
+          autoCheck: autoCheck ?? _config.update.autoCheck,
+        ),
       );
     });
     widget.configLoader.save(_config);

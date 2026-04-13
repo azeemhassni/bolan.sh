@@ -136,6 +136,16 @@ class ConfigLoader extends ChangeNotifier {
     sb.writeln('command_suggestions = ${c.ai.commandSuggestions}');
     sb.writeln('smart_history_search = ${c.ai.smartHistorySearch}');
     sb.writeln('share_history = ${c.ai.shareHistory}');
+    sb.writeln();
+
+    sb.writeln('[updates]');
+    sb.writeln('auto_check = ${c.update.autoCheck}');
+    if (c.update.lastCheckTime.isNotEmpty) {
+      sb.writeln('last_check_time = "${c.update.lastCheckTime}"');
+    }
+    if (c.update.skippedVersion.isNotEmpty) {
+      sb.writeln('skipped_version = "${c.update.skippedVersion}"');
+    }
 
     return sb.toString();
   }

@@ -6,14 +6,32 @@ class AppConfig {
   final GeneralConfig general;
   final EditorConfig editor;
   final AiConfig ai;
+  final UpdateConfig update;
   final String activeTheme;
 
   const AppConfig({
     this.general = const GeneralConfig(),
     this.editor = const EditorConfig(),
     this.ai = const AiConfig(),
+    this.update = const UpdateConfig(),
     this.activeTheme = 'default-dark',
   });
+
+  AppConfig copyWith({
+    GeneralConfig? general,
+    EditorConfig? editor,
+    AiConfig? ai,
+    UpdateConfig? update,
+    String? activeTheme,
+  }) {
+    return AppConfig(
+      general: general ?? this.general,
+      editor: editor ?? this.editor,
+      ai: ai ?? this.ai,
+      update: update ?? this.update,
+      activeTheme: activeTheme ?? this.activeTheme,
+    );
+  }
 }
 
 class GeneralConfig {
@@ -62,8 +80,8 @@ class EditorConfig {
 
   const EditorConfig({
     this.fontFamily = 'JetBrains Mono',
-    this.fontSize = 13.0,
-    this.lineHeight = 1.0,
+    this.fontSize = 16.0,
+    this.lineHeight = 1.3,
     this.cursorStyle = 'block',
     this.cursorBlink = true,
     this.scrollbackLines = 10000,
@@ -101,4 +119,28 @@ class AiConfig {
     this.smartHistorySearch = true,
     this.shareHistory = false,
   });
+}
+
+class UpdateConfig {
+  final bool autoCheck;
+  final String lastCheckTime;
+  final String skippedVersion;
+
+  const UpdateConfig({
+    this.autoCheck = true,
+    this.lastCheckTime = '',
+    this.skippedVersion = '',
+  });
+
+  UpdateConfig copyWith({
+    bool? autoCheck,
+    String? lastCheckTime,
+    String? skippedVersion,
+  }) {
+    return UpdateConfig(
+      autoCheck: autoCheck ?? this.autoCheck,
+      lastCheckTime: lastCheckTime ?? this.lastCheckTime,
+      skippedVersion: skippedVersion ?? this.skippedVersion,
+    );
+  }
 }

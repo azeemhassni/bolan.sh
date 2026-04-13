@@ -20,12 +20,15 @@ import '../../providers/font_size_provider.dart';
 import '../../providers/model_download_provider.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/update_provider.dart';
 import '../ai/memory_warning_dialog.dart';
 import '../ai/model_download_dialog.dart';
 import '../ai/model_download_toast.dart';
 import '../palette/command_palette.dart';
 import '../settings/settings_screen.dart';
 import '../shared/confirm_dialog.dart';
+import '../update/update_dialog.dart';
+import '../update/update_toast.dart';
 import 'empty_state.dart';
 import 'pane_focus_registry.dart';
 import 'pane_tree_widget.dart';
@@ -49,6 +52,8 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   bool _showPalette = false;
   bool _showDownloadDialog = false;
   bool _showDownloadToast = false;
+  bool _showUpdateDialog = false;
+  bool _showUpdateToast = false;
   final _downloadDialogKey = GlobalKey<ModelDownloadDialogState>();
 
   @override
@@ -69,7 +74,9 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       ref.read(configLoaderProvider.notifier).state = _configLoader;
       ref.read(notificationServiceProvider.notifier).state =
           _notificationService;
+      ref.read(updateProvider).setConfigLoader(_configLoader);
       _checkLocalModelNeeded();
+      _checkForUpdates();
     });
   }
 
@@ -110,6 +117,9 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     _notificationService.setAppFocused(
       state == AppLifecycleState.resumed,
     );
+    if (state == AppLifecycleState.resumed) {
+      _checkForUpdates();
+    }
     // App window closed / process about to exit — kill the LLM server
     // so it doesn't outlive Bolan as an orphan.
     if (state == AppLifecycleState.detached) {
@@ -453,6 +463,29 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     });
   }
 
+  Future<void> _checkForUpdates({bool force = false}) async {
+    final notifier = ref.read(updateProvider);
+    await notifier.check(force: force);
+    if (!mounted) return;
+    if (notifier.state.status == UpdateStatus.available) {
+      setState(() => _showUpdateDialog = true);
+    }
+  }
+
+  void _dismissUpdate() {
+    setState(() {
+      _showUpdateDialog = false;
+      _showUpdateToast = false;
+    });
+  }
+
+  void _backgroundUpdate() {
+    setState(() {
+      _showUpdateDialog = false;
+      _showUpdateToast = true;
+    });
+  }
+
   void _togglePalette() {
     setState(() => _showPalette = !_showPalette);
   }
@@ -509,6 +542,13 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         icon: Icons.settings_outlined,
         keywords: const ['preferences', 'config', 'options'],
         callback: _openSettings,
+      ),
+      AppAction(
+        id: 'check_updates',
+        label: 'Check for Updates',
+        icon: Icons.system_update_outlined,
+        keywords: const ['update', 'upgrade', 'version'],
+        callback: () => _checkForUpdates(force: true),
       ),
       AppAction(
         id: 'focus_prompt',
@@ -701,6 +741,40 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                   onTap: () => setState(() {
                     _showDownloadToast = false;
                     _showDownloadDialog = true;
+                  }),
+                );
+              }),
+            if (_showUpdateDialog)
+              UpdateDialog(
+                onDismiss: _dismissUpdate,
+                onBackgrounded: _backgroundUpdate,
+              ),
+            if (_showUpdateToast)
+              Builder(builder: (context) {
+                final us = ref.watch(updateProvider).state;
+                if (us.status != UpdateStatus.downloading) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && _showUpdateToast) {
+                      if (us.status == UpdateStatus.readyToRestart ||
+                          us.status == UpdateStatus.error ||
+                          us.status == UpdateStatus.verifying ||
+                          us.status == UpdateStatus.installing) {
+                        setState(() {
+                          _showUpdateToast = false;
+                          _showUpdateDialog = true;
+                        });
+                      } else {
+                        setState(() => _showUpdateToast = false);
+                      }
+                    }
+                  });
+                }
+                return UpdateToast(
+                  received: us.received,
+                  total: us.total,
+                  onTap: () => setState(() {
+                    _showUpdateToast = false;
+                    _showUpdateDialog = true;
                   }),
                 );
               }),
