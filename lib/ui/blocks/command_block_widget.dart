@@ -489,6 +489,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
       final linkedSpans = LinkifiedText.linkify(
         spans,
         linkColor: theme.ansiCyan,
+        cwd: widget.cwd,
       );
       textWidget = SelectableText.rich(
         TextSpan(children: linkedSpans),
