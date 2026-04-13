@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'tool_completer.dart';
+
 /// Type of a completion item.
 enum CompletionType {
   command,
@@ -15,6 +17,8 @@ enum CompletionType {
   npmScript,
   npmPackage,
   artisanCommand,
+  composerCommand,
+  toolCommand,
 }
 
 /// A single completion candidate with metadata.
@@ -56,6 +60,27 @@ class CompletionResult {
 ///
 /// This avoids fragile shell subprocess scripts for path completion
 /// and gives reliable cross-shell results.
+/// Registry of self-discovering tool completers.
+///
+/// To add a new tool, just add a [ToolCompleter] here.
+/// The engine tries each one in order during dispatch.
+final _toolCompleters = <ToolCompleter>[
+  const ToolCompleter(
+    names: ['composer'],
+    type: CompletionType.composerCommand,
+    discover: DiscoverCommand(
+      executable: 'composer',
+      args: ['list', '--format=json'],
+      parse: parseSymfonyConsoleJson,
+    ),
+    requiredFile: 'composer.json',
+    excludeNames: {'_complete', 'completion'},
+  ),
+  // Future tools can be added here:
+  // ToolCompleter(names: ['cargo'], type: CompletionType.toolCommand, ...),
+  // ToolCompleter(names: ['symfony'], type: CompletionType.toolCommand, ...),
+];
+
 class CompletionEngine {
   final String _shell;
 
@@ -94,6 +119,12 @@ class CompletionEngine {
         items = await _completeNpm(words, currentWord, cwd);
       } else if (_isArtisanCommand(words)) {
         items = await _completeArtisan(words, currentWord, cwd);
+      } else if (_matchToolCompleter(words) case final tool?) {
+        if (words.length == tool.subcommandIndex + 1) {
+          items = await tool.complete(currentWord, cwd);
+        } else {
+          items = await _completePath(currentWord, cwd);
+        }
       } else {
         items = await _completePath(currentWord, cwd);
       }
@@ -702,6 +733,13 @@ class CompletionEngine {
       replaceStart: cursorPos,
       replaceEnd: cursorPos,
     );
+  }
+
+  ToolCompleter? _matchToolCompleter(List<String> words) {
+    for (final tool in _toolCompleters) {
+      if (tool.matches(words)) return tool;
+    }
+    return null;
   }
 
   // ── Laravel Artisan ───────────────────────────────────────

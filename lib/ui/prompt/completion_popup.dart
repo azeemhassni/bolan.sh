@@ -81,6 +81,8 @@ class _CompletionPopupState extends State<CompletionPopup> {
       CompletionType.npmScript => Icons.play_arrow,
       CompletionType.npmPackage => Icons.inventory_2_outlined,
       CompletionType.artisanCommand => Icons.code, // unreachable
+      CompletionType.composerCommand => Icons.code,
+      CompletionType.toolCommand => Icons.code,
     };
     return Icon(icon, size: size, color: color);
   }
