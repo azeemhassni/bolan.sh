@@ -14,6 +14,7 @@ enum CompletionType {
   npmSubcommand,
   npmScript,
   npmPackage,
+  artisanCommand,
 }
 
 /// A single completion candidate with metadata.
@@ -91,6 +92,8 @@ class CompletionEngine {
           (words.first == 'npm' || words.first == 'npx' ||
            words.first == 'pnpm' || words.first == 'yarn')) {
         items = await _completeNpm(words, currentWord, cwd);
+      } else if (_isArtisanCommand(words)) {
+        items = await _completeArtisan(words, currentWord, cwd);
       } else {
         items = await _completePath(currentWord, cwd);
       }
@@ -700,6 +703,165 @@ class CompletionEngine {
       replaceEnd: cursorPos,
     );
   }
+
+  // ── Laravel Artisan ───────────────────────────────────────
+
+  /// Matches `php artisan`, `artisan`, or `./artisan`.
+  bool _isArtisanCommand(List<String> words) {
+    if (words.isEmpty) return false;
+    final first = words.first;
+    if (first == 'artisan' || first == './artisan') return true;
+    if (first == 'php' && words.length > 1 && words[1] == 'artisan') {
+      return true;
+    }
+    return false;
+  }
+
+  /// Index of the artisan subcommand word (the word after "artisan").
+  int _artisanCmdIndex(List<String> words) {
+    if (words.first == 'php') return 2; // php artisan <cmd>
+    return 1; // artisan <cmd> or ./artisan <cmd>
+  }
+
+  Future<List<CompletionItem>> _completeArtisan(
+    List<String> words,
+    String partial,
+    String cwd,
+  ) async {
+    final cmdIdx = _artisanCmdIndex(words);
+
+    // Complete the artisan command name
+    if (words.length == cmdIdx + 1) {
+      return _artisanCommands(partial, cwd);
+    }
+
+    // After the command — fall back to path completion for arguments
+    return _completePath(partial, cwd);
+  }
+
+  /// Gets artisan commands by running `php artisan list --format=json`.
+  /// Falls back to a static list if php/artisan isn't available.
+  Future<List<CompletionItem>> _artisanCommands(
+    String partial,
+    String cwd,
+  ) async {
+    // Try dynamic discovery first
+    try {
+      final result = await Process.run(
+        'php',
+        ['artisan', 'list', '--format=json'],
+        workingDirectory: cwd,
+      ).timeout(const Duration(seconds: 3));
+
+      if (result.exitCode == 0) {
+        final data = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+        final commands = data['commands'] as List<dynamic>? ?? [];
+        final items = <CompletionItem>[];
+        for (final cmd in commands) {
+          final c = cmd as Map<String, dynamic>;
+          final name = c['name'] as String? ?? '';
+          if (name.isEmpty || name == '_complete' || name == 'completion') {
+            continue;
+          }
+          if (name.toLowerCase().startsWith(partial.toLowerCase())) {
+            items.add(CompletionItem(
+              text: name,
+              type: CompletionType.artisanCommand,
+              description: _truncate(
+                  c['description']?.toString() ?? '', 60),
+            ));
+          }
+        }
+        if (items.isNotEmpty) return items;
+      }
+    } on Exception {
+      // Fall through to static list
+    }
+
+    // Static fallback — only if we're in a Laravel project
+    if (!File('$cwd/artisan').existsSync()) return [];
+    return _artisanStaticCommands.entries
+        .where((e) => e.key.toLowerCase().startsWith(partial.toLowerCase()))
+        .map((e) => CompletionItem(
+              text: e.key,
+              type: CompletionType.artisanCommand,
+              description: e.value,
+            ))
+        .toList();
+  }
+
+  static const _artisanStaticCommands = <String, String>{
+    'cache:clear': 'Flush the application cache',
+    'cache:forget': 'Remove an item from the cache',
+    'cache:table': 'Create a migration for the cache database table',
+    'config:cache': 'Create a cache file for faster configuration loading',
+    'config:clear': 'Remove the configuration cache file',
+    'db:seed': 'Seed the database with records',
+    'db:wipe': 'Drop all tables, views, and types',
+    'down': 'Put the application into maintenance mode',
+    'env': 'Display the current framework environment',
+    'event:generate': 'Generate the missing events and listeners',
+    'event:list': 'List the application events and listeners',
+    'inspire': 'Display an inspiring quote',
+    'key:generate': 'Set the application key',
+    'make:cast': 'Create a new custom Eloquent cast class',
+    'make:channel': 'Create a new channel class',
+    'make:command': 'Create a new Artisan command',
+    'make:component': 'Create a new view component class',
+    'make:controller': 'Create a new controller class',
+    'make:event': 'Create a new event class',
+    'make:exception': 'Create a new custom exception class',
+    'make:factory': 'Create a new model factory',
+    'make:job': 'Create a new job class',
+    'make:listener': 'Create a new event listener class',
+    'make:livewire': 'Create a new Livewire component',
+    'make:mail': 'Create a new email class',
+    'make:middleware': 'Create a new middleware class',
+    'make:migration': 'Create a new migration file',
+    'make:model': 'Create a new Eloquent model class',
+    'make:notification': 'Create a new notification class',
+    'make:observer': 'Create a new observer class',
+    'make:policy': 'Create a new policy class',
+    'make:provider': 'Create a new service provider class',
+    'make:request': 'Create a new form request class',
+    'make:resource': 'Create a new resource',
+    'make:rule': 'Create a new validation rule',
+    'make:scope': 'Create a new scope class',
+    'make:seeder': 'Create a new seeder class',
+    'make:test': 'Create a new test class',
+    'make:view': 'Create a new view',
+    'migrate': 'Run the database migrations',
+    'migrate:fresh': 'Drop all tables and re-run all migrations',
+    'migrate:install': 'Create the migration repository',
+    'migrate:refresh': 'Reset and re-run all migrations',
+    'migrate:reset': 'Rollback all database migrations',
+    'migrate:rollback': 'Rollback the last database migration',
+    'migrate:status': 'Show the status of each migration',
+    'optimize': 'Cache framework bootstrap, configuration, and metadata',
+    'optimize:clear': 'Remove the cached bootstrap files',
+    'queue:clear': 'Delete all of the jobs from the specified queue',
+    'queue:failed': 'List all of the failed queue jobs',
+    'queue:flush': 'Flush all of the failed queue jobs',
+    'queue:listen': 'Listen to a given queue',
+    'queue:restart': 'Restart queue worker daemons after their current job',
+    'queue:retry': 'Retry a failed queue job',
+    'queue:work': 'Start processing jobs on the queue as a daemon',
+    'route:cache': 'Create a route cache file for faster route registration',
+    'route:clear': 'Remove the route cache file',
+    'route:list': 'List all registered routes',
+    'schedule:list': 'List all scheduled tasks',
+    'schedule:run': 'Run the scheduled commands',
+    'schedule:work': 'Start the schedule worker',
+    'serve': 'Serve the application on the PHP development server',
+    'storage:link': 'Create the symbolic links for the application',
+    'stub:publish': 'Publish all stubs that are available for customization',
+    'test': 'Run the application tests',
+    'tinker': 'Interact with your application',
+    'up': 'Bring the application out of maintenance mode',
+    'vendor:publish': 'Publish any publishable assets from vendor packages',
+    'view:cache': 'Compile all of the application Blade templates',
+    'view:clear': 'Clear all compiled view files',
+  };
 
   void dispose() {}
 }

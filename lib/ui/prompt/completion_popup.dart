@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/completion/completion_engine.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -58,8 +59,16 @@ class _CompletionPopupState extends State<CompletionPopup> {
     }
   }
 
-  IconData _iconForType(CompletionType type) {
-    return switch (type) {
+  Widget _iconForType(CompletionType type, {required Color color, required double size}) {
+    if (type == CompletionType.artisanCommand) {
+      return SvgPicture.asset(
+        'assets/icons/ic_laravel.svg',
+        width: size,
+        height: size,
+        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+      );
+    }
+    final icon = switch (type) {
       CompletionType.command => Icons.terminal,
       CompletionType.builtin => Icons.code,
       CompletionType.file => Icons.insert_drive_file_outlined,
@@ -71,7 +80,9 @@ class _CompletionPopupState extends State<CompletionPopup> {
       CompletionType.npmSubcommand => Icons.code,
       CompletionType.npmScript => Icons.play_arrow,
       CompletionType.npmPackage => Icons.inventory_2_outlined,
+      CompletionType.artisanCommand => Icons.code, // unreachable
     };
+    return Icon(icon, size: size, color: color);
   }
 
   @override
@@ -142,8 +153,8 @@ class _CompletionPopupState extends State<CompletionPopup> {
                               : theme.statusChipBg,
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Icon(
-                          _iconForType(item.type),
+                        child: _iconForType(
+                          item.type,
                           size: 13,
                           color: isSelected
                               ? theme.cursor
