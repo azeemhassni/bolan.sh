@@ -90,7 +90,8 @@ class OpenAiCompatibleProvider implements AiProvider {
         throw Exception('No choices in $_name response');
       }
 
-      final message = choices[0]['message'] as Map<String, dynamic>?;
+      final firstChoice = choices[0] as Map<String, dynamic>;
+      final message = firstChoice['message'] as Map<String, dynamic>?;
       return (message?['content'] as String?)?.trim() ?? '';
     } finally {
       client.close();

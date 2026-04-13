@@ -11,7 +11,6 @@ import '../../core/theme/bolan_theme.dart';
 import '../shared/anchored_popover.dart';
 import '../shared/popover_menu.dart';
 import 'ansi_text_parser.dart';
-import 'linkified_text.dart';
 import 'share_image_dialog.dart';
 
 /// Renders a completed command as a Warp-style block.
@@ -404,111 +403,6 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
         ],
       ),
     );
-  }
-
-  Widget _buildPlainOutput(CommandBlock block, BolonTheme theme) {
-    final baseStyle = TextStyle(
-      color: theme.foreground,
-      fontFamily: theme.fontFamily,
-      fontSize: widget.fontSize,
-      height: widget.lineHeight,
-      decoration: TextDecoration.none,
-    );
-
-    // Use colored output if available
-    List<TextSpan> spans;
-    if (block.rawOutput.isNotEmpty) {
-      final parser = AnsiTextParser(theme, ligatures: widget.ligatures);
-      spans = parser.parse(block.rawOutput, baseStyle: baseStyle);
-    } else {
-      spans = [TextSpan(text: block.output, style: baseStyle)];
-    }
-
-    // Make URLs clickable (Cmd+click / Ctrl+click)
-    final linkedSpans = LinkifiedText.linkify(
-      spans,
-      linkColor: theme.ansiCyan,
-    );
-
-    // Apply search highlights if active
-    if (widget.searchHighlight != null) {
-      spans = _applySearchHighlights(
-        block.output, spans, baseStyle, theme,
-      );
-      return GestureDetector(
-        onSecondaryTapDown: widget.onSecondaryTap,
-        child: SelectableText.rich(
-          TextSpan(children: spans),
-          contextMenuBuilder: (_, __) => const SizedBox.shrink(),
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onSecondaryTapDown: widget.onSecondaryTap,
-      child: SelectableText.rich(
-        TextSpan(children: linkedSpans),
-        contextMenuBuilder: (_, __) => const SizedBox.shrink(),
-      ),
-    );
-  }
-
-  /// Overlays search highlights on top of existing styled spans.
-  /// Rebuilds spans from plain text with highlights, preserving colors
-  /// from the ANSI parser would be complex — so we use plain text
-  /// with highlights for simplicity when search is active.
-  List<TextSpan> _applySearchHighlights(
-    String plainText,
-    List<TextSpan> coloredSpans,
-    TextStyle baseStyle,
-    BolonTheme theme,
-  ) {
-    final regex = widget.searchHighlight!;
-    final matches = regex.allMatches(plainText).toList();
-    if (matches.isEmpty) return coloredSpans;
-
-    final highlightStyle = baseStyle.copyWith(
-      backgroundColor: theme.ansiYellow.withAlpha(60),
-    );
-    final currentHighlightStyle = baseStyle.copyWith(
-      backgroundColor: theme.ansiYellow.withAlpha(150),
-      color: theme.background,
-    );
-
-    final result = <TextSpan>[];
-    var lastEnd = 0;
-
-    for (var i = 0; i < matches.length; i++) {
-      final match = matches[i];
-      final globalIndex = widget.blockMatchStartIndex + i;
-      final isCurrent = globalIndex == widget.currentMatchIndex;
-
-      // Text before match
-      if (match.start > lastEnd) {
-        result.add(TextSpan(
-          text: plainText.substring(lastEnd, match.start),
-          style: baseStyle,
-        ));
-      }
-
-      // Highlighted match
-      result.add(TextSpan(
-        text: plainText.substring(match.start, match.end),
-        style: isCurrent ? currentHighlightStyle : highlightStyle,
-      ));
-
-      lastEnd = match.end;
-    }
-
-    // Remaining text
-    if (lastEnd < plainText.length) {
-      result.add(TextSpan(
-        text: plainText.substring(lastEnd),
-        style: baseStyle,
-      ));
-    }
-
-    return result;
   }
 
   Widget _buildScrollableOutput(CommandBlock block, BolonTheme theme) {

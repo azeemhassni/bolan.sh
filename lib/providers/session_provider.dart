@@ -226,7 +226,7 @@ class SessionNotifier extends Notifier<SessionState> {
       switchTab(existing);
       return;
     }
-    final tab = const TabState(
+    const tab = TabState(
       type: TabType.settings,
       customTitle: 'Settings',
     );

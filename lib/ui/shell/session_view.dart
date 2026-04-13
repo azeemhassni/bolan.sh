@@ -344,15 +344,6 @@ class SessionViewState extends ConsumerState<SessionView> {
     );
   }
 
-  void _toggleFindBar() {
-    if (_showFindBar) {
-      // Already open — focus it
-      _findBarKey.currentState?.requestFocus();
-    } else {
-      setState(() => _showFindBar = true);
-    }
-  }
-
   // --- Find ---
 
   void _onFind(FindResult result) {
@@ -443,20 +434,6 @@ class SessionViewState extends ConsumerState<SessionView> {
     return count;
   }
 
-  void _increaseFontSize() {
-    ref.read(fontSizeProvider.notifier).increase();
-    setState(() => _showToast = true);
-  }
-
-  void _decreaseFontSize() {
-    ref.read(fontSizeProvider.notifier).decrease();
-    setState(() => _showToast = true);
-  }
-
-  void _resetFontSize() {
-    ref.read(fontSizeProvider.notifier).reset();
-    setState(() => _showToast = true);
-  }
 }
 
 class _FindMatch {

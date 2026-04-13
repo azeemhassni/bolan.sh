@@ -96,7 +96,7 @@ class ErrorExplainer {
     final match = didYouMean.firstMatch(output);
     if (match != null) {
       final suggested = match.group(1)!;
-      return "Note: the tool itself suggests the correct command is "
+      return 'Note: the tool itself suggests the correct command is '
           "'$suggested'. The user likely made a typo.";
     }
 
