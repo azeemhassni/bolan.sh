@@ -32,6 +32,7 @@ import '../update/update_toast.dart';
 import 'empty_state.dart';
 import 'pane_focus_registry.dart';
 import 'pane_tree_widget.dart';
+import 'session_view.dart';
 import 'tab_bar.dart';
 
 /// Root layout widget for the terminal emulator.
@@ -239,8 +240,12 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       return true;
     }
     if (meta && key == LogicalKeyboardKey.keyF) {
-      // Handled by session_view — just consume to prevent DANG
-      return false;
+      final s = ref.read(sessionProvider);
+      final tab = s.activeTab;
+      if (tab != null && tab.focusedPaneId != null) {
+        SessionViewState.of(tab.focusedPaneId!)?.toggleFindBar();
+      }
+      return true;
     }
     if (meta && key == LogicalKeyboardKey.digit0) {
       ref.read(fontSizeProvider.notifier).reset();

@@ -44,6 +44,10 @@ class SessionView extends ConsumerStatefulWidget {
 /// Public State class so external widgets (e.g. the pane right-click
 /// handler) can grab the live terminal selection through a GlobalKey.
 class SessionViewState extends ConsumerState<SessionView> {
+  static final Map<String, SessionViewState> _registry = {};
+
+  static SessionViewState? of(String paneId) => _registry[paneId];
+
   final _terminalController = TerminalController();
   final _scrollController = ScrollController();
   late final FocusNode _terminalFocusNode;
@@ -64,6 +68,7 @@ class SessionViewState extends ConsumerState<SessionView> {
   bool _showFindBar = false;
   int _findCurrentMatch = 0;
   int _findTotalMatches = 0;
+  final _terminalHighlights = <TerminalHighlight>[];
   List<_FindMatch> _findMatches = [];
   FindResult? _lastFindResult;
 
@@ -73,6 +78,7 @@ class SessionViewState extends ConsumerState<SessionView> {
     _terminalFocusNode = FocusNode(debugLabel: 'terminal-${widget.session.id}');
     widget.session.addListener(_onSessionChanged);
     HardwareKeyboard.instance.addHandler(_handleAltForSelection);
+    if (widget.paneId != null) _registry[widget.paneId!] = this;
     // Register prompt for global focus forwarding after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.paneId != null && _promptKey.currentState != null) {
@@ -131,7 +137,11 @@ class SessionViewState extends ConsumerState<SessionView> {
 
   @override
   void dispose() {
-    if (widget.paneId != null) PaneFocusRegistry.unregister(widget.paneId!);
+    if (widget.paneId case final paneId?) {
+      PaneFocusRegistry.unregister(paneId);
+      _registry.remove(paneId);
+    }
+    _clearTerminalHighlights();
     widget.session.removeListener(_onSessionChanged);
     HardwareKeyboard.instance.removeHandler(_handleAltForSelection);
     // Restore mouseMode if Alt was held when the pane closed.
@@ -336,12 +346,21 @@ class SessionViewState extends ConsumerState<SessionView> {
                   _findMatches = [];
                   _findTotalMatches = 0;
                   _findCurrentMatch = 0;
+                  _clearTerminalHighlights();
                 }),
               ),
             ),
         ],
       ),
     );
+  }
+
+  void toggleFindBar() {
+    if (_showFindBar) {
+      _findBarKey.currentState?.requestFocus();
+    } else {
+      setState(() => _showFindBar = true);
+    }
   }
 
   // --- Find ---
@@ -390,6 +409,31 @@ class SessionViewState extends ConsumerState<SessionView> {
       }
     }
 
+    // Search the live terminal buffer (nano, vi, streaming output, etc.)
+    // and create native xterm highlights for visual feedback.
+    _clearTerminalHighlights();
+    final buffer = widget.session.terminal.buffer;
+    final bufferText = buffer.getText();
+    for (final m in regex.allMatches(bufferText)) {
+      matches.add(_FindMatch(blockIndex: -1, start: m.start, end: m.end));
+
+      // Convert text offset to buffer (x, y) coordinates
+      final start = _textOffsetToCell(bufferText, m.start);
+      final end = _textOffsetToCell(bufferText, m.end);
+      if (start != null && end != null) {
+        try {
+          final h = _terminalController.highlight(
+            p1: buffer.createAnchor(start.$1, start.$2),
+            p2: buffer.createAnchor(end.$1, end.$2),
+            color: const Color(0x60FFFF00),
+          );
+          _terminalHighlights.add(h);
+        } on RangeError {
+          // Anchor out of bounds — skip
+        }
+      }
+    }
+
     setState(() {
       _findMatches = matches;
       _findTotalMatches = matches.length;
@@ -434,6 +478,28 @@ class SessionViewState extends ConsumerState<SessionView> {
     return count;
   }
 
+  void _clearTerminalHighlights() {
+    for (final h in _terminalHighlights) {
+      h.dispose();
+    }
+    _terminalHighlights.clear();
+  }
+
+  /// Converts a character offset in the buffer's `getText()` output to
+  /// (x, y) cell coordinates, accounting for newlines between lines.
+  (int, int)? _textOffsetToCell(String text, int offset) {
+    var y = 0;
+    var lineStart = 0;
+    for (var i = 0; i < text.length; i++) {
+      if (i == offset) return (offset - lineStart, y);
+      if (text[i] == '\n') {
+        y++;
+        lineStart = i + 1;
+      }
+    }
+    if (offset == text.length) return (offset - lineStart, y);
+    return null;
+  }
 }
 
 class _FindMatch {
