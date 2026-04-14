@@ -170,6 +170,16 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                           : ref
                               .read(sessionProvider.notifier)
                               .closeTab(index),
+                      onCloseOthers: sessionState.tabs.length > 1
+                          ? () => ref
+                              .read(sessionProvider.notifier)
+                              .closeOtherTabs(index)
+                          : null,
+                      onCloseRight: index < sessionState.tabs.length - 1
+                          ? () => ref
+                              .read(sessionProvider.notifier)
+                              .closeTabsToRight(index)
+                          : null,
                       onRename: (name) => ref
                           .read(sessionProvider.notifier)
                           .renameTab(index, name),
@@ -226,6 +236,8 @@ class _Tab extends StatefulWidget {
   final BolonTheme theme;
   final VoidCallback onTap;
   final VoidCallback onClose;
+  final VoidCallback? onCloseOthers;
+  final VoidCallback? onCloseRight;
   final ValueChanged<String?> onRename;
 
   const _Tab({
@@ -239,6 +251,8 @@ class _Tab extends StatefulWidget {
     required this.theme,
     required this.onTap,
     required this.onClose,
+    this.onCloseOthers,
+    this.onCloseRight,
     required this.onRename,
   });
 
@@ -366,17 +380,45 @@ class _TabState extends State<_Tab> {
           child: Text(
             'Close Tab',
             style: TextStyle(
-              color: theme.exitFailureFg,
+              color: theme.foreground,
               fontFamily: theme.fontFamily,
               fontSize: 12,
             ),
           ),
         ),
+        if (widget.onCloseRight != null)
+          PopupMenuItem(
+            value: 'close_right',
+            height: 32,
+            child: Text(
+              'Close Tabs to the Right',
+              style: TextStyle(
+                color: theme.foreground,
+                fontFamily: theme.fontFamily,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        if (widget.onCloseOthers != null)
+          PopupMenuItem(
+            value: 'close_others',
+            height: 32,
+            child: Text(
+              'Close All Other Tabs',
+              style: TextStyle(
+                color: theme.exitFailureFg,
+                fontFamily: theme.fontFamily,
+                fontSize: 12,
+              ),
+            ),
+          ),
       ],
     ).then((value) {
       if (value == 'rename') _startEditing();
       if (value == 'reset') widget.onRename(null);
       if (value == 'close') widget.onClose();
+      if (value == 'close_right') widget.onCloseRight?.call();
+      if (value == 'close_others') widget.onCloseOthers?.call();
     });
   }
 

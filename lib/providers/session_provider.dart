@@ -276,6 +276,31 @@ class SessionNotifier extends Notifier<SessionState> {
     state = SessionState(tabs: tabs, activeTabIndex: activeIndex);
   }
 
+  /// Closes all tabs except the one at [keepIndex].
+  void closeOtherTabs(int keepIndex) {
+    if (keepIndex < 0 || keepIndex >= state.tabs.length) return;
+    final kept = state.tabs[keepIndex];
+    for (var i = 0; i < state.tabs.length; i++) {
+      if (i == keepIndex) continue;
+      final tab = state.tabs[i];
+      if (tab.rootPane != null) PaneManager.disposeAll(tab.rootPane!);
+    }
+    state = SessionState(tabs: [kept], activeTabIndex: 0);
+  }
+
+  /// Closes all tabs to the right of [index].
+  void closeTabsToRight(int index) {
+    if (index < 0 || index >= state.tabs.length - 1) return;
+    for (var i = index + 1; i < state.tabs.length; i++) {
+      final tab = state.tabs[i];
+      if (tab.rootPane != null) PaneManager.disposeAll(tab.rootPane!);
+    }
+    final tabs = state.tabs.sublist(0, index + 1);
+    var activeIndex = state.activeTabIndex;
+    if (activeIndex > index) activeIndex = index;
+    state = SessionState(tabs: tabs, activeTabIndex: activeIndex);
+  }
+
   /// Moves the tab at [oldIndex] to [newIndex], adjusting the active
   /// tab pointer so the same logical tab stays selected.
   void reorderTab(int oldIndex, int newIndex) {
