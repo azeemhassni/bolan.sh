@@ -220,6 +220,22 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       _switchTab(shift ? -1 : 1);
       return true;
     }
+    if (meta && shift && key == LogicalKeyboardKey.arrowLeft) {
+      final s = ref.read(sessionProvider);
+      if (s.activeTabIndex > 0) {
+        ref.read(sessionProvider.notifier)
+            .reorderTab(s.activeTabIndex, s.activeTabIndex - 1);
+      }
+      return true;
+    }
+    if (meta && shift && key == LogicalKeyboardKey.arrowRight) {
+      final s = ref.read(sessionProvider);
+      if (s.activeTabIndex < s.tabs.length - 1) {
+        ref.read(sessionProvider.notifier)
+            .reorderTab(s.activeTabIndex, s.activeTabIndex + 2);
+      }
+      return true;
+    }
     if (meta && key == LogicalKeyboardKey.keyD && shift) {
       ref.read(sessionProvider.notifier).splitPane(Axis.vertical);
       return true;

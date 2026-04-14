@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:macos_window_utils/widgets/macos_toolbar_passthrough.dart';
 import 'package:macos_window_utils/window_manipulator.dart';
 
 import '../../core/terminal/session.dart';
@@ -28,7 +29,33 @@ class BolonTabBar extends ConsumerStatefulWidget {
 }
 
 class _BolonTabBarState extends ConsumerState<BolonTabBar> {
+  final _scrollController = ScrollController();
+  final _tabKeys = <int, GlobalKey>{};
   DateTime? _lastTapDown;
+  int? _lastActiveIndex;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  GlobalKey _keyFor(int index) =>
+      _tabKeys.putIfAbsent(index, () => GlobalKey());
+
+  /// Scrolls the tab bar so the tab at [index] is fully visible.
+  /// Uses the tab's actual render position, not an estimate.
+  void _scrollToTab(int index) {
+    final ctx = _tabKeys[index]?.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+      alignment: 0.5,
+      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+    );
+  }
 
   void _handlePointerDown() {
     if (!Platform.isMacOS) return;
@@ -53,6 +80,15 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
     final theme = BolonTheme.of(context);
     final sessionState = ref.watch(sessionProvider);
 
+    // Keep the active tab visible when it changes (e.g. keyboard switch
+    // or keyboard reorder). Schedule after the frame so layout is ready.
+    if (_lastActiveIndex != sessionState.activeTabIndex) {
+      _lastActiveIndex = sessionState.activeTabIndex;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scrollToTab(sessionState.activeTabIndex);
+      });
+    }
+
     return Listener(
       onPointerDown: (_) => _handlePointerDown(),
       child: Container(
@@ -60,35 +96,47 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
         color: theme.tabBarBackground,
         child: Row(
           children: [
-            // Tabs
+            // Tabs — expand to fill remaining space, scroll on overflow.
+            // Individual tabs are wrapped in MacosToolbarPassthrough
+            // (inside _DraggableTab) so empty scroll area remains a
+            // window drag zone.
             Expanded(
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: sessionState.tabs.length,
-                padding: EdgeInsets.only(
-                  left: Platform.isMacOS ? 78 : 8,
-                ),
+              child: _TabScrollFades(
+                controller: _scrollController,
+                background: theme.tabBarBackground,
+                child: ListView.builder(
+                  controller: _scrollController,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: sessionState.tabs.length,
+                  padding: EdgeInsets.only(
+                    left: Platform.isMacOS ? 78 : 8,
+                  ),
                 itemBuilder: (context, index) {
                   final tab = sessionState.tabs[index];
                   final isActive = index == sessionState.activeTabIndex;
 
                   if (tab.isSettings) {
-                    return _Tab(
-                      title: 'Settings',
-                      fullTitle: 'Settings',
-                      status: TabStatus.idle,
-                      isActive: isActive,
-                      isRenamed: false,
-                      icon: Icons.settings_outlined,
-                      canRename: false,
-                      theme: theme,
-                      onTap: () => ref
-                          .read(sessionProvider.notifier)
-                          .switchTab(index),
-                      onClose: () => ref
-                          .read(sessionProvider.notifier)
-                          .closeTab(index),
-                      onRename: (_) {},
+                    return KeyedSubtree(
+                      key: _keyFor(index),
+                      child: MacosToolbarPassthrough(
+                        child: _Tab(
+                        title: 'Settings',
+                        fullTitle: 'Settings',
+                        status: TabStatus.idle,
+                        isActive: isActive,
+                        isRenamed: false,
+                        icon: Icons.settings_outlined,
+                        canRename: false,
+                        theme: theme,
+                        onTap: () => ref
+                            .read(sessionProvider.notifier)
+                            .switchTab(index),
+                        onClose: () => ref
+                            .read(sessionProvider.notifier)
+                            .closeTab(index),
+                        onRename: (_) {},
+                        ),
+                      ),
                     );
                   }
 
@@ -99,10 +147,12 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                   final fullTitle = tab.customTitle ??
                       session?.fullTabTitle ??
                       'zsh';
-                  return _DraggableTab(
-                    index: index,
-                    theme: theme,
-                    onReorder: (oldIndex, newIndex) => ref
+                  return KeyedSubtree(
+                    key: _keyFor(index),
+                    child: _DraggableTab(
+                      index: index,
+                      theme: theme,
+                      onReorder: (oldIndex, newIndex) => ref
                         .read(sessionProvider.notifier)
                         .reorderTab(oldIndex, newIndex),
                     child: _Tab(
@@ -124,31 +174,38 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                           .read(sessionProvider.notifier)
                           .renameTab(index, name),
                     ),
+                    ),
                   );
-                },
+                  },
+                ),
               ),
             ),
-            // + button
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _IconButton(
-                    icon: Icons.add,
-                    theme: theme,
-                    onTap: () =>
-                        ref.read(sessionProvider.notifier).createTab(),
-                  ),
-                  const SizedBox(width: 2),
-                  _IconButton(
-                    icon: Icons.settings_outlined,
-                    theme: theme,
-                    onTap: () => ref
-                        .read(sessionProvider.notifier)
-                        .openSettingsTab(),
-                  ),
-                ],
+            // Window drag handle — fixed 100px, unwrapped so native
+            // macOS title bar handles drag gestures here.
+            const SizedBox(width: 100, height: 36),
+            // + and settings buttons
+            MacosToolbarPassthrough(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _IconButton(
+                      icon: Icons.add,
+                      theme: theme,
+                      onTap: () =>
+                          ref.read(sessionProvider.notifier).createTab(),
+                    ),
+                    const SizedBox(width: 2),
+                    _IconButton(
+                      icon: Icons.settings_outlined,
+                      theme: theme,
+                      onTap: () => ref
+                          .read(sessionProvider.notifier)
+                          .openSettingsTab(),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -708,7 +765,9 @@ class _DraggableTabState extends State<_DraggableTab> {
         final box = context.findRenderObject() as RenderBox?;
         if (box == null) return;
         final local = box.globalToLocal(details.offset);
-        final after = local.dx > box.size.width / 2;
+        // 40% threshold — easier to push tabs past each other in
+        // either direction without having to cross the full midpoint.
+        final after = local.dx > box.size.width * 0.4;
         if (after != _dropAfter || !_hovering) {
           setState(() {
             _hovering = true;
@@ -726,16 +785,21 @@ class _DraggableTabState extends State<_DraggableTab> {
       builder: (context, candidate, rejected) {
         return Stack(
           children: [
-            Draggable<int>(
-              data: widget.index,
-              axis: Axis.horizontal,
-              feedback: Material(
-                color: Colors.transparent,
-                child: Opacity(opacity: 0.85, child: widget.child),
+            MacosToolbarPassthrough(
+              child: Draggable<int>(
+                data: widget.index,
+                axis: Axis.horizontal,
+                feedback: Material(
+                  color: Colors.transparent,
+                  child: SizedBox(
+                    height: 36,
+                    child: Opacity(opacity: 0.85, child: widget.child),
+                  ),
+                ),
+                childWhenDragging:
+                    Opacity(opacity: 0.35, child: widget.child),
+                child: widget.child,
               ),
-              childWhenDragging:
-                  Opacity(opacity: 0.35, child: widget.child),
-              child: widget.child,
             ),
             // Drop indicator — a 2px accent stripe on the side the
             // dragged tab will land.
@@ -753,6 +817,112 @@ class _DraggableTabState extends State<_DraggableTab> {
           ],
         );
       },
+    );
+  }
+}
+
+/// Overlays left/right gradient fades on a horizontal scroll area to
+/// indicate that more content exists in that direction.
+class _TabScrollFades extends StatefulWidget {
+  final ScrollController controller;
+  final Color background;
+  final Widget child;
+
+  const _TabScrollFades({
+    required this.controller,
+    required this.background,
+    required this.child,
+  });
+
+  @override
+  State<_TabScrollFades> createState() => _TabScrollFadesState();
+}
+
+class _TabScrollFadesState extends State<_TabScrollFades> {
+  bool _showLeft = false;
+  bool _showRight = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_update);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _update());
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_update);
+    super.dispose();
+  }
+
+  void _update() {
+    if (!widget.controller.hasClients) return;
+    final pos = widget.controller.position;
+    final left = pos.pixels > 1;
+    final right = pos.pixels < pos.maxScrollExtent - 1;
+    if (left != _showLeft || right != _showRight) {
+      setState(() {
+        _showLeft = left;
+        _showRight = right;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (_) {
+        _update();
+        return false;
+      },
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
+        children: [
+          widget.child,
+          if (_showLeft)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 24,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        widget.background,
+                        widget.background.withAlpha(0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_showRight)
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 24,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerRight,
+                      end: Alignment.centerLeft,
+                      colors: [
+                        widget.background,
+                        widget.background.withAlpha(0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
