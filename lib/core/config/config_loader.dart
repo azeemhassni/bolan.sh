@@ -16,8 +16,14 @@ import 'config_validator.dart';
 class ConfigLoader extends ChangeNotifier {
   static const _validator = ConfigValidator();
 
+  /// Optional override for the config file path. Used in tests to
+  /// avoid touching the user's real config at `~/.config/bolan/config.toml`.
+  final String? configPathOverride;
+
   AppConfig _config = const AppConfig();
   Timer? _watchTimer;
+
+  ConfigLoader({this.configPathOverride});
 
   AppConfig get config => _config;
 
@@ -82,6 +88,9 @@ class ConfigLoader extends ChangeNotifier {
   }
 
   Future<File> _configFile() async {
+    if (configPathOverride != null) {
+      return File(configPathOverride!);
+    }
     if (Platform.isMacOS || Platform.isLinux) {
       final home = Platform.environment['HOME'] ?? '';
       return File('$home/.config/bolan/config.toml');

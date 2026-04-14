@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_pty/flutter_pty.dart';
 import 'package:uuid/uuid.dart';
 import 'package:xterm/xterm.dart';
@@ -165,12 +166,18 @@ class TerminalSession extends ChangeNotifier {
       resolvedDir = home;
     }
 
+    // Start the shell as a login shell so .zprofile / .bash_profile
+    // runs and sets up PATH (including Homebrew, nvm, etc.).
+    // Merge with the current environment so PATH, HOME, USER, etc.
+    // propagate to the shell instead of being wiped.
     final pty = Pty.start(
       resolvedShell,
+      arguments: ['-l'],
       columns: columns,
       rows: rows,
       workingDirectory: resolvedDir,
       environment: {
+        ...Platform.environment,
         'TERM': 'xterm-256color',
         'TERM_PROGRAM': 'Bolan',
       },
@@ -441,12 +448,6 @@ class TerminalSession extends ChangeNotifier {
       var cleaned = _stripUnsupportedCsi(decoded);
       cleaned = _patchInsertMode(cleaned);
 
-      // xterm.dart 4.0.0 has a buffer-line resize race: when the
-      // terminal column count changes (window/pane resize or zoom),
-      // existing buffer lines occasionally aren't re-allocated in
-      // time and `setCell` writes past the underlying Uint32List
-      // capacity, throwing RangeError. A dropped chunk of output is
-      // far better than a dead session — log the error and continue.
       try {
         terminal.write(cleaned);
       } on RangeError catch (e, st) {
@@ -470,9 +471,19 @@ class TerminalSession extends ChangeNotifier {
       }
     });
 
-    // Terminal keyboard/mouse output → PTY input
+    // Terminal keyboard/mouse output → PTY input.
+    //
+    // Shift+Enter: xterm sends \r for both Enter and Shift+Enter.
+    // Modern TUIs (Claude Code, opencode, gemini-cli, codex) treat
+    // \r as "submit" and \n as "insert newline". We intercept \r
+    // here and transform to \n when Shift is currently held, letting
+    // users compose multi-line prompts inside those TUIs.
     terminal.onOutput = (data) {
-      _pty.write(const Utf8Encoder().convert(data));
+      var out = data;
+      if (out == '\r' && HardwareKeyboard.instance.isShiftPressed) {
+        out = '\n';
+      }
+      _pty.write(const Utf8Encoder().convert(out));
     };
 
     // Terminal resize → PTY resize

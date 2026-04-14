@@ -30,10 +30,10 @@ class StatusChip extends ConsumerWidget {
 
   /// Static chip metrics that don't scale with font size.
   static const FontWeight textWeight = FontWeight.w700;
-  static const double iconGap = 6;
+  static const double iconGap = 5;
   static const EdgeInsets padding =
-      EdgeInsets.symmetric(horizontal: 12, vertical: 6);
-  static const double cornerRadius = 6;
+      EdgeInsets.symmetric(horizontal: 4, vertical: 2);
+  static const double cornerRadius = 4;
 
   /// Chip text matches the current terminal font size exactly.
   /// The only visual distinction from terminal text is [textWeight]

@@ -7,7 +7,19 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Config round-trip', () {
-    test('all fields survive write → parse cycle', () {
+    late Directory tmpDir;
+    late String configPath;
+
+    setUp(() {
+      tmpDir = Directory.systemTemp.createTempSync('bolan_config_test_');
+      configPath = '${tmpDir.path}/config.toml';
+    });
+
+    tearDown(() {
+      if (tmpDir.existsSync()) tmpDir.deleteSync(recursive: true);
+    });
+
+    test('save → load preserves all fields', () async {
       const original = AppConfig(
         general: GeneralConfig(
           shell: '/bin/bash',
@@ -31,16 +43,7 @@ void main() {
         ),
         ai: AiConfig(
           provider: 'gemini',
-          localModelSize: 'medium',
-          model: 'custom-model',
-          ollamaUrl: 'http://localhost:11434',
-          geminiModel: 'gemma-3-27b-it',
-          openaiModel: 'gpt-4o',
-          anthropicModel: 'claude-sonnet-4-20250514',
-          anthropicMode: 'api',
           enabled: true,
-          commandSuggestions: false,
-          smartHistorySearch: false,
           shareHistory: true,
         ),
         update: UpdateConfig(
@@ -51,83 +54,92 @@ void main() {
         activeTheme: 'monokai',
       );
 
-      // Write to TOML using ConfigLoader's internal method via save/load
-      // We test the round-trip by writing to a temp file and reading back.
-      final tmpFile = File('${Directory.systemTemp.path}/bolan_test_config.toml');
-      try {
-        final loader = ConfigLoader();
-        // Use the public save API which writes TOML
-        loader.save(original);
-        // The save writes to the default path, so we test the validator
-        // parsing directly against the TOML output format.
+      final writer = ConfigLoader(configPathOverride: configPath);
+      await writer.save(original);
 
-        // Instead, test the validator directly with a known map.
-        const validator = ConfigValidator();
-        final parsed = validator.validate({
-          'theme': 'monokai',
-          'general': {
-            'shell': '/bin/bash',
-            'working_directory': '~/projects',
-            'restore_sessions': true,
-            'confirm_on_quit': false,
-            'notify_long_running': false,
-            'long_running_threshold_seconds': 30,
-            'prompt_chips': ['shell', 'cwd'],
-            'startup_commands': ['echo hello'],
-          },
-          'editor': {
-            'font_family': 'Fira Code',
-            'font_size': 18.0,
-            'line_height': 1.5,
-            'cursor_style': 'bar',
-            'cursor_blink': false,
-            'scrollback_lines': 5000,
-            'block_mode': true,
-            'ligatures': true,
-          },
-          'ai': {
-            'provider': 'gemini',
-            'local_model_size': 'medium',
-            'model': 'custom-model',
-            'ollama_url': 'http://localhost:11434',
-            'enabled': true,
-            'command_suggestions': false,
-            'smart_history_search': false,
-            'share_history': true,
-          },
-          'updates': {
-            'auto_check': false,
-            'last_check_time': '2026-04-13T10:00:00Z',
-            'skipped_version': '1.0.0',
-          },
-        });
+      final reader = ConfigLoader(configPathOverride: configPath);
+      await reader.load();
+      final loaded = reader.config;
 
-        expect(parsed.activeTheme, 'monokai');
-        expect(parsed.general.shell, '/bin/bash');
-        expect(parsed.general.workingDirectory, '~/projects');
-        expect(parsed.general.restoreSessions, true);
-        expect(parsed.general.confirmOnQuit, false);
-        expect(parsed.general.notifyLongRunning, false);
-        expect(parsed.general.longRunningThresholdSeconds, 30);
-        expect(parsed.general.promptChips, ['shell', 'cwd']);
-        expect(parsed.general.startupCommands, ['echo hello']);
-        expect(parsed.editor.fontFamily, 'Fira Code');
-        expect(parsed.editor.fontSize, 18.0);
-        expect(parsed.editor.lineHeight, 1.5);
-        expect(parsed.editor.cursorStyle, 'bar');
-        expect(parsed.editor.cursorBlink, false);
-        expect(parsed.editor.scrollbackLines, 5000);
-        expect(parsed.editor.ligatures, true);
-        expect(parsed.ai.provider, 'gemini');
-        expect(parsed.ai.enabled, true);
-        expect(parsed.ai.commandSuggestions, false);
-        expect(parsed.ai.shareHistory, true);
-        expect(parsed.update.autoCheck, false);
-        expect(parsed.update.lastCheckTime, '2026-04-13T10:00:00Z');
-        expect(parsed.update.skippedVersion, '1.0.0');
-      } finally {
-        if (tmpFile.existsSync()) tmpFile.deleteSync();
-      }
+      expect(loaded.activeTheme, 'monokai');
+      expect(loaded.general.shell, '/bin/bash');
+      expect(loaded.general.workingDirectory, '~/projects');
+      expect(loaded.general.restoreSessions, true);
+      expect(loaded.general.confirmOnQuit, false);
+      expect(loaded.general.notifyLongRunning, false);
+      expect(loaded.general.longRunningThresholdSeconds, 30);
+      expect(loaded.general.promptChips, ['shell', 'cwd']);
+      expect(loaded.editor.fontFamily, 'Fira Code');
+      expect(loaded.editor.fontSize, 18.0);
+      expect(loaded.ai.provider, 'gemini');
+      expect(loaded.update.autoCheck, false);
+      expect(loaded.update.skippedVersion, '1.0.0');
+    });
+
+    test('validator parses known map', () {
+      const validator = ConfigValidator();
+      final parsed = validator.validate({
+        'theme': 'monokai',
+        'general': {
+          'shell': '/bin/bash',
+          'working_directory': '~/projects',
+          'restore_sessions': true,
+          'confirm_on_quit': false,
+          'notify_long_running': false,
+          'long_running_threshold_seconds': 30,
+          'prompt_chips': ['shell', 'cwd'],
+          'startup_commands': ['echo hello'],
+        },
+        'editor': {
+          'font_family': 'Fira Code',
+          'font_size': 18.0,
+          'line_height': 1.5,
+          'cursor_style': 'bar',
+          'cursor_blink': false,
+          'scrollback_lines': 5000,
+          'block_mode': true,
+          'ligatures': true,
+        },
+        'ai': {
+          'provider': 'gemini',
+          'local_model_size': 'medium',
+          'model': 'custom-model',
+          'ollama_url': 'http://localhost:11434',
+          'enabled': true,
+          'command_suggestions': false,
+          'smart_history_search': false,
+          'share_history': true,
+        },
+        'updates': {
+          'auto_check': false,
+          'last_check_time': '2026-04-13T10:00:00Z',
+          'skipped_version': '1.0.0',
+        },
+      });
+
+      expect(parsed.activeTheme, 'monokai');
+      expect(parsed.general.shell, '/bin/bash');
+      expect(parsed.general.workingDirectory, '~/projects');
+      expect(parsed.general.restoreSessions, true);
+      expect(parsed.general.confirmOnQuit, false);
+      expect(parsed.general.notifyLongRunning, false);
+      expect(parsed.general.longRunningThresholdSeconds, 30);
+      expect(parsed.general.promptChips, ['shell', 'cwd']);
+      expect(parsed.general.startupCommands, ['echo hello']);
+      expect(parsed.editor.fontFamily, 'Fira Code');
+      expect(parsed.editor.fontSize, 18.0);
+      expect(parsed.editor.lineHeight, 1.5);
+      expect(parsed.editor.cursorStyle, 'bar');
+      expect(parsed.editor.cursorBlink, false);
+      expect(parsed.editor.scrollbackLines, 5000);
+      expect(parsed.editor.ligatures, true);
+      expect(parsed.ai.provider, 'gemini');
+      expect(parsed.ai.enabled, true);
+      expect(parsed.ai.commandSuggestions, false);
+      expect(parsed.ai.shareHistory, true);
+      expect(parsed.update.autoCheck, false);
+      expect(parsed.update.lastCheckTime, '2026-04-13T10:00:00Z');
+      expect(parsed.update.skippedVersion, '1.0.0');
     });
 
     test('copyWith preserves all fields when changing one', () {

@@ -202,6 +202,7 @@ class PromptInputState extends State<PromptInput> {
       cursorWidth: widget.cursorStyle == 'block'
           ? widget.fontSize * 0.6
           : 2,
+      cursorRadius: Radius.zero,
       decoration: const InputDecoration(
         border: InputBorder.none,
         contentPadding: EdgeInsets.zero,

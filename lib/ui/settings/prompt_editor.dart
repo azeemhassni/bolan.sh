@@ -289,7 +289,7 @@ class _PromptEditorState extends State<PromptEditor> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: theme.statusChipBg,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(4),
         border: Border.all(color: color.withAlpha(60), width: 1),
       ),
       child: Row(
@@ -332,7 +332,7 @@ class _PromptEditorState extends State<PromptEditor> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: theme.statusChipBg,
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(4),
           border: Border.all(color: color.withAlpha(30), width: 1),
         ),
         child: Row(

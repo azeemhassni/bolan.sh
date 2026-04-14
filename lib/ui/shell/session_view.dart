@@ -101,6 +101,67 @@ class SessionViewState extends ConsumerState<SessionView> {
     _terminalController.clearSelection();
   }
 
+  /// Intercepts text-editor-style shortcuts (Cmd/Option + arrows and
+  /// Delete) when a TUI is running, and transforms them into
+  /// readline-compatible byte sequences sent directly to the PTY.
+  ///
+  /// These are the same bytes Terminal.app and iTerm2 send, so they
+  /// work in bash, zsh, fish, Python REPL, Node REPL, Claude Code,
+  /// opencode, gemini-cli — anything using readline conventions.
+  ///
+  /// Returns [KeyEventResult.handled] for intercepted keys (which
+  /// prevents xterm's default processing), [ignored] for everything
+  /// else so xterm handles it normally.
+  KeyEventResult _handleTerminalKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    final key = event.logicalKey;
+    final meta = HardwareKeyboard.instance.isMetaPressed;
+    final alt = HardwareKeyboard.instance.isAltPressed;
+
+    // macOS primary modifier: Cmd. Linux/Windows: use Ctrl via shell's
+    // own bindings — we only intercept Cmd/Option here to match macOS
+    // text-field conventions. On Linux these modifiers usually aren't
+    // used for arrow keys, so behavior stays default.
+    if (meta) {
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        widget.session.writeInput('\x01'); // Ctrl+A — beginning-of-line
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        widget.session.writeInput('\x05'); // Ctrl+E — end-of-line
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.backspace) {
+        widget.session.writeInput('\x15'); // Ctrl+U — kill line
+        return KeyEventResult.handled;
+      }
+    }
+
+    if (alt) {
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        widget.session.writeInput('\x1bb'); // ESC+b — backward-word
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        widget.session.writeInput('\x1bf'); // ESC+f — forward-word
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.backspace) {
+        widget.session.writeInput('\x1b\x7f'); // ESC+DEL — backward-kill-word
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.delete) {
+        widget.session.writeInput('\x1bd'); // ESC+d — kill-word
+        return KeyEventResult.handled;
+      }
+    }
+
+    return KeyEventResult.ignored;
+  }
+
   /// Listens for Alt key state changes and toggles this session's
   /// terminal mouse mode so the user can drag-select text while a
   /// mouse-tracking TUI is running. Returns false to never consume
@@ -247,6 +308,7 @@ class SessionViewState extends ConsumerState<SessionView> {
                   autofocus: true,
                   cursorType: cursorType,
                   backgroundOpacity: 0,
+                  onKeyEvent: _handleTerminalKey,
                 ),
                 // Cursor overlay:
                 //  - Block: paints the character under the cursor
