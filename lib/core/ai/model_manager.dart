@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 /// Available local model sizes.
 enum ModelSize {
   small,
@@ -94,9 +96,13 @@ const modelInfoMap = <ModelSize, ModelInfo>{
 class ModelManager {
   ModelManager._();
 
+  // Llamafile runtime — pinned to a specific release for reproducible
+  // SHA256 verification and stable inference behavior. Bump deliberately
+  // after testing the new version against our prompts.
+  static const _runtimeVersion = '0.10.0';
   static const _runtimeFileName = 'llamafile';
   static const _runtimeUrl =
-      'https://github.com/Mozilla-Ocho/llamafile/releases/latest/download/llamafile';
+      'https://github.com/mozilla-ai/llamafile/releases/download/$_runtimeVersion/llamafile-$_runtimeVersion';
 
   /// Returns the directory for model files.
   static String modelsDir() {
@@ -146,11 +152,16 @@ class ModelManager {
   }
 
   /// Download URL for a model size (from HuggingFace).
-  static String downloadUrl(ModelSize size) =>
-      modelInfoMap[size]!.downloadUrl;
+  static String downloadUrl(ModelSize size) => modelInfoMap[size]!.downloadUrl;
 
   /// Download URL for the llamafile runtime.
   static String get runtimeUrl => _runtimeUrl;
+
+  /// Pinned version string of the llamafile runtime.
+  static String get runtimeVersion => _runtimeVersion;
+
+  /// Whether the llamafile runtime binary exists on disk.
+  static bool isRuntimeDownloaded() => File(runtimePath()).existsSync();
 
   /// Downloads the model for [size] with progress reporting.
   ///
@@ -167,6 +178,24 @@ class ModelManager {
     final download = ModelDownload._(
       url: downloadUrl(size),
       targetPath: modelPath(size),
+      onProgress: onProgress,
+      onComplete: onComplete,
+      onError: onError,
+    );
+    download._start();
+    return download;
+  }
+
+  /// Downloads the llamafile runtime binary. Returns a [ModelDownload]
+  /// handle with the same pause/resume/cancel semantics as [download].
+  static ModelDownload downloadRuntime({
+    required void Function(int received, int total) onProgress,
+    required void Function() onComplete,
+    required void Function(String error) onError,
+  }) {
+    final download = ModelDownload._(
+      url: runtimeUrl,
+      targetPath: runtimePath(),
       onProgress: onProgress,
       onComplete: onComplete,
       onError: onError,
@@ -326,7 +355,13 @@ class ModelDownload {
       }
 
       _onComplete();
-    } on Exception catch (e) {
+    } on Exception catch (e, st) {
+      debugPrint('[bolan-dl] FAIL url=$_url: $e\n$st');
+      if (!_cancelled && !_paused) {
+        _onError(e.toString());
+      }
+    } catch (e, st) {
+      debugPrint('[bolan-dl] FAIL (Error) url=$_url: $e\n$st');
       if (!_cancelled && !_paused) {
         _onError(e.toString());
       }
@@ -343,5 +378,16 @@ bool hasPartialDownload(ModelSize size) {
 /// Returns the size of the partial download in bytes, or 0.
 int partialDownloadSize(ModelSize size) {
   final partFile = File('${ModelManager.modelPath(size)}.part');
+  return partFile.existsSync() ? partFile.lengthSync() : 0;
+}
+
+/// Whether a partial llamafile runtime download exists.
+bool hasPartialRuntimeDownload() {
+  return File('${ModelManager.runtimePath()}.part').existsSync();
+}
+
+/// Returns the size of the partial runtime download in bytes, or 0.
+int partialRuntimeDownloadSize() {
+  final partFile = File('${ModelManager.runtimePath()}.part');
   return partFile.existsSync() ? partFile.lengthSync() : 0;
 }

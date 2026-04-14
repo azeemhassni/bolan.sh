@@ -2055,6 +2055,19 @@ class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
           // Download progress (shown while downloading or paused)
           if (isActiveDownload) ...[
             const SizedBox(height: 10),
+            if (dlState.phaseCount > 1 && dlState.phase != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'Step ${dlState.phaseIndex} of ${dlState.phaseCount}  ·  ${dlState.phaseLabel}',
+                  style: TextStyle(
+                    color: t.dimForeground,
+                    fontFamily: t.fontFamily,
+                    fontSize: 11,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
             ClipRRect(
               borderRadius: BorderRadius.circular(3),
               child: LinearProgressIndicator(
@@ -2088,7 +2101,7 @@ class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Download failed. Tap Download to retry.',
+                      'Download failed. Tap Download to retry.\n${dlState.error}',
                       style: TextStyle(
                         color: t.exitFailureFg,
                         fontFamily: t.fontFamily,
