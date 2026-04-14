@@ -16,6 +16,9 @@ import '../../providers/session_provider.dart';
 /// key handler to avoid stealing keystrokes.
 bool tabRenameActive = false;
 
+const double _kMaxTabWidth = 200.0;
+const double _kMinTabWidth = 130.0;
+
 /// Compact tab bar rendered in the macOS title bar area.
 ///
 /// Matches Warp's tab style: compact height, tight spacing, gradient-fade
@@ -43,6 +46,73 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
 
   GlobalKey _keyFor(int index) =>
       _tabKeys.putIfAbsent(index, () => GlobalKey());
+
+  Widget _buildTabItem(int index, SessionState sessionState, BolonTheme theme) {
+    final tab = sessionState.tabs[index];
+    final isActive = index == sessionState.activeTabIndex;
+
+    if (tab.isSettings) {
+      return KeyedSubtree(
+        key: _keyFor(index),
+        child: MacosToolbarPassthrough(
+          child: _Tab(
+            title: 'Settings',
+            fullTitle: 'Settings',
+            status: TabStatus.idle,
+            isActive: isActive,
+            isRenamed: false,
+            icon: Icons.settings_outlined,
+            canRename: false,
+            theme: theme,
+            onTap: () =>
+                ref.read(sessionProvider.notifier).switchTab(index),
+            onClose: () =>
+                ref.read(sessionProvider.notifier).closeTab(index),
+            onRename: (_) {},
+          ),
+        ),
+      );
+    }
+
+    final session = tab.focusedSession;
+    final title = tab.customTitle ?? session?.tabTitle ?? 'zsh';
+    final fullTitle = tab.customTitle ?? session?.fullTabTitle ?? 'zsh';
+    return KeyedSubtree(
+      key: _keyFor(index),
+      child: _DraggableTab(
+        index: index,
+        theme: theme,
+        onReorder: (oldIndex, newIndex) => ref
+            .read(sessionProvider.notifier)
+            .reorderTab(oldIndex, newIndex),
+        child: _Tab(
+          title: title,
+          fullTitle: fullTitle,
+          status: session?.tabStatus ?? TabStatus.idle,
+          isActive: isActive,
+          isRenamed: tab.customTitle != null,
+          theme: theme,
+          onTap: () =>
+              ref.read(sessionProvider.notifier).switchTab(index),
+          onClose: () => widget.onCloseTab != null
+              ? widget.onCloseTab!(index)
+              : ref.read(sessionProvider.notifier).closeTab(index),
+          onCloseOthers: sessionState.tabs.length > 1
+              ? () => ref
+                  .read(sessionProvider.notifier)
+                  .closeOtherTabs(index)
+              : null,
+          onCloseRight: index < sessionState.tabs.length - 1
+              ? () => ref
+                  .read(sessionProvider.notifier)
+                  .closeTabsToRight(index)
+              : null,
+          onRename: (name) =>
+              ref.read(sessionProvider.notifier).renameTab(index, name),
+        ),
+      ),
+    );
+  }
 
   /// Scrolls the tab bar so the tab at [index] is fully visible.
   /// Uses the tab's actual render position, not an estimate.
@@ -100,99 +170,50 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
             // Tabs — expand to fill remaining space, scroll on overflow.
             // Individual tabs are wrapped in MacosToolbarPassthrough
             // (inside _DraggableTab) so empty scroll area remains a
-            // window drag zone.
+            // window drag zone on macOS. On Linux the ListView's pan
+            // recognizer wins the gesture arena over a Stacked
+            // MoveWindow, so we swap in a non-scrolling Row whose
+            // trailing space is an Expanded MoveWindow whenever the
+            // tabs fit. On overflow we fall back to the ListView and
+            // rely on the 100px handle below for window drag.
             Expanded(
               child: _TabScrollFades(
                 controller: _scrollController,
                 background: theme.tabBarBackground,
-                child: ListView.builder(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  itemCount: sessionState.tabs.length,
-                  padding: EdgeInsets.only(
-                    left: Platform.isMacOS ? 78 : 8,
-                  ),
-                itemBuilder: (context, index) {
-                  final tab = sessionState.tabs[index];
-                  final isActive = index == sessionState.activeTabIndex;
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final tabs = sessionState.tabs;
+                    final leftPad = Platform.isMacOS ? 78.0 : 8.0;
+                    final tabsFit = Platform.isLinux &&
+                        leftPad + tabs.length * _kMaxTabWidth <=
+                            constraints.maxWidth;
 
-                  if (tab.isSettings) {
-                    return KeyedSubtree(
-                      key: _keyFor(index),
-                      child: MacosToolbarPassthrough(
-                        child: _Tab(
-                        title: 'Settings',
-                        fullTitle: 'Settings',
-                        status: TabStatus.idle,
-                        isActive: isActive,
-                        isRenamed: false,
-                        icon: Icons.settings_outlined,
-                        canRename: false,
-                        theme: theme,
-                        onTap: () => ref
-                            .read(sessionProvider.notifier)
-                            .switchTab(index),
-                        onClose: () => ref
-                            .read(sessionProvider.notifier)
-                            .closeTab(index),
-                        onRename: (_) {},
-                        ),
-                      ),
+                    if (tabsFit) {
+                      return Row(
+                        children: [
+                          SizedBox(width: leftPad),
+                          for (var i = 0; i < tabs.length; i++)
+                            _buildTabItem(i, sessionState, theme),
+                          Expanded(child: MoveWindow()),
+                        ],
+                      );
+                    }
+                    return ListView.builder(
+                      controller: _scrollController,
+                      scrollDirection: Axis.horizontal,
+                      itemCount: tabs.length,
+                      padding: EdgeInsets.only(left: leftPad),
+                      itemBuilder: (context, index) =>
+                          _buildTabItem(index, sessionState, theme),
                     );
-                  }
-
-                  final session = tab.focusedSession;
-                  final title = tab.customTitle ??
-                      session?.tabTitle ??
-                      'zsh';
-                  final fullTitle = tab.customTitle ??
-                      session?.fullTabTitle ??
-                      'zsh';
-                  return KeyedSubtree(
-                    key: _keyFor(index),
-                    child: _DraggableTab(
-                      index: index,
-                      theme: theme,
-                      onReorder: (oldIndex, newIndex) => ref
-                        .read(sessionProvider.notifier)
-                        .reorderTab(oldIndex, newIndex),
-                    child: _Tab(
-                      title: title,
-                      fullTitle: fullTitle,
-                      status: session?.tabStatus ?? TabStatus.idle,
-                      isActive: isActive,
-                      isRenamed: tab.customTitle != null,
-                      theme: theme,
-                      onTap: () => ref
-                          .read(sessionProvider.notifier)
-                          .switchTab(index),
-                      onClose: () => widget.onCloseTab != null
-                          ? widget.onCloseTab!(index)
-                          : ref
-                              .read(sessionProvider.notifier)
-                              .closeTab(index),
-                      onCloseOthers: sessionState.tabs.length > 1
-                          ? () => ref
-                              .read(sessionProvider.notifier)
-                              .closeOtherTabs(index)
-                          : null,
-                      onCloseRight: index < sessionState.tabs.length - 1
-                          ? () => ref
-                              .read(sessionProvider.notifier)
-                              .closeTabsToRight(index)
-                          : null,
-                      onRename: (name) => ref
-                          .read(sessionProvider.notifier)
-                          .renameTab(index, name),
-                    ),
-                    ),
-                  );
                   },
                 ),
               ),
             ),
-            // Window drag handle — fixed 100px. On macOS the native title
-            // bar handles drag; on Linux we use bitsdojo's MoveWindow.
+            // Dedicated drag handle. On macOS the native title bar
+            // handles drag; on Linux this is a reliable fallback for
+            // when the tab list overflows and the Expanded MoveWindow
+            // above is absent.
             SizedBox(
               width: 100,
               height: 36,
@@ -277,8 +298,8 @@ class _TabState extends State<_Tab> {
   Timer? _successFadeTimer;
   static const _successFadeDelay = Duration(seconds: 3);
 
-  static const _maxTabWidth = 200.0;
-  static const _minTabWidth = 130.0;
+  static const _maxTabWidth = _kMaxTabWidth;
+  static const _minTabWidth = _kMinTabWidth;
   static const _fontSize = 11.0;
   static const _accentHeight = 2.0;
   static const _closeSlotWidth = 14.0;
