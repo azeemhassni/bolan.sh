@@ -1202,6 +1202,15 @@ __bolan_env() {
 # as the running command. We use a guard variable that's set while
 # PROMPT_COMMAND is running so the DEBUG trap can ignore those calls
 # (this is the same technique bash-preexec.sh uses).
+#
+# We SUBSUME the user's existing PROMPT_COMMAND (e.g. Ubuntu's
+# __vte_prompt_command from /etc/bash.bashrc) into our precmd hook
+# rather than chaining after it, so those commands execute INSIDE
+# the guard and don't trip the DEBUG trap. Chaining caused a
+# spurious `__vte_prompt_command` CommandStart at every prompt on
+# Linux, leaving Bolan stuck in "command running" mode and hiding
+# the prompt/block UI.
+__bolan_existing_prompt_command="${PROMPT_COMMAND:-}"
 __bolan_inside_precmd=0
 __bolan_preexec_invoke() {
   # Skip if we're already inside PROMPT_COMMAND.
@@ -1216,15 +1225,26 @@ __bolan_preexec_invoke() {
   __bolan_cmd_start
 }
 __bolan_precmd_invoke() {
+  local __bolan_last_ec=$?
   __bolan_inside_precmd=1
-  __bolan_cmd_end
+  # Preserve $? for __bolan_cmd_end so the D marker carries the
+  # real exit code of the just-finished command.
+  (exit $__bolan_last_ec); __bolan_cmd_end
   __bolan_prompt_start
   __bolan_osc7
   __bolan_env
+  # Run whatever the user (or system bashrc) had in PROMPT_COMMAND
+  # before us. The guard above keeps any DEBUG trap firings for
+  # these commands from generating spurious OSC 133 markers.
+  if [[ -n "$__bolan_existing_prompt_command" ]]; then
+    eval "$__bolan_existing_prompt_command"
+  fi
   __bolan_inside_precmd=0
 }
+# Install PROMPT_COMMAND BEFORE the DEBUG trap so the assignment
+# itself doesn't fire a spurious CommandStart during sourcing.
+PROMPT_COMMAND=__bolan_precmd_invoke
 trap '__bolan_preexec_invoke' DEBUG
-PROMPT_COMMAND="__bolan_precmd_invoke${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 """;
     }
 
