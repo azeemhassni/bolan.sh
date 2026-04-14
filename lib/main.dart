@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_window_utils/macos_window_utils.dart';
 
 import 'app.dart';
+import 'core/system/linux_desktop_entry.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +20,9 @@ Future<void> main() async {
   runApp(const ProviderScope(child: BolonApp()));
 
   if (Platform.isLinux) {
+    // Install a .desktop entry + hicolor icons so GNOME/Wayland's dock
+    // can resolve our app_id to a real icon. Fire-and-forget.
+    unawaited(ensureLinuxDesktopEntry());
     doWhenWindowReady(() {
       const initialSize = Size(1100, 700);
       appWindow.minSize = const Size(600, 400);
