@@ -279,11 +279,14 @@ class SessionViewState extends ConsumerState<SessionView> {
       },
       child: Stack(
         children: [
-          // Three modes:
+          // Modes:
           // 1. No shell integration (fish, nushell, etc.) → always raw terminal
           // 2. Command running → full-screen terminal
-          // 3. Idle → blocks + Bolan prompt
-          if (!widget.session.hasShellIntegration || isRunning)
+          // 3. Awaiting shell response (e.g. continuation prompt) → terminal
+          // 4. Idle → blocks + Bolan prompt
+          if (!widget.session.hasShellIntegration ||
+              isRunning ||
+              widget.session.awaitingShellResponse)
             Stack(
               children: [
                 TerminalView(
@@ -408,6 +411,7 @@ class SessionViewState extends ConsumerState<SessionView> {
                   _findMatches = [];
                   _findTotalMatches = 0;
                   _findCurrentMatch = 0;
+                  _matchStartIndexCache = const {};
                   _clearTerminalHighlights();
                 }),
               ),
@@ -434,6 +438,7 @@ class SessionViewState extends ConsumerState<SessionView> {
         _findMatches = [];
         _findTotalMatches = 0;
         _findCurrentMatch = 0;
+        _matchStartIndexCache = const {};
       });
       return;
     }
@@ -456,6 +461,7 @@ class SessionViewState extends ConsumerState<SessionView> {
         _findMatches = [];
         _findTotalMatches = 0;
         _findCurrentMatch = 0;
+        _matchStartIndexCache = const {};
       });
       return;
     }
@@ -500,6 +506,7 @@ class SessionViewState extends ConsumerState<SessionView> {
       _findMatches = matches;
       _findTotalMatches = matches.length;
       _findCurrentMatch = matches.isNotEmpty ? 0 : 0;
+      _rebuildMatchStartIndexCache();
     });
   }
 
@@ -518,26 +525,53 @@ class SessionViewState extends ConsumerState<SessionView> {
     });
   }
 
+  // Cache the compiled search regex so we don't rebuild it every
+  // frame while the find bar is open. Invalidated whenever the
+  // find result changes.
+  RegExp? _cachedSearchRegex;
+  FindResult? _cachedSearchRegexFor;
+
   RegExp? _buildSearchRegex() {
     if (!_showFindBar || _findMatches.isEmpty || _lastFindResult == null) {
       return null;
     }
     final r = _lastFindResult!;
+    if (identical(_cachedSearchRegexFor, r)) return _cachedSearchRegex;
     try {
-      return r.isRegex
+      _cachedSearchRegex = r.isRegex
           ? RegExp(r.query, caseSensitive: r.caseSensitive)
           : RegExp(RegExp.escape(r.query), caseSensitive: r.caseSensitive);
+      _cachedSearchRegexFor = r;
+      return _cachedSearchRegex;
     } on FormatException {
+      _cachedSearchRegex = null;
+      _cachedSearchRegexFor = r;
       return null;
     }
   }
 
-  int _matchStartIndexForBlock(int blockIndex) {
-    var count = 0;
+  /// Precomputed counts of matches that appear before each block index,
+  /// so the per-block render loop doesn't re-scan _findMatches every time.
+  Map<int, int> _matchStartIndexCache = const {};
+
+  void _rebuildMatchStartIndexCache() {
+    // Group match counts by blockIndex in one pass, then sort and prefix-sum.
+    final perBlock = <int, int>{};
     for (final m in _findMatches) {
-      if (m.blockIndex < blockIndex) count++;
+      perBlock[m.blockIndex] = (perBlock[m.blockIndex] ?? 0) + 1;
     }
-    return count;
+    final keys = perBlock.keys.toList()..sort();
+    final cache = <int, int>{};
+    var count = 0;
+    for (final idx in keys) {
+      cache[idx] = count;
+      count += perBlock[idx]!;
+    }
+    _matchStartIndexCache = cache;
+  }
+
+  int _matchStartIndexForBlock(int blockIndex) {
+    return _matchStartIndexCache[blockIndex] ?? 0;
   }
 
   void _clearTerminalHighlights() {
@@ -691,7 +725,22 @@ class _CursorCharPainter extends CustomPainter {
     }
   }
 
+  /// Cell size depends only on font family, size, and line height —
+  /// none of which change between paints in normal use. Cache the
+  /// result keyed on those three values to avoid laying out a
+  /// paragraph on every paint.
+  static Size? _cachedCellSize;
+  static String? _cachedFontFamily;
+  static double? _cachedFontSize;
+  static double? _cachedLineHeight;
+
   Size _measureCell() {
+    if (_cachedCellSize != null &&
+        _cachedFontFamily == fontFamily &&
+        _cachedFontSize == fontSize &&
+        _cachedLineHeight == lineHeight) {
+      return _cachedCellSize!;
+    }
     const test = 'mmmmmmmmmm';
     final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
       fontFamily: fontFamily,
@@ -711,6 +760,10 @@ class _CursorCharPainter extends CustomPainter {
       paragraph.height,
     );
     paragraph.dispose();
+    _cachedCellSize = result;
+    _cachedFontFamily = fontFamily;
+    _cachedFontSize = fontSize;
+    _cachedLineHeight = lineHeight;
     return result;
   }
 

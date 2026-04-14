@@ -99,8 +99,23 @@ class TerminalSession extends ChangeNotifier {
   // keystroke.
   bool _termInsertMode = false;
 
+  /// True between submitting a line at the Bolan prompt and the next
+  /// PromptStart (133;A). Lets the UI show the live terminal while the
+  /// shell is processing — including continuation prompts (zsh's
+  /// `dquote>`, `cmdsubst>`, bash's `> `) for unfinished input that
+  /// the shell can't execute yet.
+  bool _awaitingShellResponse = false;
+  bool get awaitingShellResponse => _awaitingShellResponse;
+
   // Buffer for capturing command output between C and D markers
   final StringBuffer _outputCapture = StringBuffer();
+
+  /// Set by the listener when an entire command lifecycle (C marker,
+  /// output, D marker) arrives in a single PTY chunk. Consumed by the
+  /// CommandStart handler to pre-populate _outputCapture so CommandEnd
+  /// (which fires synchronously inside the same terminal.write) has
+  /// data to read instead of an empty buffer.
+  String? _pendingSingleChunkOutput;
 
   // Completion engine — lazily initialized
   CompletionEngine? _completionEngine;
@@ -417,6 +432,18 @@ class TerminalSession extends ChangeNotifier {
     _pty.write(const Utf8Encoder().convert(data));
   }
 
+  /// Submits a line from the Bolan prompt. Marks the session as
+  /// awaiting a shell response so the UI shows the live terminal —
+  /// covering the case where the shell can't execute the input
+  /// immediately (e.g. unfinished quote → continuation prompt) and
+  /// no OSC 133 markers fire.
+  void submitFromPrompt(String data) {
+    if (_disposed) return;
+    _awaitingShellResponse = true;
+    notifyListeners();
+    _pty.write(const Utf8Encoder().convert(data));
+  }
+
   /// Resizes the PTY and terminal to the given dimensions.
   void resize(int rows, int cols) {
     if (_disposed) return;
@@ -448,6 +475,13 @@ class TerminalSession extends ChangeNotifier {
       var cleaned = _stripUnsupportedCsi(decoded);
       cleaned = _patchInsertMode(cleaned);
 
+      // If this single chunk contains an entire command lifecycle
+      // (CommandStart marker followed later by a CommandEnd marker),
+      // pre-extract the output slice so the CommandStart handler can
+      // populate _outputCapture before CommandEnd's _finalizeBlock
+      // runs synchronously inside terminal.write.
+      _pendingSingleChunkOutput = _extractSingleChunkOutput(decoded);
+
       try {
         terminal.write(cleaned);
       } on RangeError catch (e, st) {
@@ -456,7 +490,10 @@ class TerminalSession extends ChangeNotifier {
         debugPrint('terminal.write failed: $e\n$st');
       }
 
-      // Capture output while a command is running
+      // Clear in case the CommandStart handler didn't fire (defensive).
+      _pendingSingleChunkOutput = null;
+
+      // Capture output while a command is running (multi-chunk path).
       if (_commandRunning) {
         _outputCapture.write(decoded);
         // Detect alternate screen buffer usage (vim, less, top, etc.)
@@ -528,6 +565,10 @@ class TerminalSession extends ChangeNotifier {
           _finalizeBlock(exitCode: null);
         }
         _commandRunning = false;
+        // Shell is back at a primary prompt — leave terminal-passthrough
+        // mode (used for continuation prompts and other interactive
+        // states with no OSC 133 markers).
+        _awaitingShellResponse = false;
         // Refresh every live chip on each prompt so they reflect
         // changes from the just-finished command (git checkout,
         // terraform workspace select, kubectl config use-context,
@@ -541,6 +582,14 @@ class TerminalSession extends ChangeNotifier {
       case CommandStart(:final command):
         if (command.isNotEmpty) {
           _outputCapture.clear();
+          // For the single-chunk lifecycle case, pre-populate the
+          // capture buffer with the output slice the listener
+          // extracted before terminal.write was called. Otherwise
+          // CommandEnd's _finalizeBlock would read empty output.
+          if (_pendingSingleChunkOutput case final pending?) {
+            _outputCapture.write(pending);
+            _pendingSingleChunkOutput = null;
+          }
           _usedAltBuffer = false;
           _redrawSequenceCount = 0;
           _activeBlock = CommandBlock(
@@ -746,34 +795,31 @@ class TerminalSession extends ChangeNotifier {
   /// Strips zsh's PROMPT_EOL_MARK — the inverse-video % (or #) followed by
   /// spaces and a carriage return that zsh prints when output doesn't end
   /// with a newline.
+  static final _partialLineMarkerRe =
+      RegExp(r'(?:\x1B\[[0-9;]*m)*\x1B\[7m[%#](?:\x1B\[[0-9;]*m)+ *\r');
+
   static String _stripPartialLineMarker(String input) {
-    // zsh wraps it with bold + inverse: \e[1m\e[7m%\e[27m\e[1m\e[0m + spaces + \r
-    // Require inverse video (\e[7m) before the marker to avoid false matches.
-    return input.replaceAll(
-      RegExp(r'(?:\x1B\[[0-9;]*m)*\x1B\[7m[%#](?:\x1B\[[0-9;]*m)+ *\r'),
-      '',
-    );
+    return input.replaceAll(_partialLineMarkerRe, '');
   }
 
+  static final _ansiEscapeRe = RegExp(
+      r'\x1B\[[0-9;?]*[a-zA-Z]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)|\x1B[()][0-9A-Z]|\x1B[>=<]');
+
   static String _stripAnsiEscapes(String input) {
-    return input.replaceAll(
-      RegExp(r'\x1B\[[0-9;?]*[a-zA-Z]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)|\x1B[()][0-9A-Z]|\x1B[>=<]'),
-      '',
-    );
+    return input.replaceAll(_ansiEscapeRe, '');
   }
 
   /// Strips all escape sequences EXCEPT SGR color codes (\e[...m).
   /// Used to preserve colors for rich text rendering in blocks.
+  static final _nonSgrEscapeRe = RegExp(
+    r'\x1B\[[0-9;?]*[a-ln-zA-Z]' // CSI except 'm'
+    r'|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)' // OSC
+    r'|\x1B[()*/+][0-9A-Z%]?' // Charset
+    r'|\x1B[@-Z\\^_]', // Single-char Fe
+  );
+
   static String _stripNonSgrEscapes(String input) {
-    return input.replaceAll(
-      RegExp(
-        r'\x1B\[[0-9;?]*[a-ln-zA-Z]'  // CSI except 'm'
-        r'|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'  // OSC
-        r'|\x1B[()*/+][0-9A-Z%]?'  // Charset
-        r'|\x1B[@-Z\\^_]',  // Single-char Fe
-      ),
-      '',
-    );
+    return input.replaceAll(_nonSgrEscapeRe, '');
   }
 
   /// Expands tab characters to spaces using 8-character tab stops.
@@ -958,7 +1004,7 @@ class TerminalSession extends ChangeNotifier {
     try {
       final raw = await File(cfgPath).readAsString();
       for (final line in raw.split('\n')) {
-        final m = RegExp(r'^version\s*=\s*(.+)$').firstMatch(line.trim());
+        final m = _pyvenvVersionRe.firstMatch(line.trim());
         if (m != null) {
           version = m.group(1)!.trim();
           break;
@@ -1223,14 +1269,35 @@ PROMPT_COMMAND="__bolan_precmd_invoke${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
     _gitDeletions = 0;
     if (output.isEmpty) return;
 
-    final filesMatch = RegExp(r'(\d+) files? changed').firstMatch(output);
-    final insMatch = RegExp(r'(\d+) insertions?').firstMatch(output);
-    final delMatch = RegExp(r'(\d+) deletions?').firstMatch(output);
+    final filesMatch = _shortstatFilesRe.firstMatch(output);
+    final insMatch = _shortstatInsRe.firstMatch(output);
+    final delMatch = _shortstatDelRe.firstMatch(output);
 
     if (filesMatch != null) _gitFilesChanged = int.parse(filesMatch.group(1)!);
     if (insMatch != null) _gitInsertions = int.parse(insMatch.group(1)!);
     if (delMatch != null) _gitDeletions = int.parse(delMatch.group(1)!);
   }
+
+  static final _pyvenvVersionRe = RegExp(r'^version\s*=\s*(.+)$');
+  /// If [chunk] contains a complete OSC 133 command lifecycle
+  /// (CommandStart `\e]133;C[;...]\a` followed by CommandEnd
+  /// `\e]133;D[;...]\a`), returns the bytes between the two markers.
+  /// Otherwise returns null. Used to pre-populate the output capture
+  /// buffer for short commands whose entire run fits in one PTY chunk.
+  static String? _extractSingleChunkOutput(String chunk) {
+    final cIdx = chunk.indexOf('\x1b]133;C');
+    if (cIdx < 0) return null;
+    final cBel = chunk.indexOf('\x07', cIdx);
+    if (cBel < 0) return null;
+    final outputStart = cBel + 1;
+    final dIdx = chunk.indexOf('\x1b]133;D', outputStart);
+    if (dIdx < outputStart) return null;
+    return chunk.substring(outputStart, dIdx);
+  }
+
+  static final _shortstatFilesRe = RegExp(r'(\d+) files? changed');
+  static final _shortstatInsRe = RegExp(r'(\d+) insertions?');
+  static final _shortstatDelRe = RegExp(r'(\d+) deletions?');
 
   static String _defaultShell() {
     if (Platform.isMacOS || Platform.isLinux) {

@@ -782,9 +782,9 @@ class PromptInputState extends State<PromptInput> {
     }
 
     if (command.isEmpty) {
-      widget.session.writeInput('\n');
+      widget.session.submitFromPrompt('\n');
     } else {
-      widget.session.writeInput('$command\n');
+      widget.session.submitFromPrompt('$command\n');
       widget.session.history.add(command);
     }
     _controller.clear();
