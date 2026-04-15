@@ -60,15 +60,14 @@ class WorkspacePaths {
     return id == null ? root : '$root/workspaces/$id';
   }
 
-  /// Global config file (shared across all workspaces). Per-workspace
-  /// overrides live separately and are merged on top — see Phase 4.
-  static File configFile() => File('${rootPath()}/config.toml');
+  /// Active workspace's config file. Each workspace owns its own full
+  /// config; new workspaces are seeded by copying the active workspace's
+  /// config at creation time. (No live inheritance in v1.)
+  static File configFile() => File('${workspacePath()}/config.toml');
 
-  /// Per-workspace config override (sparse — only keys that differ from
-  /// the global config). Returns the legacy global path when no
-  /// workspace is active. Wired in Phase 4.
-  static File configOverrideFile() =>
-      File('${workspacePath()}/config.toml');
+  /// Legacy root-level config. Used only as a one-time migration source
+  /// — copied into `workspaces/default/config.toml` on first run.
+  static File legacyConfigFile() => File('${rootPath()}/config.toml');
 
   /// Workspace registry — list of all workspaces, ordering, last active.
   static File registryFile() => File('${rootPath()}/workspaces.toml');

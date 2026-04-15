@@ -73,6 +73,17 @@ class WorkspaceRegistry extends ChangeNotifier {
     WorkspacePaths.setActiveWorkspace('default');
 
     final root = WorkspacePaths.rootPath();
+    // Seed default workspace's config from legacy root config so the
+    // user keeps their existing settings. We COPY rather than move —
+    // the legacy file stays put as a safety net during the upgrade
+    // window. A future version can clean it up once we're confident.
+    final legacyConfig = WorkspacePaths.legacyConfigFile();
+    final newConfig = WorkspacePaths.configFile();
+    if (await legacyConfig.exists() && !await newConfig.exists()) {
+      await newConfig.parent.create(recursive: true);
+      await legacyConfig.copy(newConfig.path);
+    }
+
     await _moveIfPresent(
         File('$root/history'), WorkspacePaths.historyFile());
     await _moveIfPresent(
@@ -114,10 +125,25 @@ class WorkspaceRegistry extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> add(Workspace w) async {
+  /// Adds a workspace, optionally seeding its config from [seedFromId]
+  /// (typically the currently-active workspace). Without a seed the
+  /// new workspace starts with no config file and consumers will fall
+  /// back to factory defaults.
+  Future<void> add(Workspace w, {String? seedFromId}) async {
     if (_workspaces.any((existing) => existing.id == w.id)) {
       throw ArgumentError('Workspace id "${w.id}" already exists');
     }
+
+    if (seedFromId != null) {
+      final root = WorkspacePaths.rootPath();
+      final src = File('$root/workspaces/$seedFromId/config.toml');
+      final dst = File('$root/workspaces/${w.id}/config.toml');
+      if (await src.exists() && !await dst.exists()) {
+        await dst.parent.create(recursive: true);
+        await src.copy(dst.path);
+      }
+    }
+
     _workspaces = [..._workspaces, w];
     await save();
     notifyListeners();
