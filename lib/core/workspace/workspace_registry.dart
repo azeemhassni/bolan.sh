@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:toml/toml.dart';
 
+import '../ai/api_key_storage.dart';
 import 'workspace.dart';
 import 'workspace_paths.dart';
 
@@ -170,6 +171,7 @@ class WorkspaceRegistry extends ChangeNotifier {
     if (await dir.exists()) {
       await dir.delete(recursive: true);
     }
+    await ApiKeyStorage.deleteAllForWorkspace(id);
     _workspaces = _workspaces.where((w) => w.id != id).toList();
     if (_activeId == id) {
       _activeId = _workspaces.first.id;
