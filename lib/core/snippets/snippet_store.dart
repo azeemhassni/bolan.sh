@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../workspace/workspace_paths.dart';
 import 'snippet.dart';
 
 const _uuid = Uuid();
@@ -16,10 +17,7 @@ class SnippetStore extends ChangeNotifier {
 
   List<Snippet> get snippets => List.unmodifiable(_snippets);
 
-  File _snippetFile() {
-    final home = Platform.environment['HOME'] ?? '';
-    return File('$home/.config/bolan/snippets.json');
-  }
+  File _snippetFile() => WorkspacePaths.snippetsFile();
 
   /// Loads snippets from disk.
   Future<void> load() async {

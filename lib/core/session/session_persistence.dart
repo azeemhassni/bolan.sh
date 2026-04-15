@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 
+import '../workspace/workspace_paths.dart';
+
 /// Persists and restores tab/pane layout across app restarts.
 ///
 /// Saves to `~/.config/bolan/session_state.json`. Only stores the pane tree
@@ -11,10 +13,7 @@ import 'package:flutter/widgets.dart';
 class SessionPersistence {
   SessionPersistence._();
 
-  static File _stateFile() {
-    final home = Platform.environment['HOME'] ?? '';
-    return File('$home/.config/bolan/session_state.json');
-  }
+  static File _stateFile() => WorkspacePaths.sessionStateFile();
 
   /// Saves the current layout to disk.
   static Future<void> save(SessionLayout layout) async {

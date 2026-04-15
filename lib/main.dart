@@ -9,15 +9,35 @@ import 'package:macos_window_utils/macos_window_utils.dart';
 
 import 'app.dart';
 import 'core/system/linux_desktop_entry.dart';
+import 'core/workspace/workspace_paths.dart';
+import 'core/workspace/workspace_registry.dart';
+import 'providers/workspace_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Resolve config root once so per-workspace path lookups can be sync.
+  // Must run before ProviderScope so config/history loaders see the path.
+  await WorkspacePaths.init();
+
+  // Load the workspace registry. On first run after upgrade this also
+  // migrates legacy state files into workspaces/default/ and sets
+  // WorkspacePaths.activeWorkspaceId — must happen before any consumer
+  // (config loader, session provider) reads from disk.
+  final registry = WorkspaceRegistry();
+  await registry.loadOrCreate();
+  WorkspacePaths.setActiveWorkspace(registry.activeId);
 
   if (Platform.isMacOS) {
     await _initMacosWindow();
   }
 
-  runApp(const ProviderScope(child: BolonApp()));
+  runApp(ProviderScope(
+    overrides: [
+      workspaceRegistryProvider.overrideWith((_) => registry),
+    ],
+    child: const BolonApp(),
+  ));
 
   if (Platform.isLinux) {
     // Install a .desktop entry + hicolor icons so GNOME/Wayland's dock

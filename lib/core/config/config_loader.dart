@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:toml/toml.dart';
 
+import '../workspace/workspace_paths.dart';
 import 'app_config.dart';
 import 'config_validator.dart';
 
@@ -91,12 +91,7 @@ class ConfigLoader extends ChangeNotifier {
     if (configPathOverride != null) {
       return File(configPathOverride!);
     }
-    if (Platform.isMacOS || Platform.isLinux) {
-      final home = Platform.environment['HOME'] ?? '';
-      return File('$home/.config/bolan/config.toml');
-    }
-    final dir = await getApplicationSupportDirectory();
-    return File('${dir.path}/config.toml');
+    return WorkspacePaths.configFile();
   }
 
   String _toToml(AppConfig c) {

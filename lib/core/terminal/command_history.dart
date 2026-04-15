@@ -1,7 +1,6 @@
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
-
+import '../workspace/workspace_paths.dart';
 import 'shell_history_importer.dart';
 
 /// Persisted command history with search.
@@ -20,7 +19,7 @@ class CommandHistory {
   /// history so completions and recall work immediately.
   Future<void> load() async {
     try {
-      final file = await _historyFile();
+      final file = _historyFile();
       if (await file.exists()) {
         final lines = await file.readAsLines();
         _entries.addAll(lines.where((l) => l.isNotEmpty));
@@ -45,7 +44,7 @@ class CommandHistory {
         : imported;
     _entries.addAll(capped);
 
-    final file = await _historyFile();
+    final file = _historyFile();
     await file.parent.create(recursive: true);
     await file.writeAsString('${capped.join('\n')}\n');
   }
@@ -59,7 +58,7 @@ class CommandHistory {
     if (_entries.length > _maxEntries) {
       _entries.removeAt(0);
     }
-    final file = await _historyFile();
+    final file = _historyFile();
     await file.parent.create(recursive: true);
     await file.writeAsString('$command\n', mode: FileMode.append);
   }
@@ -95,12 +94,5 @@ class CommandHistory {
     return null;
   }
 
-  Future<File> _historyFile() async {
-    if (Platform.isMacOS || Platform.isLinux) {
-      final home = Platform.environment['HOME'] ?? '';
-      return File('$home/.config/bolan/history');
-    }
-    final dir = await getApplicationSupportDirectory();
-    return File('${dir.path}/history');
-  }
+  File _historyFile() => WorkspacePaths.historyFile();
 }
