@@ -11,6 +11,7 @@ import 'package:macos_window_utils/window_manipulator.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/session_provider.dart';
+import '../../providers/workspace_provider.dart';
 
 /// Whether a tab is currently being renamed. Checked by the global
 /// key handler to avoid stealing keystrokes.
@@ -252,7 +253,7 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
   }
 }
 
-class _Tab extends StatefulWidget {
+class _Tab extends ConsumerStatefulWidget {
   final String title;
   final String fullTitle;
   final TabStatus status;
@@ -284,10 +285,10 @@ class _Tab extends StatefulWidget {
   });
 
   @override
-  State<_Tab> createState() => _TabState();
+  ConsumerState<_Tab> createState() => _TabState();
 }
 
-class _TabState extends State<_Tab> {
+class _TabState extends ConsumerState<_Tab> {
   bool _hovered = false;
   bool _editing = false;
   late TextEditingController _editController;
@@ -500,7 +501,7 @@ class _TabState extends State<_Tab> {
                     height: _accentHeight,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: t.effectiveTabAccent,
+                        color: ref.watch(currentWorkspaceProvider).accentColor,
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(6),
                           topRight: Radius.circular(6),
@@ -882,7 +883,7 @@ class _IconButton extends StatelessWidget {
 /// Wraps a [_Tab] in a [Draggable] + [DragTarget] pair so the user
 /// can reorder tabs by dragging one onto another. The drag carries
 /// the source index; the drop target reorders via [onReorder].
-class _DraggableTab extends StatefulWidget {
+class _DraggableTab extends ConsumerStatefulWidget {
   final int index;
   final BolonTheme theme;
   final Widget child;
@@ -896,16 +897,15 @@ class _DraggableTab extends StatefulWidget {
   });
 
   @override
-  State<_DraggableTab> createState() => _DraggableTabState();
+  ConsumerState<_DraggableTab> createState() => _DraggableTabState();
 }
 
-class _DraggableTabState extends State<_DraggableTab> {
+class _DraggableTabState extends ConsumerState<_DraggableTab> {
   bool _hovering = false;
   bool _dropAfter = false;
 
   @override
   Widget build(BuildContext context) {
-    final t = widget.theme;
     return DragTarget<int>(
       onWillAcceptWithDetails: (details) => details.data != widget.index,
       onMove: (details) {
@@ -961,7 +961,7 @@ class _DraggableTabState extends State<_DraggableTab> {
                 bottom: 4,
                 child: Container(
                   width: 2,
-                  color: t.effectiveTabAccent,
+                  color: ref.watch(currentWorkspaceProvider).accentColor,
                 ),
               ),
           ],
