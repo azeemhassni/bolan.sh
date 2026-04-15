@@ -40,6 +40,13 @@ class LocalLlmProvider implements AiProvider {
   bool _starting = false;
   OpenAiCompatibleProvider? _client;
 
+  /// True once the llamafile server has been started and a client
+  /// bound to it. Used by opportunistic features (e.g. next-command
+  /// prediction) that should only query the model when it's already
+  /// loaded, never trigger a load themselves.
+  bool get isRunning =>
+      _serverProcess != null && _client != null && !_starting;
+
   LocalLlmProvider({ModelSize preferredSize = ModelSize.small})
       : _preferredSize = preferredSize;
 

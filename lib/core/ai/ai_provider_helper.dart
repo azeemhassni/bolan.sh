@@ -82,6 +82,11 @@ class AiProviderHelper {
     }
   }
 
+  /// Whether the cached local provider has an active llamafile server.
+  /// Use this before firing opportunistic requests that must not
+  /// trigger an on-demand model load.
+  static bool isLocalLoaded() => _localProvider?.isRunning ?? false;
+
   /// Disposes the shared local provider (call on app exit).
   static void dispose() {
     _localProvider?.dispose();
