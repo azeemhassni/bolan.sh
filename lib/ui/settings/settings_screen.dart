@@ -17,6 +17,7 @@ import '../../providers/model_download_provider.dart';
 import 'font_picker.dart';
 import 'prompt_editor.dart';
 import 'theme_editor.dart';
+import 'workspaces_tab.dart';
 
 /// Settings screen with sidebar tab navigation.
 class SettingsScreen extends StatefulWidget {
@@ -39,13 +40,16 @@ class _SettingsScreenState extends State<SettingsScreen>
   String? _shellError;
   String? _workingDirError;
 
-  static const _tabs = ['General', 'Editor', 'Appearance', 'AI', 'Prompt'];
+  static const _tabs = [
+    'General', 'Editor', 'Appearance', 'AI', 'Prompt', 'Workspaces',
+  ];
   static const _tabIcons = [
     Icons.settings_outlined,
     Icons.edit_outlined,
     Icons.palette_outlined,
     Icons.auto_awesome_outlined,
     Icons.terminal_outlined,
+    Icons.workspaces_outlined,
   ];
   static const _maxContentWidth = 860.0;
 
@@ -251,6 +255,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       2 => _buildAppearanceTab(theme),
       3 => _buildAiTab(theme),
       4 => _buildPromptTab(theme),
+      5 => const [WorkspacesTab()],
       _ => [],
     };
   }
