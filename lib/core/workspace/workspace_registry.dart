@@ -70,7 +70,7 @@ class WorkspaceRegistry extends ChangeNotifier {
 
     // Set the active id BEFORE migrating so destination paths resolve
     // through WorkspacePaths.workspacePath().
-    WorkspacePaths.setActiveWorkspace('default');
+    WorkspacePaths.setActiveWorkspace('default', _workspaces.first);
 
     final root = WorkspacePaths.rootPath();
     // Seed default workspace's config from legacy root config so the
@@ -118,9 +118,10 @@ class WorkspaceRegistry extends ChangeNotifier {
   }
 
   Future<void> setActive(String id) async {
-    if (!_workspaces.any((w) => w.id == id)) return;
+    final next = _workspaces.where((w) => w.id == id).firstOrNull;
+    if (next == null) return;
     _activeId = id;
-    WorkspacePaths.setActiveWorkspace(id);
+    WorkspacePaths.setActiveWorkspace(id, next);
     await save();
     notifyListeners();
   }
@@ -172,7 +173,7 @@ class WorkspaceRegistry extends ChangeNotifier {
     _workspaces = _workspaces.where((w) => w.id != id).toList();
     if (_activeId == id) {
       _activeId = _workspaces.first.id;
-      WorkspacePaths.setActiveWorkspace(_activeId);
+      WorkspacePaths.setActiveWorkspace(_activeId, _workspaces.first);
     }
     await save();
     notifyListeners();

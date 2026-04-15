@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'workspace.dart';
+
 /// Single source of truth for where per-workspace state lives on disk.
 ///
 /// Workspace-scoped files are: `config.toml`, `history`, `session_state.json`,
@@ -22,6 +24,11 @@ class WorkspacePaths {
   /// Mutate via [setActiveWorkspace] so dependent caches stay coherent.
   static String? activeWorkspaceId;
 
+  /// Currently-active [Workspace] object. Read by `TerminalSession.start`
+  /// to inject env vars and git identity into spawned PTYs without
+  /// threading the workspace through every caller.
+  static Workspace? activeWorkspace;
+
   /// Cached root directory, populated by [init]. Sync APIs depend on this.
   static String? _rootPath;
 
@@ -38,8 +45,9 @@ class WorkspacePaths {
     }
   }
 
-  static void setActiveWorkspace(String? id) {
+  static void setActiveWorkspace(String? id, [Workspace? workspace]) {
     activeWorkspaceId = id;
+    activeWorkspace = workspace;
   }
 
   /// Root directory for all Bolan state. Requires [init] to have run.

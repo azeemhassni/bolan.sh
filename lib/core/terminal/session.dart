@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import 'package:xterm/xterm.dart';
 
 import '../completion/completion_engine.dart';
+import '../workspace/workspace_paths.dart';
 import 'command_block.dart';
 import 'command_history.dart';
 import 'shell_integration.dart';
@@ -185,6 +186,20 @@ class TerminalSession extends ChangeNotifier {
     // runs and sets up PATH (including Homebrew, nvm, etc.).
     // Merge with the current environment so PATH, HOME, USER, etc.
     // propagate to the shell instead of being wiped.
+    //
+    // Layering (last write wins): host env -> workspace env -> our
+    // TERM_*. Workspace overrides host (so AWS_PROFILE etc. are
+    // workspace-scoped) but our TERM_* are sacrosanct.
+    final ws = WorkspacePaths.activeWorkspace;
+    final wsGitEnv = <String, String>{};
+    if (ws?.gitName != null && ws!.gitName!.isNotEmpty) {
+      wsGitEnv['GIT_AUTHOR_NAME'] = ws.gitName!;
+      wsGitEnv['GIT_COMMITTER_NAME'] = ws.gitName!;
+    }
+    if (ws?.gitEmail != null && ws!.gitEmail!.isNotEmpty) {
+      wsGitEnv['GIT_AUTHOR_EMAIL'] = ws.gitEmail!;
+      wsGitEnv['GIT_COMMITTER_EMAIL'] = ws.gitEmail!;
+    }
     final pty = Pty.start(
       resolvedShell,
       arguments: ['-l'],
@@ -193,6 +208,8 @@ class TerminalSession extends ChangeNotifier {
       workingDirectory: resolvedDir,
       environment: {
         ...Platform.environment,
+        ...?ws?.envVars,
+        ...wsGitEnv,
         'TERM': 'xterm-256color',
         'TERM_PROGRAM': 'Bolan',
       },

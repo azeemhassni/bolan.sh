@@ -26,7 +26,7 @@ Future<void> main() async {
   // (config loader, session provider) reads from disk.
   final registry = WorkspaceRegistry();
   await registry.loadOrCreate();
-  WorkspacePaths.setActiveWorkspace(registry.activeId);
+  WorkspacePaths.setActiveWorkspace(registry.activeId, registry.active);
 
   if (Platform.isMacOS) {
     await _initMacosWindow();
