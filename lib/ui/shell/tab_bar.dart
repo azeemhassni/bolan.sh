@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -190,9 +191,13 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                 ),
               ),
             ),
-            // Window drag handle — fixed 100px, unwrapped so native
-            // macOS title bar handles drag gestures here.
-            const SizedBox(width: 100, height: 36),
+            // Window drag handle — fixed 100px. On macOS the native title
+            // bar handles drag; on Linux we use bitsdojo's MoveWindow.
+            SizedBox(
+              width: 100,
+              height: 36,
+              child: Platform.isLinux ? MoveWindow() : null,
+            ),
             // + and settings buttons
             MacosToolbarPassthrough(
               child: Padding(
@@ -218,6 +223,7 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                 ),
               ),
             ),
+            if (Platform.isLinux) _LinuxWindowButtons(theme: theme),
           ],
         ),
       ),
@@ -737,6 +743,87 @@ class _StatusIconState extends State<_StatusIcon>
       width: _slotSize,
       height: _slotSize,
       child: Center(child: child),
+    );
+  }
+}
+
+class _LinuxWindowButtons extends StatelessWidget {
+  final BolonTheme theme;
+  const _LinuxWindowButtons({required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, right: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _WinBtn(
+            icon: Icons.remove,
+            theme: theme,
+            onTap: () => appWindow.minimize(),
+          ),
+          _WinBtn(
+            icon: Icons.crop_square,
+            theme: theme,
+            onTap: () => appWindow.maximizeOrRestore(),
+          ),
+          _WinBtn(
+            icon: Icons.close,
+            theme: theme,
+            hoverColor: const Color(0xFFE81123),
+            onTap: () => appWindow.close(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WinBtn extends StatefulWidget {
+  final IconData icon;
+  final BolonTheme theme;
+  final VoidCallback onTap;
+  final Color? hoverColor;
+  const _WinBtn({
+    required this.icon,
+    required this.theme,
+    required this.onTap,
+    this.hoverColor,
+  });
+
+  @override
+  State<_WinBtn> createState() => _WinBtnState();
+}
+
+class _WinBtnState extends State<_WinBtn> {
+  bool _hovered = false;
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: _hovered
+                ? (widget.hoverColor ?? widget.theme.statusChipBg)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Icon(
+            widget.icon,
+            size: 12,
+            color: _hovered && widget.hoverColor != null
+                ? Colors.white
+                : widget.theme.dimForeground,
+          ),
+        ),
+      ),
     );
   }
 }

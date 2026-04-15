@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +16,17 @@ Future<void> main() async {
   }
 
   runApp(const ProviderScope(child: BolonApp()));
+
+  if (Platform.isLinux) {
+    doWhenWindowReady(() {
+      const initialSize = Size(1100, 700);
+      appWindow.minSize = const Size(600, 400);
+      appWindow.size = initialSize;
+      appWindow.alignment = Alignment.center;
+      appWindow.title = 'Bolan';
+      appWindow.show();
+    });
+  }
 }
 
 Future<void> _initMacosWindow() async {

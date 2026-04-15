@@ -25,6 +25,7 @@ dependencies:
   # Native window
   macos_window_utils: ^1.6.0
   flutter_acrylic: ^1.1.0
+  bitsdojo_window: ^0.1.6
 
   # Config & storage
   toml: ^0.16.0
