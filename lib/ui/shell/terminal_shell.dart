@@ -29,6 +29,7 @@ import '../settings/settings_screen.dart';
 import '../shared/confirm_dialog.dart';
 import '../update/update_dialog.dart';
 import '../update/update_toast.dart';
+import '../workspace/workspace_sidebar.dart';
 import 'empty_state.dart';
 import 'pane_focus_registry.dart';
 import 'pane_tree_widget.dart';
@@ -709,31 +710,39 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                     onCloseTab: (_) => _closeTabWithConfirm(),
                   ),
                   Expanded(
-                    child: sessionState.tabs.isEmpty
-                        ? EmptyState(
-                            onNewSession: () =>
-                                ref.read(sessionProvider.notifier).createTab(),
-                          )
-                        : IndexedStack(
-                            index: sessionState.activeTabIndex,
-                            children: [
-                              for (var i = 0;
-                                  i < sessionState.tabs.length;
-                                  i++)
-                                if (sessionState.tabs[i].isSettings)
-                                  SettingsScreen(
-                                      configLoader: _configLoader)
-                                else
-                                  PaneTreeWidget(
-                                    node: sessionState.tabs[i].rootPane!,
-                                    focusedPaneId:
-                                        sessionState.tabs[i].focusedPaneId!,
-                                    isSinglePane:
-                                        sessionState.tabs[i].rootPane
-                                            is LeafPane,
-                                  ),
-                            ],
-                          ),
+                    child: Row(
+                      children: [
+                        const WorkspaceSidebar(),
+                        Expanded(
+                          child: sessionState.tabs.isEmpty
+                              ? EmptyState(
+                                  onNewSession: () => ref
+                                      .read(sessionProvider.notifier)
+                                      .createTab(),
+                                )
+                              : IndexedStack(
+                                  index: sessionState.activeTabIndex,
+                                  children: [
+                                    for (var i = 0;
+                                        i < sessionState.tabs.length;
+                                        i++)
+                                      if (sessionState.tabs[i].isSettings)
+                                        SettingsScreen(
+                                            configLoader: _configLoader)
+                                      else
+                                        PaneTreeWidget(
+                                          node: sessionState.tabs[i].rootPane!,
+                                          focusedPaneId: sessionState
+                                              .tabs[i].focusedPaneId!,
+                                          isSinglePane: sessionState
+                                                  .tabs[i].rootPane
+                                              is LeafPane,
+                                        ),
+                                  ],
+                                ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
