@@ -72,7 +72,6 @@ enum _CopyFlash { none, command, output, block }
 
 class _CommandBlockWidgetState extends State<CommandBlockWidget> {
   bool _hovered = false;
-  bool _collapsed = false;
   _CopyFlash _copyFlash = _CopyFlash.none;
   bool _explaining = false;
   String? _explanation;
@@ -189,14 +188,14 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Output body
-                      if (block.hasOutput && !_collapsed)
+                      if (block.hasOutput && !widget.block.collapsed)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: _buildScrollableOutput(block, theme),
                         ),
 
                       // Collapsed placeholder
-                      if (block.hasOutput && _collapsed)
+                      if (block.hasOutput && widget.block.collapsed)
                         Padding(
                           padding:
                               const EdgeInsets.only(top: 4, bottom: 4),
@@ -690,10 +689,11 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
           const SizedBox(width: 2),
           _BlockActionButton(
             icon:
-                _collapsed ? Icons.expand_more : Icons.expand_less,
-            tooltip: _collapsed ? 'Expand output' : 'Collapse output',
+                widget.block.collapsed ? Icons.expand_more : Icons.expand_less,
+            tooltip: widget.block.collapsed ? 'Expand output' : 'Collapse output',
             theme: theme,
-            onTap: () => setState(() => _collapsed = !_collapsed),
+            onTap: () => setState(() =>
+                widget.block.collapsed = !widget.block.collapsed),
           ),
         ],
         const SizedBox(width: 2),

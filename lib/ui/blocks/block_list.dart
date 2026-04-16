@@ -50,9 +50,11 @@ class _BlockListState extends State<BlockList> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       itemCount: allBlocks.length,
       itemBuilder: (context, index) {
+        final block = allBlocks[index];
         return Padding(
+          key: ValueKey(block.id),
           padding: const EdgeInsets.only(bottom: 6),
-          child: CommandBlockWidget(block: allBlocks[index]),
+          child: CommandBlockWidget(block: block),
         );
       },
     );

@@ -347,6 +347,7 @@ class SessionViewState extends ConsumerState<SessionView> {
                 blocks: [
                   for (var i = 0; i < blocks.length; i++)
                     CommandBlockWidget(
+                      key: ValueKey(blocks[i].id),
                       block: blocks[i],
                       fontSize: fontSize,
                       lineHeight: lineHeight,

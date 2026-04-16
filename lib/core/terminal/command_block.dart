@@ -16,7 +16,12 @@ class CommandBlock {
   final String shellName;
   final String? gitBranch;
 
-  const CommandBlock({
+  /// UI-only state — whether the output section is collapsed. Stored
+  /// on the model (not widget State) so it survives widget rebuilds
+  /// caused by new blocks being added to the list.
+  bool collapsed = false;
+
+  CommandBlock({
     required this.id,
     required this.command,
     this.output = '',
