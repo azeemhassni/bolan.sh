@@ -122,13 +122,6 @@ class PromptInputState extends State<PromptInput> {
     if (text.isEmpty && _aiSuggestion != null) {
       return _aiSuggestion!;
     }
-    if (_aiSuggestion != null) {
-      debugPrint(
-        '[command-suggest] ghost not shown: _aiSuggestion set '
-        '("$_aiSuggestion") but text non-empty '
-        '("${text.length > 20 ? "${text.substring(0, 20)}..." : text}")',
-      );
-    }
     return '';
   }
 
@@ -302,30 +295,12 @@ class PromptInputState extends State<PromptInput> {
   }
 
   void _onSessionChanged() {
-    // Detect when a new block is added (command completed)
     final blocks = widget.session.blocks;
-    if (blocks.length > _lastBlockCount) {
-      debugPrint(
-        '[command-suggest] block added: '
-        '$_lastBlockCount -> ${blocks.length}, '
-        'commandSuggestions=${widget.commandSuggestions}',
-      );
-      if (widget.commandSuggestions) {
-        _lastBlockCount = blocks.length;
-        final lastBlock = blocks.last;
-        _requestSuggestion(lastBlock.command, lastBlock.output,
-            lastBlock.exitCode ?? 0);
-      } else {
-        debugPrint(
-          '[command-suggest] skipped: commandSuggestions=false '
-          '(aiEnabled+commandSuggestions in Settings > AI).',
-        );
-      }
-    } else if (blocks.length < _lastBlockCount) {
-      debugPrint(
-        '[command-suggest] blocks shrank: '
-        '$_lastBlockCount -> ${blocks.length} (cleared?)',
-      );
+    if (blocks.length > _lastBlockCount && widget.commandSuggestions) {
+      _lastBlockCount = blocks.length;
+      final lastBlock = blocks.last;
+      _requestSuggestion(lastBlock.command, lastBlock.output,
+          lastBlock.exitCode ?? 0);
     }
     _lastBlockCount = blocks.length;
   }
@@ -360,16 +335,7 @@ class PromptInputState extends State<PromptInput> {
     } else {
       setState(() {
         _isAiMode = aiMode;
-        // Clear AI suggestion when user starts typing
-        if (_controller.text.isNotEmpty) {
-          if (_aiSuggestion != null) {
-            debugPrint(
-              '[command-suggest] _aiSuggestion cleared by _onTextChanged '
-              '(text="${_controller.text}")',
-            );
-          }
-          _aiSuggestion = null;
-        }
+        if (_controller.text.isNotEmpty) _aiSuggestion = null;
       });
     }
     aiModeNotifier.value = _isAiMode || _aiLoading;
@@ -727,11 +693,6 @@ class PromptInputState extends State<PromptInput> {
         offset: _controller.text.length,
       );
     });
-    if (_aiSuggestion != null) {
-      debugPrint(
-        '[command-suggest] _aiSuggestion cleared by _acceptGhostText',
-      );
-    }
     _aiSuggestion = null;
     setState(() {});
   }
@@ -913,26 +874,10 @@ class PromptInputState extends State<PromptInput> {
     //     enough that it's not worth the outbound traffic.
     final isLocal = widget.aiProvider == 'local';
     if (isLocal) {
-      if (!AiProviderHelper.isLocalLoaded()) {
-        debugPrint(
-          '[command-suggest] skipped: local provider, server not loaded. '
-          'Load the model in Settings > AI to enable suggestions.',
-        );
-        return;
-      }
+      if (!AiProviderHelper.isLocalLoaded()) return;
     } else {
-      if (!widget.shareHistory) {
-        debugPrint(
-          '[command-suggest] skipped: provider=${widget.aiProvider}, '
-          'shareHistory=false. Enable "Share History with AI" in Settings.',
-        );
-        return;
-      }
+      if (!widget.shareHistory) return;
     }
-    debugPrint(
-      '[command-suggest] requesting: provider=${widget.aiProvider}, '
-      'isLocal=$isLocal, cmd="$lastCommand", exit=$lastExitCode',
-    );
 
     try {
       final provider = await AiProviderHelper.create(
@@ -974,31 +919,12 @@ class PromptInputState extends State<PromptInput> {
         gitDirty: widget.session.gitDirty,
       );
 
-      if (!mounted) {
-        debugPrint('[command-suggest] decision: widget unmounted, dropping');
-        return;
-      }
-      if (suggestion == null) {
-        debugPrint(
-          '[command-suggest] decision: no suggestion (model said NONE '
-          'or returned empty)',
-        );
-      } else if (_controller.text.isNotEmpty) {
-        debugPrint(
-          '[command-suggest] decision: dropped, prompt not empty '
-          '(user typed "${_controller.text}" while waiting)',
-        );
-      } else {
-        debugPrint(
-          '[command-suggest] decision: accepted, ghost="$suggestion"',
-        );
+      if (!mounted) return;
+      if (suggestion != null && _controller.text.isEmpty) {
         setState(() => _aiSuggestion = suggestion);
       }
-    } on Exception catch (e) {
-      // Best-effort feature — never surface to the user. Log in debug
-      // so a dev running from a terminal can see why suggestions are
-      // not appearing (bad key, network, rate limit, etc.).
-      debugPrint('[command-suggest] skipped: $e');
+    } on Exception {
+      // Best-effort — suggestions are best-effort
     }
   }
 
@@ -1160,11 +1086,6 @@ class _GhostTextController extends TextEditingController {
   /// this controller — which is illegal mid-build.
   void updateGhost(String text, TextStyle style) {
     if (text == _ghostText && style == _ghostStyle) return;
-    debugPrint(
-      '[command-suggest] ghost controller updated: '
-      '"${_ghostText.length > 30 ? "${_ghostText.substring(0, 30)}..." : _ghostText}" '
-      '-> "${text.length > 30 ? "${text.substring(0, 30)}..." : text}"',
-    );
     _ghostText = text;
     _ghostStyle = style;
     WidgetsBinding.instance.addPostFrameCallback((_) {

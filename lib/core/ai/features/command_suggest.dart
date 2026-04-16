@@ -1,7 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-
 import '../ai_provider.dart';
 
 /// Suggests the next command based on context using AI.
@@ -31,28 +29,9 @@ class CommandSuggestor {
       shellName, recentHistory, gitBranch, gitDirty,
     );
 
-    debugPrint('[command-suggest] --- prompt begin ---');
-    for (final line in prompt.split('\n')) {
-      debugPrint('[command-suggest] | $line');
-    }
-    debugPrint('[command-suggest] --- prompt end (${prompt.length} chars) ---');
-
-    final sw = Stopwatch()..start();
     final response = await _provider.generateContent(prompt);
-    sw.stop();
-
-    debugPrint(
-      '[command-suggest] raw response in ${sw.elapsedMilliseconds}ms '
-      '(${response.length} chars): ${_truncate(response, 400)}',
-    );
-
-    final cleaned = _cleanResponse(response);
-    debugPrint('[command-suggest] cleaned: ${cleaned ?? "<null/NONE>"}');
-    return cleaned;
+    return _cleanResponse(response);
   }
-
-  static String _truncate(String s, int max) =>
-      s.length <= max ? s : '${s.substring(0, max)}... (+${s.length - max})';
 
   String _buildPrompt(
     String lastCommand,
