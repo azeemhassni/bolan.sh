@@ -19,7 +19,7 @@ import '../../providers/workspace_provider.dart';
 class WorkspaceSidebar extends ConsumerStatefulWidget {
   const WorkspaceSidebar({super.key});
 
-  static const double width = 60;
+  static const double width = 220;
 
   @override
   ConsumerState<WorkspaceSidebar> createState() => _WorkspaceSidebarState();
@@ -79,26 +79,47 @@ class _WorkspaceSidebarState extends ConsumerState<WorkspaceSidebar> {
       onPointerSignal: (event) {
         if (event is PointerScrollEvent) _handleScroll(event);
       },
-      child: Container(
-        width: WorkspaceSidebar.width,
-        color: theme.tabBarBackground,
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            for (final w in registry.workspaces)
-              _WorkspaceItem(
-                workspace: w,
-                isActive: w.id == activeId,
-                onTap: () => _switchTo(w.id),
-              ),
-            const Spacer(),
-            _AddWorkspaceButton(
-              theme: theme,
-              onTap: () =>
-                  ref.read(currentSessionNotifierProvider).openSettingsTab(),
+      child: ClipRect(
+        child: Container(
+          width: WorkspaceSidebar.width,
+          decoration: BoxDecoration(
+            color: theme.tabBarBackground,
+            border: Border(
+              right: BorderSide(color: theme.blockBorder, width: 0.5),
             ),
-            const SizedBox(height: 8),
-          ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                child: Text(
+                  'Workspaces',
+                  style: TextStyle(
+                    color: theme.dimForeground,
+                    fontFamily: theme.fontFamily,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              for (final w in registry.workspaces)
+                _WorkspaceItem(
+                  workspace: w,
+                  isActive: w.id == activeId,
+                  theme: theme,
+                  onTap: () => _switchTo(w.id),
+                ),
+              const Spacer(),
+              _AddWorkspaceButton(
+                theme: theme,
+                onTap: () =>
+                    ref.read(currentSessionNotifierProvider).openSettingsTab(),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -113,11 +134,13 @@ class _WorkspaceSidebarState extends ConsumerState<WorkspaceSidebar> {
 class _WorkspaceItem extends StatefulWidget {
   final Workspace workspace;
   final bool isActive;
+  final BolonTheme theme;
   final VoidCallback onTap;
 
   const _WorkspaceItem({
     required this.workspace,
     required this.isActive,
+    required this.theme,
     required this.onTap,
   });
 
@@ -130,45 +153,56 @@ class _WorkspaceItemState extends State<_WorkspaceItem> {
 
   @override
   Widget build(BuildContext context) {
+    final t = widget.theme;
     final accent = widget.workspace.accentColor;
-    final fill = widget.isActive ? accent : accent.withAlpha(40);
-    final border = widget.isActive ? accent : Colors.transparent;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
-      child: Tooltip(
-        message: widget.workspace.name,
-        waitDuration: const Duration(milliseconds: 400),
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
-          child: GestureDetector(
-            onTap: widget.onTap,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: _hovered && !widget.isActive
-                    ? accent.withAlpha(70)
-                    : fill,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: border, width: 1.5),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: widget.isActive
+                ? accent.withAlpha(30)
+                : _hovered
+                    ? t.statusChipBg
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: accent,
+                  shape: BoxShape.circle,
+                ),
               ),
-              child: Center(
+              const SizedBox(width: 10),
+              Expanded(
                 child: Text(
-                  widget.workspace.initial,
+                  widget.workspace.name,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                   style: TextStyle(
-                    color: widget.isActive
-                        ? Colors.white
-                        : accent.withAlpha(220),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    color: widget.isActive ? t.foreground : t.dimForeground,
+                    fontFamily: t.fontFamily,
+                    fontSize: 12,
+                    fontWeight:
+                        widget.isActive ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
               ),
-            ),
+              if (widget.isActive)
+                Icon(Icons.check, size: 12, color: accent),
+            ],
           ),
         ),
       ),

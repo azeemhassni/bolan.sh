@@ -57,6 +57,8 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   bool _showDownloadToast = false;
   bool _showUpdateDialog = false;
   bool _showUpdateToast = false;
+  bool _sidebarOpen = false;
+  String? _lastWorkspaceId;
   final _downloadDialogKey = GlobalKey<ModelDownloadDialogState>();
 
   @override
@@ -203,6 +205,10 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       _openSettings();
       return true;
     }
+    if (meta && key == LogicalKeyboardKey.backslash) {
+      _toggleSidebar();
+      return true;
+    }
     if (meta && key == LogicalKeyboardKey.keyT) {
       ref.read(currentSessionNotifierProvider).createTab();
       return true;
@@ -340,6 +346,10 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
 
   void _openSettings() {
     ref.read(currentSessionNotifierProvider).openSettingsTab();
+  }
+
+  void _toggleSidebar() {
+    setState(() => _sidebarOpen = !_sidebarOpen);
   }
 
   /// Checks if any session across all tabs has a running command.
@@ -680,6 +690,17 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   @override
   Widget build(BuildContext context) {
     final sessionState = ref.watch(currentSessionProvider);
+
+    // Reload config when the active workspace changes so the new
+    // workspace's theme, font, shell, and AI settings apply instantly.
+    final currentWs = ref.watch(currentWorkspaceProvider);
+    if (_lastWorkspaceId != null && _lastWorkspaceId != currentWs.id) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _configLoader.load();
+      });
+    }
+    _lastWorkspaceId = currentWs.id;
+
     final configuredFont =
         _configLoader.config.editor.fontFamily;
     final theme = ref.watch(activeThemeProvider)
@@ -709,11 +730,22 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                 children: [
                   BolonTabBar(
                     onCloseTab: (_) => _closeTabWithConfirm(),
+                    sidebarOpen: _sidebarOpen,
+                    onToggleSidebar: _toggleSidebar,
                   ),
                   Expanded(
                     child: Row(
                       children: [
-                        const WorkspaceSidebar(),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOut,
+                          width: _sidebarOpen
+                              ? WorkspaceSidebar.width
+                              : 0,
+                          child: _sidebarOpen
+                              ? const WorkspaceSidebar()
+                              : const SizedBox.shrink(),
+                        ),
                         Expanded(
                           // Key on the active workspace id so switching
                           // workspaces fully unmounts the previous tab

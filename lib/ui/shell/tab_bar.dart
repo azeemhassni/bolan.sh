@@ -26,8 +26,15 @@ const double _kMinTabWidth = 130.0;
 /// only on overflow, status icons, hover close button.
 class BolonTabBar extends ConsumerStatefulWidget {
   final void Function(int index)? onCloseTab;
+  final bool sidebarOpen;
+  final VoidCallback? onToggleSidebar;
 
-  const BolonTabBar({super.key, this.onCloseTab});
+  const BolonTabBar({
+    super.key,
+    this.onCloseTab,
+    this.sidebarOpen = false,
+    this.onToggleSidebar,
+  });
 
   @override
   ConsumerState<BolonTabBar> createState() => _BolonTabBarState();
@@ -168,6 +175,22 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
         color: theme.tabBarBackground,
         child: Row(
           children: [
+            // Sidebar toggle — placed after macOS traffic lights.
+            if (widget.onToggleSidebar != null)
+              Padding(
+                padding: EdgeInsets.only(
+                  left: Platform.isMacOS ? 78 : 8,
+                ),
+                child: MacosToolbarPassthrough(
+                  child: _IconButton(
+                    icon: widget.sidebarOpen
+                        ? Icons.view_sidebar
+                        : Icons.view_sidebar_outlined,
+                    theme: theme,
+                    onTap: widget.onToggleSidebar!,
+                  ),
+                ),
+              ),
             // Tabs — expand to fill remaining space, scroll on overflow.
             // Individual tabs are wrapped in MacosToolbarPassthrough
             // (inside _DraggableTab) so empty scroll area remains a
@@ -184,7 +207,11 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final tabs = sessionState.tabs;
-                    final leftPad = Platform.isMacOS ? 78.0 : 8.0;
+                    // When the sidebar toggle is present it already
+                    // provides the macOS traffic-light offset.
+                    final leftPad = widget.onToggleSidebar != null
+                        ? 4.0
+                        : (Platform.isMacOS ? 78.0 : 8.0);
                     final tabsFit = Platform.isLinux &&
                         leftPad + tabs.length * _kMaxTabWidth <=
                             constraints.maxWidth;
