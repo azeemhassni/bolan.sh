@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_window_utils/macos_window_utils.dart';
 
 import 'app.dart';
+import 'core/ai/ai_provider_helper.dart';
+import 'core/ai/model_manager.dart';
 import 'core/system/linux_desktop_entry.dart';
 import 'core/workspace/workspace_paths.dart';
 import 'core/workspace/workspace_registry.dart';
@@ -27,6 +29,12 @@ Future<void> main() async {
   final registry = WorkspaceRegistry();
   await registry.loadOrCreate();
   WorkspacePaths.setActiveWorkspace(registry.activeId, registry.active);
+
+  // Set default local model size based on system RAM before any
+  // config or provider reads it. If the user has overridden it in
+  // their config, the config loader will replace this later.
+  final recommended = await ModelManager.recommendedSize();
+  AiProviderHelper.configuredLocalModelSize = recommended.name;
 
   if (Platform.isMacOS) {
     await _initMacosWindow();

@@ -8,11 +8,11 @@ void main() {
     test('returns defaults for empty map', () {
       final config = validator.validate({});
       expect(config.activeTheme, 'default-dark');
-      expect(config.editor.fontSize, 16.0);
+      expect(config.editor.fontSize, 15.0);
       expect(config.editor.fontFamily, 'JetBrains Mono');
       expect(config.editor.cursorStyle, 'block');
       expect(config.ai.provider, 'local');
-      expect(config.ai.enabled, false);
+      expect(config.ai.enabled, true);
       expect(config.update.autoCheck, true);
       expect(config.update.skippedVersion, '');
     });
@@ -65,7 +65,7 @@ void main() {
           'cursor_blink': 'yes',
         },
       });
-      expect(config.editor.fontSize, 16.0);
+      expect(config.editor.fontSize, 15.0);
       expect(config.editor.cursorBlink, true);
     });
   });

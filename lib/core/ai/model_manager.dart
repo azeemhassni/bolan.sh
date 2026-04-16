@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../system/system_memory.dart';
+
 /// Available local model sizes.
 enum ModelSize {
   small,
@@ -95,6 +97,21 @@ const modelInfoMap = <ModelSize, ModelInfo>{
 /// only the GGUF model weights differ per size.
 class ModelManager {
   ModelManager._();
+
+  /// Recommends a local model size based on available system RAM.
+  /// Called once at startup to set the default before the user overrides.
+  static Future<ModelSize> recommendedSize() async {
+    try {
+      final total = await SystemMemory.totalBytes();
+      if (total == null) return ModelSize.small;
+      const gb = 1024 * 1024 * 1024;
+      if (total >= 16 * gb) return ModelSize.large;
+      if (total >= 8 * gb) return ModelSize.medium;
+      return ModelSize.small;
+    } on Exception {
+      return ModelSize.small;
+    }
+  }
 
   // Llamafile runtime — pinned to a specific release for reproducible
   // SHA256 verification and stable inference behavior. Bump deliberately

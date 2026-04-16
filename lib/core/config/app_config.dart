@@ -80,14 +80,14 @@ class EditorConfig {
 
   const EditorConfig({
     this.fontFamily = 'JetBrains Mono',
-    this.fontSize = 16.0,
+    this.fontSize = 15.0,
     this.lineHeight = 1.3,
     this.cursorStyle = 'block',
     this.cursorBlink = true,
-    this.scrollbackLines = 10000,
+    this.scrollbackLines = 15000,
     this.blockMode = false,
     this.scrollableBlocks = false,
-    this.ligatures = false,
+    this.ligatures = true,
   });
 }
 
@@ -110,11 +110,11 @@ class AiConfig {
     this.localModelSize = 'small',
     this.model = '',
     this.ollamaUrl = 'http://127.0.0.1:11434',
-    this.geminiModel = 'gemma-3-27b-it',
+    this.geminiModel = 'gemini-2.5-flash',
     this.openaiModel = 'gpt-4o',
     this.anthropicModel = 'claude-sonnet-4-20250514',
     this.anthropicMode = 'claude-code',
-    this.enabled = false,
+    this.enabled = true,
     this.commandSuggestions = true,
     this.smartHistorySearch = true,
     this.shareHistory = false,

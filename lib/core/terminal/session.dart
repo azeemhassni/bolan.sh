@@ -1338,6 +1338,8 @@ trap '__bolan_preexec_invoke' DEBUG
 
   static String _defaultShell() {
     if (Platform.isMacOS || Platform.isLinux) {
+      if (File('/bin/zsh').existsSync()) return '/bin/zsh';
+      if (File('/usr/bin/zsh').existsSync()) return '/usr/bin/zsh';
       return Platform.environment['SHELL'] ?? '/bin/bash';
     }
     return '/bin/sh';

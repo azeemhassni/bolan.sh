@@ -72,7 +72,8 @@ class AiProviderHelper {
           name: 'Ollama',
         );
 
-      case 'gemini':
+      case 'google':
+      case 'gemini': // legacy config compat
         final key = await ApiKeyStorage.readKey('gemini');
         if (key == null || key.isEmpty) return null;
         return GeminiProvider(apiKey: key, model: geminiModel);

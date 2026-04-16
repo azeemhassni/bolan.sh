@@ -593,6 +593,22 @@ class _SettingsScreenState extends State<SettingsScreen>
         theme: theme,
         onChanged: (v) => _updateUpdate(autoCheck: v),
       ),
+      const SizedBox(height: 32),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => _confirmRestoreDefaults(theme),
+          icon: Icon(Icons.restore, size: 14, color: theme.exitFailureFg),
+          label: Text(
+            'Restore All Settings to Defaults',
+            style: TextStyle(
+              color: theme.exitFailureFg,
+              fontFamily: theme.fontFamily,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ),
       Padding(
         padding: const EdgeInsets.only(top: 16),
         child: Text(
@@ -678,6 +694,48 @@ class _SettingsScreenState extends State<SettingsScreen>
     ];
   }
 
+  void _confirmRestoreDefaults(BolonTheme theme) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.blockBackground,
+        title: Text(
+          'Restore defaults?',
+          style: TextStyle(color: theme.foreground, fontFamily: theme.fontFamily),
+        ),
+        content: Text(
+          'This resets all settings in this workspace to their defaults. '
+          'Your command history, tabs, and workspaces are not affected.',
+          style: TextStyle(
+            color: theme.dimForeground,
+            fontFamily: theme.fontFamily,
+            fontSize: 12,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: TextStyle(color: theme.foreground)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _restoreDefaults();
+            },
+            child: Text('Restore', style: TextStyle(color: theme.exitFailureFg)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _restoreDefaults() {
+    setState(() {
+      _config = const AppConfig();
+    });
+    _save();
+  }
+
   // ---- AI Tab ----
 
   List<Widget> _buildAiTab(BolonTheme theme) {
@@ -715,7 +773,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         theme: theme,
         child: _SegmentedControl(
           value: _config.ai.provider,
-          options: const ['local', 'gemini', 'anthropic', 'openai', 'ollama'],
+          options: const ['local', 'google', 'anthropic', 'openai', 'ollama'],
           theme: theme,
           onChanged: (v) => _updateAi(provider: v),
         ),
@@ -748,15 +806,21 @@ class _SettingsScreenState extends State<SettingsScreen>
             ),
           ),
         ];
-      case 'gemini':
+      case 'google':
+      case 'gemini': // legacy
         return [
           _ApiKeyField(provider: 'gemini', theme: theme),
           _Field(
             label: 'Model',
             theme: theme,
-            child: _Input(
+            child: _ModelDropdown(
               value: _config.ai.geminiModel,
-              hint: 'gemma-3-27b-it',
+              options: const [
+                'gemini-2.5-flash',
+                'gemini-2.5-pro',
+                'gemini-2.0-flash',
+                'gemma-3-27b-it',
+              ],
               theme: theme,
               onChanged: (v) => _updateAi(geminiModel: v),
             ),
@@ -780,9 +844,13 @@ class _SettingsScreenState extends State<SettingsScreen>
             _Field(
               label: 'Model',
               theme: theme,
-              child: _Input(
+              child: _ModelDropdown(
                 value: _config.ai.anthropicModel,
-                hint: 'claude-sonnet-4-20250514',
+                options: const [
+                  'claude-sonnet-4-20250514',
+                  'claude-opus-4-20250514',
+                  'claude-haiku-4-5-20251001',
+                ],
                 theme: theme,
                 onChanged: (v) => _updateAi(anthropicModel: v),
               ),
@@ -795,9 +863,15 @@ class _SettingsScreenState extends State<SettingsScreen>
           _Field(
             label: 'Model',
             theme: theme,
-            child: _Input(
+            child: _ModelDropdown(
               value: _config.ai.openaiModel,
-              hint: 'gpt-4o',
+              options: const [
+                'gpt-4o',
+                'gpt-4o-mini',
+                'gpt-4.1',
+                'gpt-4.1-mini',
+                'o3-mini',
+              ],
               theme: theme,
               onChanged: (v) => _updateAi(openaiModel: v),
             ),
@@ -1054,6 +1128,53 @@ class _Field extends StatelessWidget {
           const SizedBox(height: 8),
           child,
         ],
+      ),
+    );
+  }
+}
+
+class _ModelDropdown extends StatelessWidget {
+  final String value;
+  final List<String> options;
+  final BolonTheme theme;
+  final ValueChanged<String> onChanged;
+
+  const _ModelDropdown({
+    required this.value,
+    required this.options,
+    required this.theme,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveValue = options.contains(value) ? value : options.first;
+    return Container(
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: theme.blockBackground,
+        border: Border.all(color: theme.blockBorder),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: DropdownButton<String>(
+        value: effectiveValue,
+        isExpanded: true,
+        underline: const SizedBox.shrink(),
+        dropdownColor: theme.blockBackground,
+        style: TextStyle(
+          color: theme.foreground,
+          fontFamily: theme.fontFamily,
+          fontSize: 12,
+        ),
+        icon: Icon(Icons.expand_more, size: 16, color: theme.dimForeground),
+        items: [
+          for (final opt in options)
+            DropdownMenuItem(value: opt, child: Text(opt)),
+        ],
+        onChanged: (v) {
+          if (v != null) onChanged(v);
+        },
       ),
     );
   }
