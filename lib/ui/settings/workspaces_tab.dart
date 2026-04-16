@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/workspace/workspace.dart';
 import '../../providers/workspace_provider.dart';
+import '../shared/bolan_button.dart';
 
 /// CRUD UI for workspaces. Renders a list of workspaces, each row
 /// expandable into an inline editor. New workspaces seed their config
@@ -72,17 +73,10 @@ class _WorkspacesTabState extends ConsumerState<WorkspacesTab> {
         else
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => setState(() => _adding = true),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('New Workspace'),
-              style: TextButton.styleFrom(
-                foregroundColor: theme.foreground,
-                textStyle: TextStyle(
-                  fontFamily: theme.fontFamily,
-                  fontSize: 13,
-                ),
-              ),
+            child: BolanButton.ghost(
+              label: '+ New Workspace',
+              icon: Icons.add,
+              onTap: () => setState(() => _adding = true),
             ),
           ),
       ],
@@ -193,18 +187,9 @@ class _WorkspaceRow extends StatelessWidget {
                       ),
                     )
                   else
-                    TextButton(
-                      onPressed: onSwitch,
-                      style: TextButton.styleFrom(
-                        foregroundColor: theme.dimForeground,
-                        textStyle: TextStyle(
-                          fontFamily: theme.fontFamily,
-                          fontSize: 11,
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: const Size(0, 28),
-                      ),
-                      child: const Text('Switch'),
+                    BolanButton.ghost(
+                      label: 'Switch',
+                      onTap: onSwitch,
                     ),
                   Icon(
                     isExpanded
@@ -362,38 +347,24 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
             ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => setState(
+            child: BolanButton.ghost(
+              label: '+ Add variable',
+              icon: Icons.add,
+              onTap: () => setState(
                   () => _envEntries.add(const MapEntry('', ''))),
-              icon: const Icon(Icons.add, size: 14),
-              label: const Text('Add variable'),
-              style: TextButton.styleFrom(
-                foregroundColor: t.dimForeground,
-                textStyle: TextStyle(
-                    fontFamily: t.fontFamily, fontSize: 11),
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                minimumSize: const Size(0, 28),
-              ),
             ),
           ),
           const SizedBox(height: 12),
           Row(children: [
-            ElevatedButton(
-              onPressed: _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: widget.workspace.accentColor,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Save'),
+            BolanButton.primary(
+              label: 'Save',
+              onTap: _save,
             ),
             const Spacer(),
             if (widget.canDelete)
-              TextButton(
-                onPressed: () => _confirmDelete(context),
-                style: TextButton.styleFrom(
-                  foregroundColor: t.exitFailureFg,
-                ),
-                child: const Text('Delete workspace'),
+              BolanButton.danger(
+                label: 'Delete workspace',
+                onTap: () => _confirmDelete(context),
               ),
           ]),
         ],
@@ -416,18 +387,16 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
               color: t.dimForeground, fontFamily: t.fontFamily, fontSize: 12),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Cancel',
-                style: TextStyle(color: t.foreground)),
+          BolanButton(
+            label: 'Cancel',
+            onTap: () => Navigator.of(ctx).pop(),
           ),
-          TextButton(
-            onPressed: () {
+          BolanButton.danger(
+            label: 'Delete',
+            onTap: () {
               Navigator.of(ctx).pop();
               widget.onDelete();
             },
-            child: Text('Delete',
-                style: TextStyle(color: t.exitFailureFg)),
           ),
         ],
       ),
@@ -633,15 +602,14 @@ class _NewWorkspaceFormState extends State<_NewWorkspaceForm> {
           ),
           const SizedBox(height: 12),
           Row(children: [
-            ElevatedButton(
-              onPressed: _create,
-              child: const Text('Create'),
+            BolanButton.primary(
+              label: 'Create',
+              onTap: _create,
             ),
             const SizedBox(width: 8),
-            TextButton(
-              onPressed: widget.onCancel,
-              style: TextButton.styleFrom(foregroundColor: t.dimForeground),
-              child: const Text('Cancel'),
+            BolanButton(
+              label: 'Cancel',
+              onTap: widget.onCancel,
             ),
           ]),
         ],

@@ -5,7 +5,6 @@ import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:macos_window_utils/widgets/macos_toolbar_passthrough.dart';
 import 'package:macos_window_utils/window_manipulator.dart';
 
@@ -13,6 +12,7 @@ import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/workspace_provider.dart';
+import '../shared/bolan_button.dart';
 
 /// Whether a tab is currently being renamed. Checked by the global
 /// key handler to avoid stealing keystrokes.
@@ -183,10 +183,11 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                   left: Platform.isMacOS ? 78 : 8,
                 ),
                 child: MacosToolbarPassthrough(
-                  child: _SidebarToggleButton(
-                    isOpen: widget.sidebarOpen,
-                    theme: theme,
-                    onTap: widget.onToggleSidebar!,
+                  child: BolanSvgIconButton(
+                    assetPath: 'assets/icons/sidebar.svg',
+                    tooltip: 'Toggle sidebar',
+                    active: widget.sidebarOpen,
+                    onTap: widget.onToggleSidebar,
                   ),
                 ),
               ),
@@ -253,16 +254,16 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _IconButton(
+                    BolanIconButton(
                       icon: Icons.add,
-                      theme: theme,
+                      tooltip: 'New tab',
                       onTap: () =>
                           ref.read(currentSessionNotifierProvider).createTab(),
                     ),
                     const SizedBox(width: 2),
-                    _IconButton(
+                    BolanIconButton(
                       icon: Icons.settings_outlined,
-                      theme: theme,
+                      tooltip: 'Settings',
                       onTap: () => ref
                           .read(currentSessionNotifierProvider)
                           .openSettingsTab(),
@@ -869,88 +870,6 @@ class _WinBtnState extends State<_WinBtn> {
             color: _hovered && widget.hoverColor != null
                 ? Colors.white
                 : widget.theme.dimForeground,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SidebarToggleButton extends StatefulWidget {
-  final bool isOpen;
-  final BolonTheme theme;
-  final VoidCallback onTap;
-
-  const _SidebarToggleButton({
-    required this.isOpen,
-    required this.theme,
-    required this.onTap,
-  });
-
-  @override
-  State<_SidebarToggleButton> createState() => _SidebarToggleButtonState();
-}
-
-class _SidebarToggleButtonState extends State<_SidebarToggleButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = widget.isOpen
-        ? widget.theme.foreground
-        : widget.theme.dimForeground;
-
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: widget.isOpen
-                ? widget.theme.background
-                : _hovered
-                    ? widget.theme.statusChipBg
-                    : Colors.transparent,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: SvgPicture.asset(
-            'assets/icons/sidebar.svg',
-            width: 16,
-            height: 16,
-            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _IconButton extends StatelessWidget {
-  final IconData icon;
-  final BolonTheme theme;
-  final VoidCallback onTap;
-
-  const _IconButton({
-    required this.icon,
-    required this.theme,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Icon(
-            icon,
-            size: 14,
-            color: theme.dimForeground,
           ),
         ),
       ),

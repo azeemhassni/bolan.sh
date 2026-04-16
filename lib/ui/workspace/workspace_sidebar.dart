@@ -6,6 +6,7 @@ import '../../core/theme/bolan_theme.dart';
 import '../../core/workspace/workspace.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/workspace_provider.dart';
+import '../shared/bolan_button.dart';
 
 /// Vertical rail listing workspaces. Click an item to switch; the
 /// active item is highlighted with its accent color. Two-finger
@@ -112,11 +113,15 @@ class _WorkspaceSidebarState extends ConsumerState<WorkspaceSidebar> {
                   onTap: () => _switchTo(w.id),
                 ),
               const Spacer(),
-              _AddWorkspaceButton(
-                theme: theme,
-                onTap: () =>
-                    ref.read(currentSessionNotifierProvider)
-                        .openSettingsTab(initialSettingsTab: 5),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: BolanIconButton(
+                  icon: Icons.add,
+                  tooltip: 'New workspace',
+                  onTap: () =>
+                      ref.read(currentSessionNotifierProvider)
+                          .openSettingsTab(initialSettingsTab: 5),
+                ),
               ),
               const SizedBox(height: 8),
             ],
@@ -211,50 +216,3 @@ class _WorkspaceItemState extends State<_WorkspaceItem> {
   }
 }
 
-class _AddWorkspaceButton extends StatefulWidget {
-  final BolonTheme theme;
-  final VoidCallback onTap;
-
-  const _AddWorkspaceButton({required this.theme, required this.onTap});
-
-  @override
-  State<_AddWorkspaceButton> createState() => _AddWorkspaceButtonState();
-}
-
-class _AddWorkspaceButtonState extends State<_AddWorkspaceButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Tooltip(
-        message: 'New workspace',
-        waitDuration: const Duration(milliseconds: 400),
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
-          child: GestureDetector(
-            onTap: widget.onTap,
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: _hovered
-                    ? widget.theme.statusChipBg
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.add,
-                size: 18,
-                color: widget.theme.dimForeground,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

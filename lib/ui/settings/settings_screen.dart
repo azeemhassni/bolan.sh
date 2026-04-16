@@ -14,6 +14,8 @@ import '../../core/config/config_loader.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/theme_registry.dart';
 import '../../providers/model_download_provider.dart';
+import '../shared/bolan_button.dart';
+import '../shared/bolan_components.dart';
 import 'font_picker.dart';
 import 'prompt_editor.dart';
 import 'theme_editor.dart';
@@ -535,78 +537,63 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   List<Widget> _buildGeneralTab(BolonTheme theme) {
     return [
-      _Field(
+      BolanField(
         label: 'Shell',
         help: 'Leave empty to use \$SHELL',
         error: _shellError,
-        theme: theme,
-        child: _Input(
+        child: BolanTextField(
           value: _config.general.shell,
           hint: '/bin/zsh',
-          theme: theme,
           onChanged: (v) {
             setState(() => _shellError = _validateShell(v));
             _updateGeneral(shell: v);
           },
         ),
       ),
-      _Field(
+      BolanField(
         label: 'Working Directory',
         help: 'Default directory for new tabs',
         error: _workingDirError,
-        theme: theme,
-        child: _Input(
+        child: BolanTextField(
           value: _config.general.workingDirectory,
           hint: '~ (home)',
-          theme: theme,
           onChanged: (v) {
             setState(() => _workingDirError = _validateWorkingDir(v));
             _updateGeneral(workingDirectory: v);
           },
         ),
       ),
-      _Toggle(
+      BolanToggle(
         label: 'Confirm on Quit',
         help: 'Ask before closing the app',
         value: _config.general.confirmOnQuit,
-        theme: theme,
         onChanged: (v) => _updateGeneral(confirmOnQuit: v),
       ),
-      _Toggle(
+      BolanToggle(
         label: 'Restore Sessions',
         help: 'Reopen tabs and panes on startup',
         value: _config.general.restoreSessions,
-        theme: theme,
         onChanged: (v) => _updateGeneral(restoreSessions: v),
       ),
-      _Toggle(
+      BolanToggle(
         label: 'Long-Running Notifications',
         help: 'Notify when commands take longer than ${_config.general.longRunningThresholdSeconds}s',
         value: _config.general.notifyLongRunning,
-        theme: theme,
         onChanged: (v) => _updateGeneral(notifyLongRunning: v),
       ),
-      _Toggle(
+      BolanToggle(
         label: 'Auto-Check for Updates',
         help: 'Check for new versions on startup',
         value: _config.update.autoCheck,
-        theme: theme,
         onChanged: (v) => _updateUpdate(autoCheck: v),
       ),
       const SizedBox(height: 32),
       Align(
         alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          onPressed: () => _confirmRestoreDefaults(theme),
-          icon: Icon(Icons.restore, size: 14, color: theme.exitFailureFg),
-          label: Text(
-            'Restore All Settings to Defaults',
-            style: TextStyle(
-              color: theme.exitFailureFg,
-              fontFamily: theme.fontFamily,
-              fontSize: 12,
-            ),
-          ),
+        child: BolanButton.danger(
+          label: 'Restore All Settings to Defaults',
+          icon: Icons.restore,
+          onTap: () => _confirmRestoreDefaults(theme),
         ),
       ),
       Padding(
@@ -628,67 +615,57 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   List<Widget> _buildEditorTab(BolonTheme theme) {
     return [
-      _Field(
+      BolanField(
         label: 'Font Family',
-        theme: theme,
         child: FontPicker(
           selectedFont: _config.editor.fontFamily,
           theme: theme,
           onSelected: (v) => _updateEditor(fontFamily: v),
         ),
       ),
-      _Field(
+      BolanField(
         label: 'Font Size',
-        theme: theme,
-        child: _Slider(
+        child: BolanSlider(
           value: _config.editor.fontSize,
           min: 8,
           max: 32,
           step: 1,
           suffix: 'px',
-          theme: theme,
           onChanged: (v) => _updateEditor(fontSize: v),
         ),
       ),
-      _Field(
+      BolanField(
         label: 'Line Height',
-        theme: theme,
-        child: _Slider(
+        child: BolanSlider(
           value: _config.editor.lineHeight,
           min: 1.0,
           max: 2.0,
           step: 0.1,
-          theme: theme,
           onChanged: (v) => _updateEditor(lineHeight: v),
         ),
       ),
-      _Field(
+      BolanField(
         label: 'Cursor Style',
-        theme: theme,
-        child: _SegmentedControl(
+        child: BolanSegmentedControl(
           value: _config.editor.cursorStyle,
           options: const ['block', 'underline', 'bar'],
-          theme: theme,
           onChanged: (v) => _updateEditor(cursorStyle: v),
         ),
       ),
-      _Field(
+      BolanField(
         label: 'Scrollback Lines',
-        theme: theme,
-        child: _Slider(
+        child: BolanSlider(
           value: _config.editor.scrollbackLines.toDouble(),
           min: 1000,
           max: 50000,
           step: 1000,
-          theme: theme,
           onChanged: (v) => _updateEditor(scrollbackLines: v.round()),
         ),
       ),
-      _Toggle(
+      BolanToggle(
         label: 'Ligatures',
         help: 'Enable font ligatures in block output (e.g., => != ->)',
         value: _config.editor.ligatures,
-        theme: theme,
         onChanged: (v) => _updateEditor(ligatures: v),
       ),
     ];
@@ -740,41 +717,35 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   List<Widget> _buildAiTab(BolonTheme theme) {
     return [
-      _Toggle(
+      BolanToggle(
         label: 'Enable AI Features',
         value: _config.ai.enabled,
-        theme: theme,
         onChanged: (v) => _updateAi(enabled: v),
       ),
-      _Toggle(
+      BolanToggle(
         label: 'Command Suggestions',
         help: 'Suggest next command after each execution',
         value: _config.ai.commandSuggestions,
-        theme: theme,
         onChanged: (v) => _updateAi(commandSuggestions: v),
       ),
-      _Toggle(
+      BolanToggle(
         label: 'Smart History Search',
         help: 'Use AI for natural language history search (Ctrl+R)',
         value: _config.ai.smartHistorySearch,
-        theme: theme,
         onChanged: (v) => _updateAi(smartHistorySearch: v),
       ),
-      _Toggle(
+      BolanToggle(
         label: 'Share History with AI',
         help: 'Send recent commands for better suggestions',
         value: _config.ai.shareHistory,
-        theme: theme,
         onChanged: (v) => _updateAi(shareHistory: v),
       ),
       const SizedBox(height: 8),
-      _Field(
+      BolanField(
         label: 'Provider',
-        theme: theme,
-        child: _SegmentedControl(
+        child: BolanSegmentedControl(
           value: _config.ai.provider,
           options: const ['local', 'google', 'anthropic', 'openai', 'ollama'],
-          theme: theme,
           onChanged: (v) => _updateAi(provider: v),
         ),
       ),
@@ -810,10 +781,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       case 'gemini': // legacy
         return [
           _ApiKeyField(provider: 'gemini', theme: theme),
-          _Field(
+          BolanField(
             label: 'Model',
-            theme: theme,
-            child: _ModelDropdown(
+            child: BolanDropdown(
               value: _config.ai.geminiModel,
               options: const [
                 'gemini-2.5-flash',
@@ -821,37 +791,32 @@ class _SettingsScreenState extends State<SettingsScreen>
                 'gemini-2.0-flash',
                 'gemma-3-27b-it',
               ],
-              theme: theme,
               onChanged: (v) => _updateAi(geminiModel: v),
             ),
           ),
         ];
       case 'anthropic':
         return [
-          _Field(
+          BolanField(
             label: 'Mode',
             help: 'Use Claude Code CLI or API key',
-            theme: theme,
-            child: _SegmentedControl(
+            child: BolanSegmentedControl(
               value: _config.ai.anthropicMode,
               options: const ['claude-code', 'api'],
-              theme: theme,
               onChanged: (v) => _updateAi(anthropicMode: v),
             ),
           ),
           if (_config.ai.anthropicMode == 'api') ...[
             _ApiKeyField(provider: 'anthropic', theme: theme),
-            _Field(
+            BolanField(
               label: 'Model',
-              theme: theme,
-              child: _ModelDropdown(
+              child: BolanDropdown(
                 value: _config.ai.anthropicModel,
                 options: const [
                   'claude-sonnet-4-20250514',
                   'claude-opus-4-20250514',
                   'claude-haiku-4-5-20251001',
                 ],
-                theme: theme,
                 onChanged: (v) => _updateAi(anthropicModel: v),
               ),
             ),
@@ -860,10 +825,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       case 'openai':
         return [
           _ApiKeyField(provider: 'openai', theme: theme),
-          _Field(
+          BolanField(
             label: 'Model',
-            theme: theme,
-            child: _ModelDropdown(
+            child: BolanDropdown(
               value: _config.ai.openaiModel,
               options: const [
                 'gpt-4o',
@@ -872,30 +836,25 @@ class _SettingsScreenState extends State<SettingsScreen>
                 'gpt-4.1-mini',
                 'o3-mini',
               ],
-              theme: theme,
               onChanged: (v) => _updateAi(openaiModel: v),
             ),
           ),
         ];
       case 'ollama':
         return [
-          _Field(
+          BolanField(
             label: 'URL',
-            theme: theme,
-            child: _Input(
+            child: BolanTextField(
               value: _config.ai.ollamaUrl,
               hint: 'http://127.0.0.1:11434',
-              theme: theme,
               onChanged: (v) => _updateAi(ollamaUrl: v),
             ),
           ),
-          _Field(
+          BolanField(
             label: 'Model',
-            theme: theme,
-            child: _Input(
+            child: BolanTextField(
               value: _config.ai.model,
               hint: 'llama3',
-              theme: theme,
               onChanged: (v) => _updateAi(model: v),
             ),
           ),
@@ -1079,7 +1038,7 @@ class _Field extends StatelessWidget {
   const _Field({
     required this.label,
     this.help,
-    this.error,
+    this.error, // ignore: unused_element_parameter
     required this.theme,
     required this.child,
   });
@@ -1262,6 +1221,7 @@ class _InputState extends State<_Input> {
   }
 }
 
+// ignore: unused_element
 class _Slider extends StatelessWidget {
   final double value;
   final double min;
@@ -1276,7 +1236,7 @@ class _Slider extends StatelessWidget {
     required this.min,
     required this.max,
     required this.step,
-    this.suffix,
+    this.suffix, // ignore: unused_element_parameter
     required this.theme,
     required this.onChanged,
   });
@@ -1395,6 +1355,7 @@ class _SegmentedControl extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _Toggle extends StatelessWidget {
   final String label;
   final String? help;
@@ -1404,7 +1365,7 @@ class _Toggle extends StatelessWidget {
 
   const _Toggle({
     required this.label,
-    this.help,
+    this.help, // ignore: unused_element_parameter
     required this.value,
     required this.theme,
     required this.onChanged,
