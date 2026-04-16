@@ -69,7 +69,7 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
 
     final Widget content = GestureDetector(
       onTap: () =>
-          ref.read(sessionProvider.notifier).setFocusedPane(widget.leaf.id),
+          ref.read(currentSessionNotifierProvider).setFocusedPane(widget.leaf.id),
       onSecondaryTapDown: (details) =>
           _showContextMenu(context, details),
       child: Container(
@@ -98,7 +98,7 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
           details.data != widget.leaf.id && !widget.isSinglePane,
       onAcceptWithDetails: (details) {
         if (_hoverPosition == null) return;
-        ref.read(sessionProvider.notifier).movePane(
+        ref.read(currentSessionNotifierProvider).movePane(
               details.data,
               widget.leaf.id,
               _hoverPosition!,
@@ -187,7 +187,7 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
     BuildContext context,
     TapDownDetails details,
   ) async {
-    final notifier = ref.read(sessionProvider.notifier);
+    final notifier = ref.read(currentSessionNotifierProvider);
     final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
     if (!context.mounted) return;
 
@@ -370,7 +370,7 @@ class _SplitPaneWidget extends ConsumerWidget {
             onDrag: (delta) {
               final newRatio = (split.ratio + delta).clamp(0.15, 0.85);
               ref
-                  .read(sessionProvider.notifier)
+                  .read(currentSessionNotifierProvider)
                   .updateSplitRatio(split.id, newRatio);
             },
           ),

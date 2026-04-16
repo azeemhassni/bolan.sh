@@ -66,9 +66,9 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
             canRename: false,
             theme: theme,
             onTap: () =>
-                ref.read(sessionProvider.notifier).switchTab(index),
+                ref.read(currentSessionNotifierProvider).switchTab(index),
             onClose: () =>
-                ref.read(sessionProvider.notifier).closeTab(index),
+                ref.read(currentSessionNotifierProvider).closeTab(index),
             onRename: (_) {},
           ),
         ),
@@ -84,7 +84,7 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
         index: index,
         theme: theme,
         onReorder: (oldIndex, newIndex) => ref
-            .read(sessionProvider.notifier)
+            .read(currentSessionNotifierProvider)
             .reorderTab(oldIndex, newIndex),
         child: _Tab(
           title: title,
@@ -94,22 +94,22 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
           isRenamed: tab.customTitle != null,
           theme: theme,
           onTap: () =>
-              ref.read(sessionProvider.notifier).switchTab(index),
+              ref.read(currentSessionNotifierProvider).switchTab(index),
           onClose: () => widget.onCloseTab != null
               ? widget.onCloseTab!(index)
-              : ref.read(sessionProvider.notifier).closeTab(index),
+              : ref.read(currentSessionNotifierProvider).closeTab(index),
           onCloseOthers: sessionState.tabs.length > 1
               ? () => ref
-                  .read(sessionProvider.notifier)
+                  .read(currentSessionNotifierProvider)
                   .closeOtherTabs(index)
               : null,
           onCloseRight: index < sessionState.tabs.length - 1
               ? () => ref
-                  .read(sessionProvider.notifier)
+                  .read(currentSessionNotifierProvider)
                   .closeTabsToRight(index)
               : null,
           onRename: (name) =>
-              ref.read(sessionProvider.notifier).renameTab(index, name),
+              ref.read(currentSessionNotifierProvider).renameTab(index, name),
         ),
       ),
     );
@@ -150,7 +150,7 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
   @override
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
-    final sessionState = ref.watch(sessionProvider);
+    final sessionState = ref.watch(currentSessionProvider);
 
     // Keep the active tab visible when it changes (e.g. keyboard switch
     // or keyboard reorder). Schedule after the frame so layout is ready.
@@ -231,14 +231,14 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                       icon: Icons.add,
                       theme: theme,
                       onTap: () =>
-                          ref.read(sessionProvider.notifier).createTab(),
+                          ref.read(currentSessionNotifierProvider).createTab(),
                     ),
                     const SizedBox(width: 2),
                     _IconButton(
                       icon: Icons.settings_outlined,
                       theme: theme,
                       onTap: () => ref
-                          .read(sessionProvider.notifier)
+                          .read(currentSessionNotifierProvider)
                           .openSettingsTab(),
                     ),
                   ],

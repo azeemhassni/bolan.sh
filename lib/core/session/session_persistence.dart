@@ -13,19 +13,23 @@ import '../workspace/workspace_paths.dart';
 class SessionPersistence {
   SessionPersistence._();
 
-  static File _stateFile() => WorkspacePaths.sessionStateFile();
+  static File _stateFile({String? workspaceId}) =>
+      workspaceId != null
+          ? WorkspacePaths.sessionStateFileFor(workspaceId)
+          : WorkspacePaths.sessionStateFile();
 
   /// Saves the current layout to disk.
-  static Future<void> save(SessionLayout layout) async {
-    final file = _stateFile();
+  static Future<void> save(SessionLayout layout,
+      {String? workspaceId}) async {
+    final file = _stateFile(workspaceId: workspaceId);
     await file.parent.create(recursive: true);
     final json = jsonEncode(layout.toJson());
     await file.writeAsString(json);
   }
 
   /// Loads a previously saved layout, or null if none exists.
-  static SessionLayout? load() {
-    final file = _stateFile();
+  static SessionLayout? load({String? workspaceId}) {
+    final file = _stateFile(workspaceId: workspaceId);
     if (!file.existsSync()) return null;
     try {
       final content = file.readAsStringSync();

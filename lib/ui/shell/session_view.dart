@@ -274,7 +274,7 @@ class SessionViewState extends ConsumerState<SessionView> {
       onPointerDown: (_) {
         // Any click inside this pane updates the focused pane
         if (widget.paneId != null) {
-          ref.read(sessionProvider.notifier).setFocusedPane(widget.paneId!);
+          ref.read(currentSessionNotifierProvider).setFocusedPane(widget.paneId!);
         }
       },
       child: Stack(

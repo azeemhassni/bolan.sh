@@ -21,6 +21,7 @@ import '../../providers/model_download_provider.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/update_provider.dart';
+import '../../providers/workspace_provider.dart';
 import '../ai/memory_warning_dialog.dart';
 import '../ai/model_download_dialog.dart';
 import '../ai/model_download_toast.dart';
@@ -203,7 +204,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       return true;
     }
     if (meta && key == LogicalKeyboardKey.keyT) {
-      ref.read(sessionProvider.notifier).createTab();
+      ref.read(currentSessionNotifierProvider).createTab();
       return true;
     }
     if (meta && key == LogicalKeyboardKey.keyW && shift) {
@@ -222,47 +223,47 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       return true;
     }
     if (meta && shift && key == LogicalKeyboardKey.arrowLeft) {
-      final s = ref.read(sessionProvider);
+      final s = ref.read(currentSessionProvider);
       if (s.activeTabIndex > 0) {
-        ref.read(sessionProvider.notifier)
+        ref.read(currentSessionNotifierProvider)
             .reorderTab(s.activeTabIndex, s.activeTabIndex - 1);
       }
       return true;
     }
     if (meta && shift && key == LogicalKeyboardKey.arrowRight) {
-      final s = ref.read(sessionProvider);
+      final s = ref.read(currentSessionProvider);
       if (s.activeTabIndex < s.tabs.length - 1) {
-        ref.read(sessionProvider.notifier)
+        ref.read(currentSessionNotifierProvider)
             .reorderTab(s.activeTabIndex, s.activeTabIndex + 2);
       }
       return true;
     }
     if (meta && key == LogicalKeyboardKey.keyD && shift) {
-      ref.read(sessionProvider.notifier).splitPane(Axis.vertical);
+      ref.read(currentSessionNotifierProvider).splitPane(Axis.vertical);
       return true;
     }
     if (meta && key == LogicalKeyboardKey.keyD) {
-      ref.read(sessionProvider.notifier).splitPane(Axis.horizontal);
+      ref.read(currentSessionNotifierProvider).splitPane(Axis.horizontal);
       return true;
     }
     if (meta && alt && key == LogicalKeyboardKey.arrowLeft) {
-      ref.read(sessionProvider.notifier).navigatePane(AxisDirection.left);
+      ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.left);
       return true;
     }
     if (meta && alt && key == LogicalKeyboardKey.arrowRight) {
-      ref.read(sessionProvider.notifier).navigatePane(AxisDirection.right);
+      ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.right);
       return true;
     }
     if (meta && alt && key == LogicalKeyboardKey.arrowUp) {
-      ref.read(sessionProvider.notifier).navigatePane(AxisDirection.up);
+      ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.up);
       return true;
     }
     if (meta && alt && key == LogicalKeyboardKey.arrowDown) {
-      ref.read(sessionProvider.notifier).navigatePane(AxisDirection.down);
+      ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.down);
       return true;
     }
     if (meta && key == LogicalKeyboardKey.keyF) {
-      final s = ref.read(sessionProvider);
+      final s = ref.read(currentSessionProvider);
       final tab = s.activeTab;
       if (tab != null && tab.focusedPaneId != null) {
         SessionViewState.of(tab.focusedPaneId!)?.toggleFindBar();
@@ -277,7 +278,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     // Don't forward keys when palette is open
     if (_showPalette) return false;
 
-    final s = ref.read(sessionProvider);
+    final s = ref.read(currentSessionProvider);
     final tab = s.activeTab;
     if (tab == null || !tab.isTerminal) return false;
 
@@ -330,26 +331,26 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   }
 
   void _switchTab(int delta) {
-    final s = ref.read(sessionProvider);
+    final s = ref.read(currentSessionProvider);
     final count = s.tabs.length;
     if (count <= 1) return;
     final newIndex = (s.activeTabIndex + delta) % count;
-    ref.read(sessionProvider.notifier).switchTab(newIndex);
+    ref.read(currentSessionNotifierProvider).switchTab(newIndex);
   }
 
   void _openSettings() {
-    ref.read(sessionProvider.notifier).openSettingsTab();
+    ref.read(currentSessionNotifierProvider).openSettingsTab();
   }
 
   /// Checks if any session across all tabs has a running command.
   bool _hasRunningCommands() {
-    return ref.read(sessionProvider).allSessions.any((s) => s.isCommandRunning);
+    return ref.read(currentSessionProvider).allSessions.any((s) => s.isCommandRunning);
   }
 
   /// Cmd+W — close tab with confirmation if needed.
   Future<void> _closeTabWithConfirm() async {
     final currentTheme = ref.read(activeThemeProvider);
-    final s = ref.read(sessionProvider);
+    final s = ref.read(currentSessionProvider);
     final tab = s.activeTab;
     if (tab == null) {
       // No tabs open — treat as quit
@@ -359,7 +360,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
 
     // Settings tab — just close it, no confirmation needed.
     if (tab.isSettings) {
-      ref.read(sessionProvider.notifier).closeTab(s.activeTabIndex);
+      ref.read(currentSessionNotifierProvider).closeTab(s.activeTabIndex);
       return;
     }
 
@@ -379,9 +380,9 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         isDangerous: true,
       );
       if (result == ConfirmResult.closeAll) {
-        ref.read(sessionProvider.notifier).closeTab(s.activeTabIndex);
+        ref.read(currentSessionNotifierProvider).closeTab(s.activeTabIndex);
       } else if (result == ConfirmResult.closePane) {
-        ref.read(sessionProvider.notifier).closePane();
+        ref.read(currentSessionNotifierProvider).closePane();
       }
       return;
     }
@@ -396,20 +397,20 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         secondaryLabel: 'Close Pane',
       );
       if (result == ConfirmResult.closeAll) {
-        ref.read(sessionProvider.notifier).closeTab(s.activeTabIndex);
+        ref.read(currentSessionNotifierProvider).closeTab(s.activeTabIndex);
       } else if (result == ConfirmResult.closePane) {
-        ref.read(sessionProvider.notifier).closePane();
+        ref.read(currentSessionNotifierProvider).closePane();
       }
       return;
     }
 
-    ref.read(sessionProvider.notifier).closeTab(s.activeTabIndex);
+    ref.read(currentSessionNotifierProvider).closeTab(s.activeTabIndex);
   }
 
   /// Cmd+Shift+W — close pane with confirmation if running.
   Future<void> _closePaneWithConfirm() async {
     final currentTheme = ref.read(activeThemeProvider);
-    final s = ref.read(sessionProvider);
+    final s = ref.read(currentSessionProvider);
     final tab = s.activeTab;
     if (tab == null) return;
 
@@ -426,7 +427,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       if (result != ConfirmResult.closeAll) return;
     }
 
-    ref.read(sessionProvider.notifier).closePane();
+    ref.read(currentSessionNotifierProvider).closePane();
   }
 
   /// Cmd+Q — quit with confirmation.
@@ -526,7 +527,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         shortcut: '${mod}T',
         icon: Icons.add,
         keywords: const ['tab', 'create'],
-        callback: () => ref.read(sessionProvider.notifier).createTab(),
+        callback: () => ref.read(currentSessionNotifierProvider).createTab(),
       ),
       AppAction(
         id: 'close_tab',
@@ -543,7 +544,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         icon: Icons.vertical_split,
         keywords: const ['split', 'pane', 'horizontal'],
         callback: () =>
-            ref.read(sessionProvider.notifier).splitPane(Axis.horizontal),
+            ref.read(currentSessionNotifierProvider).splitPane(Axis.horizontal),
       ),
       AppAction(
         id: 'split_down',
@@ -552,7 +553,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         icon: Icons.horizontal_split,
         keywords: const ['split', 'pane', 'vertical'],
         callback: () =>
-            ref.read(sessionProvider.notifier).splitPane(Axis.vertical),
+            ref.read(currentSessionNotifierProvider).splitPane(Axis.vertical),
       ),
       AppAction(
         id: 'close_pane',
@@ -584,7 +585,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         icon: Icons.terminal,
         keywords: const ['focus', 'input', 'prompt'],
         callback: () {
-          final s = ref.read(sessionProvider);
+          final s = ref.read(currentSessionProvider);
           final tab = s.activeTab;
           if (tab == null || tab.focusedPaneId == null) return;
           PaneFocusRegistry.get(tab.focusedPaneId!)?.requestFocus();
@@ -678,7 +679,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
 
   @override
   Widget build(BuildContext context) {
-    final sessionState = ref.watch(sessionProvider);
+    final sessionState = ref.watch(currentSessionProvider);
     final configuredFont =
         _configLoader.config.editor.fontFamily;
     final theme = ref.watch(activeThemeProvider)
@@ -714,10 +715,19 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                       children: [
                         const WorkspaceSidebar(),
                         Expanded(
-                          child: sessionState.tabs.isEmpty
+                          // Key on the active workspace id so switching
+                          // workspaces fully unmounts the previous tab
+                          // tree (calling dispose on every SessionView)
+                          // before the new one mounts. Without this,
+                          // GlobalKeys briefly collide and SessionViews
+                          // try to addListener on disposed sessions.
+                          child: KeyedSubtree(
+                            key: ValueKey(
+                                ref.watch(currentWorkspaceProvider).id),
+                            child: sessionState.tabs.isEmpty
                               ? EmptyState(
                                   onNewSession: () => ref
-                                      .read(sessionProvider.notifier)
+                                      .read(currentSessionNotifierProvider)
                                       .createTab(),
                                 )
                               : IndexedStack(
@@ -740,6 +750,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                                         ),
                                   ],
                                 ),
+                          ),
                         ),
                       ],
                     ),

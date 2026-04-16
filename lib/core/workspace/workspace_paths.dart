@@ -84,4 +84,14 @@ class WorkspacePaths {
   static File sessionStateFile() =>
       File('${workspacePath()}/session_state.json');
   static File snippetsFile() => File('${workspacePath()}/snippets.json');
+
+  /// Per-workspace variants that don't depend on [activeWorkspaceId].
+  /// Used by background workspace notifiers that need to read/write
+  /// their OWN files, not the active workspace's.
+  static File historyFileFor(String id) =>
+      File('${rootPath()}/workspaces/$id/history');
+  static File sessionStateFileFor(String id) =>
+      File('${rootPath()}/workspaces/$id/session_state.json');
+  static File configFileFor(String id) =>
+      File('${rootPath()}/workspaces/$id/config.toml');
 }

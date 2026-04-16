@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/workspace/workspace.dart';
 import '../core/workspace/workspace_registry.dart';
-import 'session_provider.dart';
 
 /// The single registry instance, populated at app startup before
 /// `runApp` is called. Dependent providers can `ref.watch` this and
@@ -21,23 +20,18 @@ final currentWorkspaceProvider = Provider<Workspace>((ref) {
 });
 
 /// Switches the active workspace. Updates [WorkspacePaths] so subsequent
-/// disk reads route to the new workspace's directory, persists the
-/// choice in `workspaces.toml`, and invalidates [sessionProvider] so
-/// the session rebuilds against the new workspace's history + layout.
-///
-/// Until the family-keyed session refactor lands this is a "tear down
-/// and rebuild" — running commands in the previous workspace are
-/// terminated. Acceptable for an early sidebar implementation; the
-/// follow-up that keeps background PTYs alive will replace this.
+/// disk reads route to the new workspace's directory and persists the
+/// choice in `workspaces.toml`. Each workspace has its own
+/// [SessionNotifier] via [sessionFamily], so background PTYs stay alive.
 final switchWorkspaceActionProvider =
     Provider<Future<void> Function(String)>((ref) {
   return (String id) async {
     final registry = ref.read(workspaceRegistryProvider);
     if (registry.activeId == id) return;
+    // Each workspace has its own SessionNotifier via sessionFamily.
+    // Switching just changes which one currentSessionProvider routes to.
+    // No invalidation needed — the old workspace's PTYs stay alive.
     await registry.setActive(id);
-    // setActive already updates WorkspacePaths.activeWorkspaceId.
-    // Force the session to rebuild against the new workspace's files.
-    ref.invalidate(sessionProvider);
   };
 });
 

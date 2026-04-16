@@ -8,8 +8,11 @@ import 'shell_history_importer.dart';
 /// Stores commands in `~/.config/bolan/history` (one per line).
 /// Supports navigation (up/down), search, and ghost text matching.
 class CommandHistory {
+  final String? _workspaceId;
   final List<String> _entries = [];
   static const _maxEntries = 10000;
+
+  CommandHistory({String? workspaceId}) : _workspaceId = workspaceId;
 
   List<String> get entries => List.unmodifiable(_entries);
   int get length => _entries.length;
@@ -94,5 +97,7 @@ class CommandHistory {
     return null;
   }
 
-  File _historyFile() => WorkspacePaths.historyFile();
+  File _historyFile() => _workspaceId != null
+      ? WorkspacePaths.historyFileFor(_workspaceId)
+      : WorkspacePaths.historyFile();
 }

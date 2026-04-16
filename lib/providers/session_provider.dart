@@ -11,6 +11,7 @@ import '../core/session/session_persistence.dart';
 import '../core/terminal/command_history.dart';
 import '../core/terminal/session.dart';
 import 'config_provider.dart';
+import 'workspace_provider.dart';
 
 export '../core/pane/pane_node.dart' show DropPosition;
 
@@ -89,26 +90,55 @@ class SessionState {
 }
 
 /// Notifier managing tabs, panes, and sessions.
-class SessionNotifier extends Notifier<SessionState> {
-  final CommandHistory history = CommandHistory();
+///
+/// Family-keyed by workspace id so each workspace maintains its own
+/// tabs, PTYs, and history in parallel. Switching workspaces changes
+/// which notifier is rendered; background workspaces stay alive.
+class SessionNotifier extends FamilyNotifier<SessionState, String> {
+  late final CommandHistory history;
+  late final String _workspaceId;
+
+  /// Mirror of `state.tabs` for use by the dispose closure. Reading
+  /// `state` from inside `onDispose` after invalidation triggers a
+  /// rebuild, which re-runs `build()` and registers a NEW onDispose
+  /// callback while Riverpod is still iterating the disposer list —
+  /// hitting "Concurrent modification during iteration".
+  List<TabState> _tabsForDisposal = const [];
+  int _activeTabIndexForDisposal = 0;
 
   @override
-  SessionState build() {
+  SessionState build(String workspaceId) {
+    _workspaceId = workspaceId;
+    history = CommandHistory(workspaceId: workspaceId);
     history.load();
 
     ref.onDispose(() {
+      // Cancel pending session-change debounce so it can't fire after
+      // disposal and trigger `state = ...` on a disposed notifier
+      // (which would rebuild and register a new disposer mid-iteration).
+      _debounceTimer?.cancel();
       _saveLayout();
-      for (final t in state.tabs) {
+      for (final t in _tabsForDisposal) {
         if (t.rootPane != null) PaneManager.disposeAll(t.rootPane!);
       }
     });
 
     // Try to restore previous session layout
     final restored = _tryRestore();
-    if (restored != null) return restored;
+    final initial = restored ?? SessionState(
+      tabs: [_createTab()],
+      activeTabIndex: 0,
+    );
+    _tabsForDisposal = initial.tabs;
+    _activeTabIndexForDisposal = initial.activeTabIndex;
+    return initial;
+  }
 
-    final tab = _createTab();
-    return SessionState(tabs: [tab], activeTabIndex: 0);
+  @override
+  set state(SessionState value) {
+    _tabsForDisposal = value.tabs;
+    _activeTabIndexForDisposal = value.activeTabIndex;
+    super.state = value;
   }
 
   SessionState? _tryRestore() {
@@ -116,7 +146,7 @@ class SessionNotifier extends Notifier<SessionState> {
     if (configLoader == null) return null;
     if (!configLoader.config.general.restoreSessions) return null;
 
-    final layout = SessionPersistence.load();
+    final layout = SessionPersistence.load(workspaceId: _workspaceId);
     if (layout == null || layout.tabs.isEmpty) return null;
 
     final tabs = <TabState>[];
@@ -186,8 +216,10 @@ class SessionNotifier extends Notifier<SessionState> {
     if (configLoader == null) return;
     if (!configLoader.config.general.restoreSessions) return;
 
-    // Only persist terminal tabs — settings tabs are transient.
-    final tabs = state.tabs
+    // Read from the disposal mirror, not `state` — see the comment on
+    // [_tabsForDisposal]. This method runs from the dispose closure
+    // after the provider may already be invalidated.
+    final tabs = _tabsForDisposal
         .where((tab) => tab.isTerminal && tab.rootPane != null)
         .map((tab) {
       return TabLayout(
@@ -196,10 +228,13 @@ class SessionNotifier extends Notifier<SessionState> {
       );
     }).toList();
 
-    SessionPersistence.save(SessionLayout(
-      tabs: tabs,
-      activeTabIndex: state.activeTabIndex,
-    ));
+    SessionPersistence.save(
+      SessionLayout(
+        tabs: tabs,
+        activeTabIndex: _activeTabIndexForDisposal,
+      ),
+      workspaceId: _workspaceId,
+    );
   }
 
   PaneLayout _serializePane(PaneNode node) {
@@ -500,5 +535,23 @@ class SessionNotifier extends Notifier<SessionState> {
   }
 }
 
-final sessionProvider =
-    NotifierProvider<SessionNotifier, SessionState>(SessionNotifier.new);
+/// Family-keyed session provider: one [SessionNotifier] per workspace id.
+/// Background workspaces keep their PTYs alive and their tab state in
+/// memory. Use [currentSessionProvider] and [currentSessionNotifierProvider]
+/// for the active workspace.
+final sessionFamily =
+    NotifierProvider.family<SessionNotifier, SessionState, String>(
+        SessionNotifier.new);
+
+/// Session state auto-routed to the active workspace.
+final currentSessionProvider = Provider<SessionState>((ref) {
+  final id = ref.watch(workspaceRegistryProvider).activeId;
+  return ref.watch(sessionFamily(id));
+});
+
+/// Session notifier auto-routed to the active workspace. For calling
+/// actions like `createTab()`, `closeTab()`, `reorderTab()`, etc.
+final currentSessionNotifierProvider = Provider<SessionNotifier>((ref) {
+  final id = ref.watch(workspaceRegistryProvider).activeId;
+  return ref.read(sessionFamily(id).notifier);
+});
