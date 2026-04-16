@@ -11,8 +11,10 @@ import 'app.dart';
 import 'core/ai/ai_provider_helper.dart';
 import 'core/ai/model_manager.dart';
 import 'core/system/linux_desktop_entry.dart';
+import 'core/theme/theme_registry.dart';
 import 'core/workspace/workspace_paths.dart';
 import 'core/workspace/workspace_registry.dart';
+import 'providers/theme_provider.dart';
 import 'providers/workspace_provider.dart';
 
 Future<void> main() async {
@@ -36,6 +38,12 @@ Future<void> main() async {
   final recommended = await ModelManager.recommendedSize();
   AiProviderHelper.configuredLocalModelSize = recommended.name;
 
+  // Load custom themes from disk before runApp so the first frame
+  // has the full theme list (including any AI-generated themes).
+  final themeRegistry = ThemeRegistry();
+  await themeRegistry.loadCustomThemes();
+  themeRegistry.startWatching();
+
   if (Platform.isMacOS) {
     await _initMacosWindow();
   }
@@ -43,6 +51,7 @@ Future<void> main() async {
   runApp(ProviderScope(
     overrides: [
       workspaceRegistryProvider.overrideWith((_) => registry),
+      themeRegistryProvider.overrideWith((_) => themeRegistry),
     ],
     child: const BolonApp(),
   ));

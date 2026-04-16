@@ -763,6 +763,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                                       if (sessionState.tabs[i].isSettings)
                                         SettingsScreen(
                                           configLoader: _configLoader,
+                                          themeRegistry: ref.read(themeRegistryProvider),
                                           initialTab: sessionState
                                               .tabs[i].initialSettingsTab,
                                         )
