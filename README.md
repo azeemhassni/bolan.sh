@@ -14,29 +14,23 @@ Bolan is what I wanted instead. Same block-based output. AI features that can ru
 
 Early and a bit rough. I use it every day.
 
-## What it does
+## Features
 
-- **Output blocks** — each command's output is its own collapsible block with ANSI colors, copy button, selectable text
-- **AI commands** — type `# find large files over 1GB` and press enter. It figures out the actual command.
-- **AI commit messages** — run `git commit` with no `-m`, it writes a message from the staged diff
-- **AI suggestions** — after a command finishes, the AI predicts what you'll type next as ghost text. Right arrow to accept. Only fires when the model is already loaded; never starts one behind your back.
-- **AI theme generator** — describe a vibe ("ocean sunset", "cyberpunk neon") and it builds a full color theme. Preview it live, save if you like it.
-- **Error explanation** — failed commands get an "Explain Error" button
-- **Workspaces** — isolated profiles (Work, Personal, whatever). Each gets its own tabs, history, config, theme, env vars, and git identity. Background shells keep running when you switch. More on this below.
-- **Split panes** — horizontal and vertical, drag to resize
-- **Tabs** — drag to reorder, right-click for close-others and close-to-the-right
-- **Themes** — 11 built-in plus custom TOML themes and AI-generated ones
-- **History** — Ctrl+R search, ghost text from history while you type
-- **Tab completion** — files, commands, git, npm, composer, artisan, more coming
-- **Git in the prompt** — branch, dirty state, file counts
-- **Clickable paths** — hold Cmd/Ctrl and hover a file path in output. If the file exists, it lights up as a link.
-- **Find** — Cmd+F across blocks and the live terminal, regex supported
-- **Prompt chips** — drag and drop the status chips (shell, cwd, git branch, etc.)
-- **Auto-updates** — checks GitHub Releases on launch, downloads quietly, verifies signatures (macOS) or checksums (Linux), installs with rollback if something goes wrong
+Command output shows up in blocks. Each block is collapsible, has ANSI color support, and a copy button. Type `# find large files over 1GB` and press enter — the AI writes the actual shell command. Run `git commit` without `-m` and it generates the message from the diff. If a command fails, there's an "Explain Error" button.
 
-## Get started
+After a command finishes, the AI can suggest what to type next (ghost text, right arrow to accept). It only does this if you've already loaded a model — it won't start downloading one just because you ran `ls`.
 
-macOS needs Xcode 15+ and CocoaPods. Linux needs clang, cmake, ninja-build, libgtk-3-dev, and pkg-config.
+There's also an AI theme generator. Go to Settings > Appearance, type something like "ocean sunset", and it spits out a complete color scheme you can preview and save.
+
+Workspaces are the big recent addition. You can have a Work profile with its own AWS_PROFILE, git email, theme, and history, completely separate from Personal. Cmd+\ toggles the sidebar, click to switch. Background shells keep running, so switching back doesn't lose anything. New workspaces copy your current config as a starting point.
+
+The rest: split panes (horizontal/vertical), tabs with drag reorder, Ctrl+R history search with ghost text, tab completion for files/commands/git/npm/composer, git branch and dirty state in the prompt, Cmd+F find with regex, 11 built-in themes plus custom TOML themes, auto-updates from GitHub Releases with signature verification and rollback.
+
+File paths in command output are clickable — hold Cmd (or Ctrl on Linux) and hover, if the file actually exists it becomes a link.
+
+## Getting started
+
+macOS needs Xcode 15+ and CocoaPods. Linux needs clang, cmake, ninja-build, libgtk-3-dev, pkg-config.
 
 Both need [Flutter](https://flutter.dev) 3.28+ (stable channel).
 
@@ -47,7 +41,7 @@ flutter pub get
 flutter run -d macos    # or: flutter run -d linux
 ```
 
-Building a release:
+Release builds:
 
 ```bash
 flutter build macos     # -> build/macos/Build/Products/Release/Bolan.app
@@ -58,55 +52,46 @@ Or grab a DMG/tar.gz from the [releases page](https://github.com/AzeemHassni/bol
 
 ## AI providers
 
-Pick one (or more) in Settings > AI:
+All optional. The terminal works fine without any of this.
 
-| Provider | Setup |
+| Provider | What you need |
 |---|---|
-| Local | Built in. Pick a model size, it downloads in the background. No keys, no external service. Size auto-selected based on your RAM. |
-| HuggingFace | Free tier with a HuggingFace token. Routes through their inference providers. Kimi-K2, DeepSeek-R1, Llama 3.3 70B, and others available. |
-| Claude Code | Needs a Pro/Max subscription, no API key |
-| Google | API key from Google AI Studio. Models: Gemini 2.5 Flash/Pro. |
-| OpenAI | API key. GPT-4o, GPT-4.1, o3-mini. |
-| Anthropic | API key. Claude Sonnet, Opus, Haiku. |
-| Ollama | Point at your local Ollama server, any model |
+| Local | Nothing. Pick a model size in settings, it downloads. No keys, no account, stays on your machine. |
+| HuggingFace | Free HuggingFace token. Kimi-K2 by default, also has DeepSeek-R1, Llama 3.3, etc. |
+| Claude Code | Anthropic Pro/Max subscription |
+| Google | API key from Google AI Studio |
+| OpenAI | API key |
+| Anthropic | API key |
+| Ollama | Your own Ollama server, any model you've pulled |
 
-If you want everything to stay on your machine, use the Local provider or Ollama. All AI features are optional; the terminal works fine with them off.
+## Config
 
-## Workspaces
+`~/.config/bolan/` has everything:
 
-Different jobs, different contexts. A "Work" workspace can have its own AWS_PROFILE, its own git email, its own theme and command history. "Personal" sees none of that.
+```
+config.toml                       # settings
+themes/*.toml                     # custom themes
+workspaces.toml                   # workspace list
+workspaces/<id>/config.toml       # per-workspace settings
+workspaces/<id>/history           # per-workspace history
+workspaces/<id>/session_state.json # saved tab layout
+```
 
-Cmd+\ opens the sidebar. Click to switch, or two-finger swipe. Each workspace's shells keep running in the background, so you can switch to Work, check something, and come back to Personal without losing your place.
+Settings UI: Cmd+, (macOS) or Ctrl+, (Linux). There's a "Restore All Settings to Defaults" button if you break something.
 
-New workspaces start as a copy of whatever you're currently using. After that they're independent.
+## Shortcuts
 
-## Configuration
-
-Everything lives in `~/.config/bolan/`:
-
-- `config.toml` — settings (per-workspace under `workspaces/<id>/`)
-- `themes/*.toml` — custom themes
-- `workspaces.toml` — workspace registry
-- `workspaces/<id>/history` — per-workspace command history
-- `workspaces/<id>/session_state.json` — tab layout
-
-Or use the settings UI (Cmd+, on macOS, Ctrl+, on Linux). Changes save automatically. There's a "Restore All Settings to Defaults" button in the General tab if you mess something up.
-
-## Keyboard shortcuts
-
-| Shortcut | Action |
+| | |
 |---|---|
 | Cmd/Ctrl+T | New tab |
 | Cmd/Ctrl+W | Close tab |
 | Cmd/Ctrl+Shift+{ / } | Switch tabs |
-| Cmd/Ctrl+Shift+left/right | Move tab |
 | Cmd/Ctrl+D | Split right |
 | Cmd/Ctrl+Shift+D | Split down |
 | Cmd/Ctrl+Shift+W | Close pane |
 | Cmd/Ctrl+Option+Arrows | Navigate panes |
-| Cmd/Ctrl+\ | Toggle workspace sidebar |
-| Cmd/Ctrl+K | Clear everything |
-| Ctrl+L | Clear screen |
+| Cmd/Ctrl+\ | Workspace sidebar |
+| Cmd/Ctrl+K | Clear |
 | Cmd/Ctrl+F | Find |
 | Cmd/Ctrl++/- | Font size |
 | Ctrl+R | History search |
