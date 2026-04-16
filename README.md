@@ -16,17 +16,21 @@ Early and a bit rough. I use it every day.
 
 ## Features
 
-Command output shows up in blocks. Each block is collapsible, has ANSI color support, and a copy button. Type `# find large files over 1GB` and press enter — the AI writes the actual shell command. Run `git commit` without `-m` and it generates the message from the diff. If a command fails, there's an "Explain Error" button.
-
-After a command finishes, the AI can suggest what to type next (ghost text, right arrow to accept). It only does this if you've already loaded a model — it won't start downloading one just because you ran `ls`.
-
-There's also an AI theme generator. Go to Settings > Appearance, type something like "ocean sunset", and it spits out a complete color scheme you can preview and save.
-
-Workspaces are the big recent addition. You can have a Work profile with its own AWS_PROFILE, git email, theme, and history, completely separate from Personal. Cmd+\ toggles the sidebar, click to switch. Background shells keep running, so switching back doesn't lose anything. New workspaces copy your current config as a starting point.
-
-The rest: split panes (horizontal/vertical), tabs with drag reorder, Ctrl+R history search with ghost text, tab completion for files/commands/git/npm/composer, git branch and dirty state in the prompt, Cmd+F find with regex, 11 built-in themes plus custom TOML themes, auto-updates from GitHub Releases with signature verification and rollback.
-
-File paths in command output are clickable — hold Cmd (or Ctrl on Linux) and hover, if the file actually exists it becomes a link.
+- Block-based output with ANSI colors, collapsible, copy button
+- `# natural language` generates shell commands
+- `git commit` without `-m` generates the commit message
+- AI command suggestions as ghost text after each command
+- AI theme generator from a text description
+- Error explanation on failed commands
+- Workspaces with isolated env vars, git identity, history, config, and theme
+- Split panes, tabs, drag to reorder
+- Ctrl+R history search, ghost text from history while typing
+- Tab completion for files, commands, git, npm, composer, artisan
+- Git branch and dirty state in the prompt
+- Cmd/Ctrl+hover file paths to open them
+- Cmd+F find with regex across blocks
+- 11 built-in themes, custom TOML themes, AI-generated themes
+- Auto-updates with signature verification and rollback
 
 ## Getting started
 
