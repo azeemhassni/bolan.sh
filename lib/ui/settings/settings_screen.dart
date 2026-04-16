@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/ai/ai_provider_helper.dart';
 import '../../core/ai/api_key_storage.dart';
+import '../../core/ai/features/theme_generator.dart';
 import '../../core/ai/model_manager.dart';
 import '../../core/app_version.dart';
 import '../../core/config/app_config.dart';
@@ -24,11 +25,13 @@ import 'workspaces_tab.dart';
 /// Settings screen with sidebar tab navigation.
 class SettingsScreen extends StatefulWidget {
   final ConfigLoader configLoader;
+  final ThemeRegistry themeRegistry;
   final int initialTab;
 
   const SettingsScreen({
     super.key,
     required this.configLoader,
+    required this.themeRegistry,
     this.initialTab = 0,
   });
 
@@ -46,6 +49,9 @@ class _SettingsScreenState extends State<SettingsScreen>
   Timer? _saveDebounce;
   String? _shellError;
   String? _workingDirError;
+  bool _generatingTheme = false;
+  String? _themeGenError;
+  BolonTheme? _previewTheme;
 
   static const _tabs = [
     'General', 'Editor', 'Appearance', 'AI', 'Prompt', 'Workspaces',
@@ -270,8 +276,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   // ---- Appearance Tab ----
 
-  late final ThemeRegistry _registry = ThemeRegistry()
-    ..loadCustomThemes();
+  ThemeRegistry get _registry => widget.themeRegistry;
 
   List<Widget> _buildAppearanceTab(BolonTheme theme) {
     final themes = _registry.allThemes;
@@ -352,6 +357,22 @@ class _SettingsScreenState extends State<SettingsScreen>
       ),
       const SizedBox(height: 24),
 
+      // AI theme generator
+      if (_config.ai.enabled)
+        _AiThemeGenerator(
+          generating: _generatingTheme,
+          error: _themeGenError,
+          previewTheme: _previewTheme,
+          onGenerate: _generateTheme,
+          onSave: _saveGeneratedTheme,
+          onDiscard: () => setState(() {
+            _previewTheme = null;
+            _themeGenError = null;
+          }),
+        ),
+
+      const SizedBox(height: 24),
+
       // Color editor
       ThemeEditor(
         theme: activeTheme,
@@ -362,6 +383,53 @@ class _SettingsScreenState extends State<SettingsScreen>
         },
       ),
     ];
+  }
+
+  Future<void> _generateTheme(String description) async {
+    if (description.trim().isEmpty) return;
+    setState(() {
+      _generatingTheme = true;
+      _themeGenError = null;
+      _previewTheme = null;
+    });
+    try {
+      final provider = await AiProviderHelper.create(
+        providerName: _config.ai.provider,
+        geminiModel: _config.ai.geminiModel,
+        anthropicMode: _config.ai.anthropicMode,
+      );
+      if (provider == null) {
+        setState(() {
+          _themeGenError = 'No AI provider configured.';
+          _generatingTheme = false;
+        });
+        return;
+      }
+      final generator = ThemeGenerator(provider: provider);
+      final theme = await generator.generate(description.trim());
+      if (!mounted) return;
+      setState(() {
+        _previewTheme = theme;
+        _generatingTheme = false;
+      });
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _themeGenError = 'Failed to generate: $e';
+        _generatingTheme = false;
+      });
+    }
+  }
+
+  Future<void> _saveGeneratedTheme() async {
+    final theme = _previewTheme;
+    if (theme == null) return;
+    await _registry.saveCustomTheme(theme);
+    setState(() {
+      _config = _config.copyWith(activeTheme: theme.name);
+      _previewTheme = null;
+    });
+    _save();
   }
 
   Future<void> _duplicateTheme(BolonTheme source) async {
@@ -2270,6 +2338,252 @@ class _ModelSizeChip extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AiThemeGenerator extends StatefulWidget {
+  final bool generating;
+  final String? error;
+  final BolonTheme? previewTheme;
+  final ValueChanged<String> onGenerate;
+  final VoidCallback onSave;
+  final VoidCallback onDiscard;
+
+  const _AiThemeGenerator({
+    required this.generating,
+    this.error,
+    this.previewTheme,
+    required this.onGenerate,
+    required this.onSave,
+    required this.onDiscard,
+  });
+
+  @override
+  State<_AiThemeGenerator> createState() => _AiThemeGeneratorState();
+}
+
+class _AiThemeGeneratorState extends State<_AiThemeGenerator> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = BolonTheme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const BolanSectionHeader('Generate with AI'),
+        Row(
+          children: [
+            Expanded(
+              child: Material(
+                color: theme.statusChipBg,
+                borderRadius: BorderRadius.circular(5),
+                child: TextField(
+                  controller: _controller,
+                  enabled: !widget.generating,
+                  onSubmitted: (_) => widget.onGenerate(_controller.text),
+                  style: TextStyle(
+                    color: theme.foreground,
+                    fontFamily: theme.fontFamily,
+                    fontSize: 13,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Describe your theme... (e.g. "ocean sunset")',
+                    hintStyle: TextStyle(
+                        color: theme.dimForeground, fontSize: 13),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(5),
+                      borderSide: BorderSide(color: theme.blockBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(5),
+                      borderSide: BorderSide(color: theme.blockBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(5),
+                      borderSide: BorderSide(color: theme.cursor),
+                    ),
+                    isDense: true,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            BolanButton.primary(
+              label: widget.generating ? 'Generating...' : 'Generate',
+              icon: widget.generating ? null : Icons.auto_awesome,
+              onTap: widget.generating
+                  ? null
+                  : () => widget.onGenerate(_controller.text),
+            ),
+          ],
+        ),
+        if (widget.error != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            widget.error!,
+            style: TextStyle(
+              color: theme.exitFailureFg,
+              fontFamily: theme.fontFamily,
+              fontSize: 11,
+            ),
+          ),
+        ],
+        if (widget.previewTheme != null) ...[
+          const SizedBox(height: 12),
+          _ThemePreview(theme: widget.previewTheme!),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              BolanButton.primary(
+                label: 'Save & Apply',
+                icon: Icons.check,
+                onTap: widget.onSave,
+              ),
+              const SizedBox(width: 8),
+              BolanButton(
+                label: 'Discard',
+                onTap: widget.onDiscard,
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ThemePreview extends StatelessWidget {
+  final BolonTheme theme;
+  const _ThemePreview({required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = BolonTheme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.background,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: t.blockBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            theme.displayName,
+            style: TextStyle(
+              color: theme.foreground,
+              fontFamily: t.fontFamily,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '\$ git status',
+            style: TextStyle(
+              color: theme.foreground,
+              fontFamily: t.fontFamily,
+              fontSize: 12,
+            ),
+          ),
+          Text(
+            'On branch main',
+            style: TextStyle(
+              color: theme.ansiGreen,
+              fontFamily: t.fontFamily,
+              fontSize: 12,
+            ),
+          ),
+          Text(
+            'modified:   src/app.dart',
+            style: TextStyle(
+              color: theme.ansiRed,
+              fontFamily: t.fontFamily,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              for (final c in [
+                theme.ansiBlack, theme.ansiRed, theme.ansiGreen,
+                theme.ansiYellow, theme.ansiBlue, theme.ansiMagenta,
+                theme.ansiCyan, theme.ansiWhite,
+              ])
+                Container(
+                  width: 18,
+                  height: 18,
+                  margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(
+                    color: c,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              for (final c in [
+                theme.ansiBrightBlack, theme.ansiBrightRed,
+                theme.ansiBrightGreen, theme.ansiBrightYellow,
+                theme.ansiBrightBlue, theme.ansiBrightMagenta,
+                theme.ansiBrightCyan, theme.ansiBrightWhite,
+              ])
+                Container(
+                  width: 18,
+                  height: 18,
+                  margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(
+                    color: c,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: theme.cursor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'cursor / accent',
+                  style: TextStyle(
+                    color: theme.background,
+                    fontFamily: t.fontFamily,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'dim text',
+                style: TextStyle(
+                  color: theme.dimForeground,
+                  fontFamily: t.fontFamily,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
