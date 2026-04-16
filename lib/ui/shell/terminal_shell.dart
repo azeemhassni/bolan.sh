@@ -156,6 +156,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AiProviderHelper.configuredLocalModelSize = newSize;
       AiProviderHelper.dispose();
     }
+    AiProviderHelper.configuredHuggingfaceModel = config.ai.huggingfaceModel;
     // Bump the config version so widgets watching it rebuild with
     // fresh values (cursor style, line height, etc.).
     ref.read(configVersionProvider.notifier).state++;

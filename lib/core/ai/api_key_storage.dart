@@ -59,5 +59,5 @@ class ApiKeyStorage {
     }
   }
 
-  static const _knownProviders = ['anthropic', 'openai', 'gemini'];
+  static const _knownProviders = ['anthropic', 'openai', 'gemini', 'huggingface'];
 }

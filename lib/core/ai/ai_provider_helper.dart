@@ -21,6 +21,9 @@ class AiProviderHelper {
   /// Used to read localModelSize without threading it through every widget.
   static String configuredLocalModelSize = 'small';
 
+  /// Set by TerminalShell when config loads/changes.
+  static String configuredHuggingfaceModel = 'moonshotai/Kimi-K2-Instruct-0905';
+
   /// Creates an [AiProvider] from widget-level parameters.
   static Future<AiProvider?> create({
     required String providerName,
@@ -28,6 +31,7 @@ class AiProviderHelper {
     String anthropicMode = 'claude-code',
     String ollamaUrl = 'http://127.0.0.1:11434',
     String ollamaModel = 'llama3',
+    String huggingfaceModel = 'moonshotai/Kimi-K2-Instruct-0905',
   }) async {
     switch (providerName) {
       case 'local':
@@ -70,6 +74,16 @@ class AiProviderHelper {
           baseUrl: ollamaUrl,
           model: ollamaModel,
           name: 'Ollama',
+        );
+
+      case 'huggingface':
+        final key = await ApiKeyStorage.readKey('huggingface');
+        if (key == null || key.isEmpty) return null;
+        return OpenAiCompatibleProvider(
+          baseUrl: 'https://router.huggingface.co',
+          model: configuredHuggingfaceModel,
+          apiKey: key,
+          name: 'HuggingFace',
         );
 
       case 'google':

@@ -99,6 +99,7 @@ class AiConfig {
   final String geminiModel;
   final String openaiModel;
   final String anthropicModel;
+  final String huggingfaceModel;
   final String anthropicMode; // 'api' or 'claude-code'
   final bool enabled;
   final bool commandSuggestions;
@@ -113,6 +114,7 @@ class AiConfig {
     this.geminiModel = 'gemini-2.5-flash',
     this.openaiModel = 'gpt-4o',
     this.anthropicModel = 'claude-sonnet-4-20250514',
+    this.huggingfaceModel = 'moonshotai/Kimi-K2-Instruct-0905',
     this.anthropicMode = 'claude-code',
     this.enabled = true,
     this.commandSuggestions = true,

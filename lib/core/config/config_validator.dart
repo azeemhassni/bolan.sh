@@ -49,13 +49,14 @@ class ConfigValidator {
   AiConfig _validateAi(Map<String, dynamic>? raw) {
     if (raw == null) return const AiConfig();
     return AiConfig(
-      provider: _oneOf(raw['provider'], ['local', 'google', 'gemini', 'ollama', 'openai', 'anthropic'], 'local'),
+      provider: _oneOf(raw['provider'], ['local', 'google', 'gemini', 'huggingface', 'ollama', 'openai', 'anthropic'], 'local'),
       localModelSize: _oneOf(raw['local_model_size'], ['small', 'medium', 'large', 'xl'], 'small'),
       model: _string(raw['model'], ''),
       ollamaUrl: _string(raw['ollama_url'], 'http://127.0.0.1:11434'),
       geminiModel: _string(raw['gemini_model'], 'gemini-2.5-flash'),
       openaiModel: _string(raw['openai_model'], 'gpt-4o'),
       anthropicModel: _string(raw['anthropic_model'], 'claude-sonnet-4-20250514'),
+      huggingfaceModel: _string(raw['huggingface_model'], 'moonshotai/Kimi-K2-Instruct-0905'),
       anthropicMode: _oneOf(raw['anthropic_mode'], ['api', 'claude-code'], 'claude-code'),
       enabled: _bool(raw['enabled'], true),
       commandSuggestions: _bool(raw['command_suggestions'], true),

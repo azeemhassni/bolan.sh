@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:ui';
 
-import '../ai_provider.dart';
 import '../../theme/bolan_theme.dart';
+import '../ai_provider.dart';
 
 /// Generates a complete [BolonTheme] from a natural-language description
 /// using AI. Returns a theme ready for preview and save.

@@ -135,6 +135,7 @@ class ConfigLoader extends ChangeNotifier {
     sb.writeln('gemini_model = "${c.ai.geminiModel}"');
     sb.writeln('openai_model = "${c.ai.openaiModel}"');
     sb.writeln('anthropic_model = "${c.ai.anthropicModel}"');
+    sb.writeln('huggingface_model = "${c.ai.huggingfaceModel}"');
     sb.writeln('anthropic_mode = "${c.ai.anthropicMode}"');
     sb.writeln('enabled = ${c.ai.enabled}');
     sb.writeln('command_suggestions = ${c.ai.commandSuggestions}');

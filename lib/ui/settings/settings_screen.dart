@@ -813,7 +813,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         label: 'Provider',
         child: BolanSegmentedControl(
           value: _config.ai.provider,
-          options: const ['local', 'google', 'anthropic', 'openai', 'ollama'],
+          options: const ['local', 'google', 'anthropic', 'openai', 'huggingface', 'ollama'],
           onChanged: (v) => _updateAi(provider: v),
         ),
       ),
@@ -905,6 +905,25 @@ class _SettingsScreenState extends State<SettingsScreen>
                 'o3-mini',
               ],
               onChanged: (v) => _updateAi(openaiModel: v),
+            ),
+          ),
+        ];
+      case 'huggingface':
+        return [
+          _ApiKeyField(provider: 'huggingface', theme: theme),
+          BolanField(
+            label: 'Model',
+            help: 'HuggingFace model ID (must support Inference API)',
+            child: BolanDropdown(
+              value: _config.ai.huggingfaceModel,
+              options: const [
+                'moonshotai/Kimi-K2-Instruct-0905',
+                'Qwen/Qwen2.5-Coder-32B-Instruct',
+                'deepseek-ai/DeepSeek-R1',
+                'meta-llama/Llama-3.3-70B-Instruct',
+                'mistralai/Mistral-Small-24B-Instruct-2501',
+              ],
+              onChanged: (v) => _updateAi(huggingfaceModel: v),
             ),
           ),
         ];
@@ -1007,6 +1026,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     String? geminiModel,
     String? openaiModel,
     String? anthropicModel,
+    String? huggingfaceModel,
     String? anthropicMode,
     bool? enabled,
     bool? commandSuggestions,
@@ -1028,6 +1048,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           geminiModel: geminiModel ?? _config.ai.geminiModel,
           openaiModel: openaiModel ?? _config.ai.openaiModel,
           anthropicModel: anthropicModel ?? _config.ai.anthropicModel,
+          huggingfaceModel: huggingfaceModel ?? _config.ai.huggingfaceModel,
           anthropicMode: anthropicMode ?? _config.ai.anthropicMode,
           enabled: enabled ?? _config.ai.enabled,
           commandSuggestions:
@@ -1096,6 +1117,7 @@ class _SidebarTab extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _Field extends StatelessWidget {
   final String label;
   final String? help;
@@ -1105,7 +1127,7 @@ class _Field extends StatelessWidget {
 
   const _Field({
     required this.label,
-    this.help,
+    this.help, // ignore: unused_element_parameter
     this.error, // ignore: unused_element_parameter
     required this.theme,
     required this.child,
@@ -1160,6 +1182,7 @@ class _Field extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _ModelDropdown extends StatelessWidget {
   final String value;
   final List<String> options;
@@ -1357,6 +1380,7 @@ class _Slider extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _SegmentedControl extends StatelessWidget {
   final String value;
   final List<String> options;
