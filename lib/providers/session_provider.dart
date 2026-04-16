@@ -95,8 +95,8 @@ class SessionState {
 /// tabs, PTYs, and history in parallel. Switching workspaces changes
 /// which notifier is rendered; background workspaces stay alive.
 class SessionNotifier extends FamilyNotifier<SessionState, String> {
-  late final CommandHistory history;
-  late final String _workspaceId;
+  late CommandHistory history;
+  late String _workspaceId;
 
   /// Mirror of `state.tabs` for use by the dispose closure. Reading
   /// `state` from inside `onDispose` after invalidation triggers a
