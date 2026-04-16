@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/workspace/workspace.dart';
 import '../core/workspace/workspace_registry.dart';
+import 'config_provider.dart';
 
 /// The single registry instance, populated at app startup before
 /// `runApp` is called. Dependent providers can `ref.watch` this and
@@ -32,6 +33,12 @@ final switchWorkspaceActionProvider =
     // Switching just changes which one currentSessionProvider routes to.
     // No invalidation needed — the old workspace's PTYs stay alive.
     await registry.setActive(id);
+    // Reload config synchronously so the new workspace's theme, font,
+    // shell, and AI settings are in memory BEFORE any widget rebuilds.
+    // Without this, widgets see the previous workspace's config for
+    // at least one frame.
+    final configLoader = ref.read(configLoaderProvider);
+    await configLoader?.load();
   };
 });
 

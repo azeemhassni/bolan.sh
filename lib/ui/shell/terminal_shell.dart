@@ -58,7 +58,6 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   bool _showUpdateDialog = false;
   bool _showUpdateToast = false;
   bool _sidebarOpen = false;
-  String? _lastWorkspaceId;
   final _downloadDialogKey = GlobalKey<ModelDownloadDialogState>();
 
   @override
@@ -690,16 +689,6 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   @override
   Widget build(BuildContext context) {
     final sessionState = ref.watch(currentSessionProvider);
-
-    // Reload config when the active workspace changes so the new
-    // workspace's theme, font, shell, and AI settings apply instantly.
-    final currentWs = ref.watch(currentWorkspaceProvider);
-    if (_lastWorkspaceId != null && _lastWorkspaceId != currentWs.id) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _configLoader.load();
-      });
-    }
-    _lastWorkspaceId = currentWs.id;
 
     final configuredFont =
         _configLoader.config.editor.fontFamily;
