@@ -762,7 +762,10 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                                         i++)
                                       if (sessionState.tabs[i].isSettings)
                                         SettingsScreen(
-                                            configLoader: _configLoader)
+                                          configLoader: _configLoader,
+                                          initialTab: sessionState
+                                              .tabs[i].initialSettingsTab,
+                                        )
                                       else
                                         PaneTreeWidget(
                                           node: sessionState.tabs[i].rootPane!,

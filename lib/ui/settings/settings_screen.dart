@@ -22,8 +22,13 @@ import 'workspaces_tab.dart';
 /// Settings screen with sidebar tab navigation.
 class SettingsScreen extends StatefulWidget {
   final ConfigLoader configLoader;
+  final int initialTab;
 
-  const SettingsScreen({super.key, required this.configLoader});
+  const SettingsScreen({
+    super.key,
+    required this.configLoader,
+    this.initialTab = 0,
+  });
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -32,7 +37,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen>
     with SingleTickerProviderStateMixin {
   late AppConfig _config;
-  int _selectedTab = 0;
+  late int _selectedTab;
   late final AnimationController _toastController;
   late final Animation<double> _toastOpacity;
   Timer? _toastTimer;
@@ -56,6 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void initState() {
     super.initState();
+    _selectedTab = widget.initialTab;
     _config = widget.configLoader.config;
     _toastController = AnimationController(
       vsync: this,

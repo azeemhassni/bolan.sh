@@ -29,12 +29,14 @@ class TabState {
   final PaneNode? rootPane;
   final String? focusedPaneId;
   final String? customTitle;
+  final int initialSettingsTab;
 
   const TabState({
     this.type = TabType.terminal,
     this.rootPane,
     this.focusedPaneId,
     this.customTitle,
+    this.initialSettingsTab = 0,
   });
 
   bool get isTerminal => type == TabType.terminal;
@@ -255,15 +257,16 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
 
   /// Opens the settings tab. If one already exists, switches to it
   /// (singleton). Otherwise creates a new settings tab.
-  void openSettingsTab() {
+  void openSettingsTab({int initialSettingsTab = 0}) {
     final existing = state.tabs.indexWhere((t) => t.isSettings);
     if (existing >= 0) {
       switchTab(existing);
       return;
     }
-    const tab = TabState(
+    final tab = TabState(
       type: TabType.settings,
       customTitle: 'Settings',
+      initialSettingsTab: initialSettingsTab,
     );
     final tabs = [...state.tabs, tab];
     state = SessionState(tabs: tabs, activeTabIndex: tabs.length - 1);

@@ -115,7 +115,8 @@ class _WorkspaceSidebarState extends ConsumerState<WorkspaceSidebar> {
               _AddWorkspaceButton(
                 theme: theme,
                 onTap: () =>
-                    ref.read(currentSessionNotifierProvider).openSettingsTab(),
+                    ref.read(currentSessionNotifierProvider)
+                        .openSettingsTab(initialSettingsTab: 5),
               ),
               const SizedBox(height: 8),
             ],
