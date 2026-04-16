@@ -790,7 +790,9 @@ class _BlocksWithStickyPrompt extends StatefulWidget {
 
 class _BlocksWithStickyPromptState extends State<_BlocksWithStickyPrompt> {
   bool _overflows = false;
+  double _promptHeight = 80;
   final _contentKey = GlobalKey();
+  final _promptKey = GlobalKey();
 
   @override
   void initState() {
@@ -810,8 +812,19 @@ class _BlocksWithStickyPromptState extends State<_BlocksWithStickyPrompt> {
     if (!hasClients) return;
     final maxExtent = widget.scrollController.position.maxScrollExtent;
     final nowOverflows = maxExtent > 0;
-    if (nowOverflows != _overflows) {
-      setState(() => _overflows = nowOverflows);
+
+    // Measure the prompt's actual rendered height so the scroll area
+    // reserves exactly the right amount of bottom space. Without this,
+    // large font sizes cause the last block to hide behind the prompt.
+    final promptBox =
+        _promptKey.currentContext?.findRenderObject() as RenderBox?;
+    final newHeight = promptBox?.size.height ?? 80;
+
+    if (nowOverflows != _overflows || newHeight != _promptHeight) {
+      setState(() {
+        _overflows = nowOverflows;
+        _promptHeight = newHeight;
+      });
     }
   }
 
@@ -824,7 +837,7 @@ class _BlocksWithStickyPromptState extends State<_BlocksWithStickyPrompt> {
         // with a pinned header, so the command + action bar of the
         // currently-visible block stays at the top of the viewport.
         Positioned.fill(
-          bottom: _overflows ? 80 : 0,
+          bottom: _overflows ? _promptHeight : 0,
           child: CustomScrollView(
             key: _contentKey,
             controller: widget.scrollController,
@@ -839,6 +852,7 @@ class _BlocksWithStickyPromptState extends State<_BlocksWithStickyPrompt> {
         // Pinned prompt at bottom (only when overflowing)
         if (_overflows)
           Positioned(
+            key: _promptKey,
             left: 0,
             right: 0,
             bottom: 0,
