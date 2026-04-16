@@ -767,6 +767,8 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                                           themeRegistry: ref.read(themeRegistryProvider),
                                           initialTab: sessionState
                                               .tabs[i].initialSettingsTab,
+                                          navGeneration: sessionState
+                                              .tabs[i].settingsNavGeneration,
                                         )
                                       else
                                         PaneTreeWidget(

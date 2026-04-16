@@ -30,6 +30,7 @@ class TabState {
   final String? focusedPaneId;
   final String? customTitle;
   final int initialSettingsTab;
+  final int settingsNavGeneration;
 
   const TabState({
     this.type = TabType.terminal,
@@ -37,6 +38,7 @@ class TabState {
     this.focusedPaneId,
     this.customTitle,
     this.initialSettingsTab = 0,
+    this.settingsNavGeneration = 0,
   });
 
   bool get isTerminal => type == TabType.terminal;
@@ -260,7 +262,18 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
   void openSettingsTab({int initialSettingsTab = 0}) {
     final existing = state.tabs.indexWhere((t) => t.isSettings);
     if (existing >= 0) {
-      switchTab(existing);
+      // Update the settings tab's initial tab so navigating from
+      // e.g. the sidebar "+" button opens the Workspaces tab even
+      // when settings is already open.
+      final tabs = [...state.tabs];
+      tabs[existing] = TabState(
+        type: TabType.settings,
+        customTitle: 'Settings',
+        initialSettingsTab: initialSettingsTab,
+        settingsNavGeneration:
+            state.tabs[existing].settingsNavGeneration + 1,
+      );
+      state = SessionState(tabs: tabs, activeTabIndex: existing);
       return;
     }
     final tab = TabState(

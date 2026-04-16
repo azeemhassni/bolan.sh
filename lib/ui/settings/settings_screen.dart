@@ -27,12 +27,14 @@ class SettingsScreen extends StatefulWidget {
   final ConfigLoader configLoader;
   final ThemeRegistry themeRegistry;
   final int initialTab;
+  final int navGeneration;
 
   const SettingsScreen({
     super.key,
     required this.configLoader,
     required this.themeRegistry,
     this.initialTab = 0,
+    this.navGeneration = 0,
   });
 
   @override
@@ -77,6 +79,14 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
     _toastOpacity =
         CurvedAnimation(parent: _toastController, curve: Curves.easeOut);
+  }
+
+  @override
+  void didUpdateWidget(SettingsScreen old) {
+    super.didUpdateWidget(old);
+    if (widget.navGeneration != old.navGeneration) {
+      setState(() => _selectedTab = widget.initialTab);
+    }
   }
 
   @override
