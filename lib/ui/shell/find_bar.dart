@@ -118,10 +118,19 @@ class FindBarState extends State<FindBar> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: theme.promptBackground,
-        border: Border(
-          bottom: BorderSide(color: theme.blockBorder, width: 1),
+        color: theme.blockBackground,
+        border: Border.all(color: theme.blockBorder, width: 1),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(8),
+          bottomRight: Radius.circular(8),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(60),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
