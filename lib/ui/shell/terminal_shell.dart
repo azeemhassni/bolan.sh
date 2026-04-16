@@ -725,15 +725,18 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
                   Expanded(
                     child: Row(
                       children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOut,
-                          width: _sidebarOpen
-                              ? WorkspaceSidebar.width
-                              : 0,
-                          child: _sidebarOpen
-                              ? const WorkspaceSidebar()
-                              : const SizedBox.shrink(),
+                        ClipRect(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOut,
+                            width: _sidebarOpen
+                                ? WorkspaceSidebar.width
+                                : 0,
+                            child: const SizedBox(
+                              width: WorkspaceSidebar.width,
+                              child: WorkspaceSidebar(),
+                            ),
+                          ),
                         ),
                         Expanded(
                           // Key on the active workspace id so switching
