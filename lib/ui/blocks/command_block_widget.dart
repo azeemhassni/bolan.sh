@@ -293,8 +293,8 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                                       children: [
                                         if (_explaining)
                                           SizedBox(
-                                            width: 14,
-                                            height: 14,
+                                            width: widget.fontSize,
+                                            height: widget.fontSize,
                                             child:
                                                 CircularProgressIndicator(
                                               strokeWidth: 1.5,
@@ -303,7 +303,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                                           )
                                         else
                                           Icon(Icons.auto_awesome,
-                                              size: 14,
+                                              size: widget.fontSize,
                                               color: theme.ansiYellow),
                                         const SizedBox(width: 8),
                                         Text(
@@ -313,7 +313,7 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
                                           style: TextStyle(
                                             color: theme.foreground,
                                             fontFamily: theme.fontFamily,
-                                            fontSize: 12,
+                                            fontSize: widget.fontSize * 0.85,
                                             decoration:
                                                 TextDecoration.none,
                                           ),
