@@ -5,6 +5,7 @@ import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:macos_window_utils/widgets/macos_toolbar_passthrough.dart';
 import 'package:macos_window_utils/window_manipulator.dart';
 
@@ -182,10 +183,8 @@ class _BolonTabBarState extends ConsumerState<BolonTabBar> {
                   left: Platform.isMacOS ? 78 : 8,
                 ),
                 child: MacosToolbarPassthrough(
-                  child: _IconButton(
-                    icon: widget.sidebarOpen
-                        ? Icons.view_sidebar
-                        : Icons.view_sidebar_outlined,
+                  child: _SidebarToggleButton(
+                    isOpen: widget.sidebarOpen,
                     theme: theme,
                     onTap: widget.onToggleSidebar!,
                   ),
@@ -870,6 +869,58 @@ class _WinBtnState extends State<_WinBtn> {
             color: _hovered && widget.hoverColor != null
                 ? Colors.white
                 : widget.theme.dimForeground,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarToggleButton extends StatefulWidget {
+  final bool isOpen;
+  final BolonTheme theme;
+  final VoidCallback onTap;
+
+  const _SidebarToggleButton({
+    required this.isOpen,
+    required this.theme,
+    required this.onTap,
+  });
+
+  @override
+  State<_SidebarToggleButton> createState() => _SidebarToggleButtonState();
+}
+
+class _SidebarToggleButtonState extends State<_SidebarToggleButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.isOpen
+        ? widget.theme.foreground
+        : widget.theme.dimForeground;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: widget.isOpen
+                ? widget.theme.background
+                : _hovered
+                    ? widget.theme.statusChipBg
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: SvgPicture.asset(
+            'assets/icons/sidebar.svg',
+            width: 16,
+            height: 16,
+            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
           ),
         ),
       ),
