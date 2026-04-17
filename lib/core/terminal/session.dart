@@ -650,11 +650,17 @@ class TerminalSession extends ChangeNotifier {
 
     // Skip output for TUI programs:
     // 1. Used the alternate screen buffer (vim, nano, less, top, etc.)
-    // 2. Heavy in-place redraw activity (Claude Code, Ink CLIs,
-    //    spinners, progress bars) — these rewrite previous content
-    //    via cursor positioning + erase, producing garbage if we
-    //    naively concatenate the byte stream.
-    if (_usedAltBuffer || _redrawSequenceCount > 10) {
+    // 2. Heavy in-place redraw activity where most of the output is
+    //    cursor positioning (Claude Code, Ink CLIs). We use a ratio
+    //    rather than an absolute threshold: commands like `laravel new`
+    //    and `npm install` produce hundreds of real output lines with
+    //    a handful of redraws (progress bars, interactive prompts),
+    //    while true TUIs are almost entirely redraws.
+    final capturedLength = _outputCapture.length;
+    final isTui = _usedAltBuffer ||
+        (_redrawSequenceCount > 50 && capturedLength > 0 &&
+            _redrawSequenceCount / (capturedLength / 100) > 5);
+    if (isTui) {
       _activeBlock = null;
       _commandRunning = false;
       _outputCapture.clear();
@@ -665,9 +671,15 @@ class TerminalSession extends ChangeNotifier {
     }
 
     // Clean up the captured output.
-    // rawOutput preserves SGR color codes for colored rendering.
-    // output is fully stripped for plain-text copy.
-    final captured = _stripPartialLineMarker(_outputCapture.toString());
+    // 1. Strip partial-line marker (zsh PROMPT_EOL_MARK).
+    // 2. Collapse carriage returns: for each line, keep only the text
+    //    after the last \r. This simulates what the terminal renders
+    //    for progress bars, spinners, and interactive prompts that
+    //    overwrite lines in place (composer progress, npm spinners).
+    // 3. rawOutput preserves SGR color codes for colored rendering.
+    //    output is fully stripped for plain-text copy.
+    final captured = _collapseCarriageReturns(
+        _stripPartialLineMarker(_outputCapture.toString()));
     final cleanOutput = _expandTabs(_stripAnsiEscapes(captured)).trim();
     final colorOutput = _expandTabs(_stripNonSgrEscapes(captured)).trim();
 
@@ -839,6 +851,34 @@ class TerminalSession extends ChangeNotifier {
 
   static String _stripNonSgrEscapes(String input) {
     return input.replaceAll(_nonSgrEscapeRe, '');
+  }
+
+  /// Collapses carriage returns within each line. When a line contains
+  /// `\r` (without `\n`), the terminal overwrites from the start of
+  /// the line. We simulate this by keeping only the text after the
+  /// last `\r` on each line. This cleans up progress bars, spinners,
+  /// and interactive prompts that redraw in place.
+  static String _collapseCarriageReturns(String input) {
+    final lines = input.split('\n');
+    final result = StringBuffer();
+    for (var i = 0; i < lines.length; i++) {
+      if (i > 0) result.write('\n');
+      var line = lines[i];
+      // Strip a single trailing \r (normal line ending in raw capture).
+      if (line.endsWith('\r')) {
+        line = line.substring(0, line.length - 1);
+      }
+      // If there are still \r characters inside the line, the terminal
+      // overwrote content in place (progress bars, spinners). Keep
+      // only the text after the last \r.
+      final lastCr = line.lastIndexOf('\r');
+      if (lastCr >= 0) {
+        result.write(line.substring(lastCr + 1));
+      } else {
+        result.write(line);
+      }
+    }
+    return result.toString();
   }
 
   /// Expands tab characters to spaces using 8-character tab stops.
