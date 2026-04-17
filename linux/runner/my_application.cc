@@ -14,6 +14,86 @@ struct _MyApplication {
   char** dart_entrypoint_arguments;
 };
 
+// --- Native context menu ---
+
+// Stores the selected menu item id after gtk_menu_popup.
+static gchar* g_selected_menu_id = nullptr;
+
+static void context_menu_item_activated(GtkMenuItem* item, gpointer user_data) {
+  g_free(g_selected_menu_id);
+  const gchar* id = (const gchar*)g_object_get_data(G_OBJECT(item), "item-id");
+  g_selected_menu_id = g_strdup(id);
+}
+
+static void context_menu_method_call(FlMethodChannel* channel,
+                                     FlMethodCall* method_call,
+                                     gpointer user_data) {
+  const gchar* method = fl_method_call_get_name(method_call);
+
+  if (strcmp(method, "show") == 0) {
+    FlValue* args = fl_method_call_get_args(method_call);
+    FlValue* items_val = fl_value_lookup_string(args, "items");
+    if (items_val == nullptr || fl_value_get_type(items_val) != FL_VALUE_TYPE_LIST) {
+      fl_method_call_respond_success(method_call, fl_value_new_null(), nullptr);
+      return;
+    }
+
+    GtkMenu* menu = GTK_MENU(gtk_menu_new());
+    size_t count = fl_value_get_length(items_val);
+
+    for (size_t i = 0; i < count; i++) {
+      FlValue* item = fl_value_get_list_value(items_val, i);
+      FlValue* is_sep = fl_value_lookup_string(item, "isSeparator");
+      if (is_sep != nullptr && fl_value_get_bool(is_sep)) {
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu),
+                              gtk_separator_menu_item_new());
+        continue;
+      }
+
+      FlValue* label_val = fl_value_lookup_string(item, "label");
+      FlValue* id_val = fl_value_lookup_string(item, "id");
+      FlValue* enabled_val = fl_value_lookup_string(item, "enabled");
+
+      const gchar* label = label_val ? fl_value_get_string(label_val) : "";
+      const gchar* id = id_val ? fl_value_get_string(id_val) : "";
+      gboolean enabled = enabled_val ? fl_value_get_bool(enabled_val) : TRUE;
+
+      GtkWidget* menu_item = gtk_menu_item_new_with_label(label);
+      g_object_set_data_full(G_OBJECT(menu_item), "item-id",
+                             g_strdup(id), g_free);
+      gtk_widget_set_sensitive(menu_item, enabled);
+      g_signal_connect(menu_item, "activate",
+                       G_CALLBACK(context_menu_item_activated), nullptr);
+      gtk_menu_shell_append(GTK_MENU_SHELL(menu), menu_item);
+    }
+
+    gtk_widget_show_all(GTK_WIDGET(menu));
+
+    g_free(g_selected_menu_id);
+    g_selected_menu_id = nullptr;
+
+    // gtk_menu_popup_at_pointer blocks until the menu is dismissed.
+    gtk_menu_popup_at_pointer(menu, nullptr);
+
+    // After menu is dismissed, return the selected id (or null).
+    if (g_selected_menu_id != nullptr) {
+      fl_method_call_respond_success(
+          method_call,
+          fl_value_new_string(g_selected_menu_id), nullptr);
+    } else {
+      fl_method_call_respond_success(
+          method_call, fl_value_new_null(), nullptr);
+    }
+
+    g_object_ref_sink(menu);
+    g_object_unref(menu);
+  } else {
+    fl_method_call_respond_not_implemented(method_call, nullptr);
+  }
+}
+
+// --- End native context menu ---
+
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
 // Called when first Flutter frame received.
@@ -63,6 +143,15 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+
+  // Register native context menu method channel.
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  FlMethodChannel* context_menu_channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "bolan/context_menu",
+      FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(
+      context_menu_channel, context_menu_method_call, nullptr, nullptr);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

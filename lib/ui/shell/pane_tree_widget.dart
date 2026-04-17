@@ -1,10 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/pane/pane_node.dart';
+import '../../core/platform/native_context_menu.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/session_provider.dart';
 import '../shared/anchored_popover.dart';
@@ -67,27 +69,33 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
 
-    final Widget content = GestureDetector(
-      onTap: () =>
-          ref.read(currentSessionNotifierProvider).setFocusedPane(widget.leaf.id),
-      onSecondaryTapDown: (details) =>
-          _showContextMenu(context, details),
-      child: Container(
-        padding: widget.isSinglePane ? null : const EdgeInsets.all(4),
-        decoration: widget.isSinglePane
-            ? null
-            : BoxDecoration(
-                border: widget.isFocused
-                    ? Border.all(color: theme.cursor.withAlpha(80), width: 1)
-                    : Border.all(color: theme.blockBorder, width: 1),
-              ),
-        child: SessionView(
-          key: _sessionViewKey,
-          session: widget.leaf.session,
-          isFocusedPane: widget.isFocused,
-          paneId: widget.leaf.id,
-          onSecondaryTap: (details) =>
-              _showContextMenu(context, details),
+    final Widget content = Listener(
+      onPointerDown: (event) {
+        if (event.buttons == kSecondaryMouseButton) {
+          _showNativeContextMenu();
+        }
+      },
+      child: GestureDetector(
+        onTap: () {
+          if (!widget.isFocused) {
+            ref.read(currentSessionNotifierProvider).setFocusedPane(widget.leaf.id);
+          }
+        },
+        child: Container(
+          padding: widget.isSinglePane ? null : const EdgeInsets.all(4),
+          decoration: widget.isSinglePane
+              ? null
+              : BoxDecoration(
+                  border: widget.isFocused
+                      ? Border.all(color: theme.cursor.withAlpha(80), width: 1)
+                      : Border.all(color: theme.blockBorder, width: 1),
+                ),
+          child: SessionView(
+            key: _sessionViewKey,
+            session: widget.leaf.session,
+            isFocusedPane: widget.isFocused,
+            paneId: widget.leaf.id,
+          ),
         ),
       ),
     );
@@ -183,6 +191,65 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
   }
 
 
+  Future<void> _showNativeContextMenu() async {
+    final notifier = ref.read(currentSessionNotifierProvider);
+    notifier.setFocusedPane(widget.leaf.id);
+
+    final mod = Platform.isMacOS ? '⌘' : 'Ctrl+';
+    final shift = Platform.isMacOS ? '⇧' : 'Shift+';
+
+    final selectedId = await NativeContextMenu.show([
+      const NativeMenuItem(id: 'copy', label: 'Copy', shortcut: 'c'),
+      const NativeMenuItem(id: 'paste', label: 'Paste', shortcut: 'v'),
+      const NativeMenuItem.separator(),
+      const NativeMenuItem(id: 'split_right', label: 'Split Right', shortcut: 'd'),
+      const NativeMenuItem(id: 'split_down', label: 'Split Down'),
+      if (!widget.isSinglePane)
+        NativeMenuItem(id: 'close_pane', label: 'Close Pane'),
+    ]);
+
+    if (selectedId == null) return;
+
+    switch (selectedId) {
+      case 'copy':
+        // Try live terminal selection first, then last block output
+        final liveSelection =
+            _sessionViewKey.currentState?.getSelectedText();
+        if (liveSelection != null && liveSelection.isNotEmpty) {
+          await Clipboard.setData(ClipboardData(text: liveSelection));
+          _sessionViewKey.currentState?.clearTerminalSelection();
+        } else {
+          // Try Flutter text selection via copy intent
+          final focused = primaryFocus?.context;
+          if (focused != null) {
+            Actions.maybeInvoke<CopySelectionTextIntent>(
+              focused,
+              CopySelectionTextIntent.copy,
+            );
+          } else {
+            // Fallback: copy last block output
+            final lastBlock = widget.leaf.session.blocks.lastOrNull;
+            if (lastBlock != null && lastBlock.hasOutput) {
+              await Clipboard.setData(
+                  ClipboardData(text: lastBlock.output));
+            }
+          }
+        }
+      case 'paste':
+        final data = await Clipboard.getData(Clipboard.kTextPlain);
+        if (data?.text != null && data!.text!.isNotEmpty) {
+          widget.leaf.session.writeInput(data.text!);
+        }
+      case 'split_right':
+        notifier.splitPane(Axis.horizontal);
+      case 'split_down':
+        notifier.splitPane(Axis.vertical);
+      case 'close_pane':
+        notifier.closePane();
+    }
+  }
+
+  // ignore: unused_element
   Future<void> _showContextMenu(
     BuildContext context,
     TapDownDetails details,
