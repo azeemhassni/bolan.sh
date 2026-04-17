@@ -209,6 +209,7 @@ class TerminalSession extends ChangeNotifier {
       environment: {
         ...Platform.environment,
         ...?ws?.envVars,
+        ...?ws?.secrets,
         ...wsGitEnv,
         'TERM': 'xterm-256color',
         'TERM_PROGRAM': 'Bolan',
@@ -829,10 +830,11 @@ class TerminalSession extends ChangeNotifier {
   /// Strips all escape sequences EXCEPT SGR color codes (\e[...m).
   /// Used to preserve colors for rich text rendering in blocks.
   static final _nonSgrEscapeRe = RegExp(
-    r'\x1B\[[0-9;?]*[a-ln-zA-Z]' // CSI except 'm'
+    r'\x1B\[[0-9;?>]*[a-ln-zA-Z]' // CSI except 'm'
     r'|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)' // OSC
     r'|\x1B[()*/+][0-9A-Z%]?' // Charset
-    r'|\x1B[@-Z\\^_]', // Single-char Fe
+    r'|\x1B[@-Z\\^_]' // Single-char Fe (C1)
+    r'|\x1B[<=>]', // Private two-char (DECKPAM, DECKPNM, etc.)
   );
 
   static String _stripNonSgrEscapes(String input) {
