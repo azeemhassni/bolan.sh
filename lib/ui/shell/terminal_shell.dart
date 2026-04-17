@@ -50,7 +50,7 @@ class TerminalShell extends ConsumerStatefulWidget {
 
 class _TerminalShellState extends ConsumerState<TerminalShell>
     with WidgetsBindingObserver {
-  final _configLoader = ConfigLoader();
+  ConfigLoader get _configLoader => ref.read(configLoaderProvider);
   final _notificationService = NotificationService();
   bool _showPalette = false;
   bool _showDownloadDialog = false;
@@ -70,17 +70,18 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     // Sweep up any orphan llamafile server left from a previous Bolan
     // run that was force-quit, crashed, or interrupted by reboot.
     LocalLlmProvider.killStaleLocalLlmServer();
+    // Sync theme + font size from already-loaded config so the first
+    // frame uses the right values instead of defaults. Can't modify
+    // providers inside initState, so defer to after the tree builds.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onConfigChanged();
+    });
     _initAsync();
   }
 
   Future<void> _initAsync() async {
-    await _configLoader.load();
-    _configLoader.startWatching();
-    AiProviderHelper.configuredLocalModelSize =
-        _configLoader.config.ai.localModelSize;
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(configLoaderProvider.notifier).state = _configLoader;
       ref.read(notificationServiceProvider.notifier).state =
           _notificationService;
       ref.read(updateProvider).setConfigLoader(_configLoader);
@@ -460,7 +461,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
 
     final configLoader = ref.read(configLoaderProvider);
     final confirmOnQuit =
-        configLoader?.config.general.confirmOnQuit ?? true;
+        configLoader.config.general.confirmOnQuit;
 
     if (confirmOnQuit) {
       final result = await showConfirmDialog(

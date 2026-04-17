@@ -147,7 +147,6 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
 
   SessionState? _tryRestore() {
     final configLoader = ref.read(configLoaderProvider);
-    if (configLoader == null) return null;
     if (!configLoader.config.general.restoreSessions) return null;
 
     final layout = SessionPersistence.load(workspaceId: _workspaceId);
@@ -176,9 +175,9 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
     switch (layout) {
       case LeafLayout():
         final configLoader2 = ref.read(configLoaderProvider);
-        final general2 = configLoader2?.config.general;
-        final configShell2 = general2?.shell ?? '';
-        final configDir2 = general2?.workingDirectory ?? '';
+        final general2 = configLoader2.config.general;
+        final configShell2 = general2.shell;
+        final configDir2 = general2.workingDirectory;
         final cwd = layout.cwd.isNotEmpty &&
                 Directory(layout.cwd).existsSync()
             ? layout.cwd
@@ -194,8 +193,8 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
 
         final configLoader = ref.read(configLoaderProvider);
         final startupCommands =
-            configLoader?.config.general.startupCommands;
-        if (startupCommands != null && startupCommands.isNotEmpty) {
+            configLoader.config.general.startupCommands;
+        if (startupCommands.isNotEmpty) {
           session.runStartupCommands(startupCommands);
         }
 
@@ -217,7 +216,6 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
 
   void _saveLayout() {
     final configLoader = ref.read(configLoaderProvider);
-    if (configLoader == null) return;
     if (!configLoader.config.general.restoreSessions) return;
 
     // Read from the disposal mirror, not `state` — see the comment on
@@ -463,9 +461,9 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
 
   TabState _createTab({String? workingDirectory}) {
     final configLoader = ref.read(configLoaderProvider);
-    final general = configLoader?.config.general;
-    final configShell = general?.shell ?? '';
-    final configDir = general?.workingDirectory ?? '';
+    final general = configLoader.config.general;
+    final configShell = general.shell;
+    final configDir = general.workingDirectory;
     final session = TerminalSession.start(
       id: _uuid.v4(),
       history: history,
@@ -477,8 +475,8 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
     _attachSessionListener(session);
 
     // Run startup commands from config
-    final startupCommands = general?.startupCommands;
-    if (startupCommands != null && startupCommands.isNotEmpty) {
+    final startupCommands = general.startupCommands;
+    if (startupCommands.isNotEmpty) {
       session.runStartupCommands(startupCommands);
     }
 
@@ -500,8 +498,8 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
   void _handleCommandFinished(
       String command, Duration duration, int exitCode) {
     final configLoader = ref.read(configLoaderProvider);
-    final config = configLoader?.config.general;
-    if (config == null || !config.notifyLongRunning) return;
+    final config = configLoader.config.general;
+    if (!config.notifyLongRunning) return;
 
     final threshold = Duration(seconds: config.longRunningThresholdSeconds);
     if (duration < threshold) return;

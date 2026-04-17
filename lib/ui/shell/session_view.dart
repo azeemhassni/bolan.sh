@@ -259,9 +259,9 @@ class SessionViewState extends ConsumerState<SessionView> {
     final fontSize = ref.watch(fontSizeProvider);
     ref.watch(configVersionProvider); // rebuild on config file changes
     final configLoader = ref.watch(configLoaderProvider);
-    final lineHeight = configLoader?.config.editor.lineHeight ?? 1.0;
-    final fontFamily = configLoader?.config.editor.fontFamily ?? theme.fontFamily;
-    final cursorStyle = configLoader?.config.editor.cursorStyle ?? 'block';
+    final lineHeight = configLoader.config.editor.lineHeight;
+    final fontFamily = configLoader.config.editor.fontFamily;
+    final cursorStyle = configLoader.config.editor.cursorStyle;
     final cursorType = switch (cursorStyle) {
       'underline' => TerminalCursorType.underline,
       'bar' => TerminalCursorType.verticalBar,
@@ -351,14 +351,14 @@ class SessionViewState extends ConsumerState<SessionView> {
                       block: blocks[i],
                       fontSize: fontSize,
                       lineHeight: lineHeight,
-                      scrollable: configLoader?.config.editor.scrollableBlocks ?? false,
+                      scrollable: configLoader.config.editor.scrollableBlocks,
                       cwd: widget.session.cwd,
                       shellName: widget.session.shellName,
-                      aiEnabled: configLoader?.config.ai.enabled ?? false,
-                      aiProvider: configLoader?.config.ai.provider ?? 'gemini',
-                      geminiModel: configLoader?.config.ai.geminiModel ?? 'gemma-3-27b-it',
-                      anthropicMode: configLoader?.config.ai.anthropicMode ?? 'claude-code',
-                      ligatures: configLoader?.config.editor.ligatures ?? false,
+                      aiEnabled: configLoader.config.ai.enabled,
+                      aiProvider: configLoader.config.ai.provider,
+                      geminiModel: configLoader.config.ai.geminiModel,
+                      anthropicMode: configLoader.config.ai.anthropicMode,
+                      ligatures: configLoader.config.editor.ligatures,
                       searchHighlight: _buildSearchRegex(),
                       currentMatchIndex: _findCurrentMatch,
                       blockMatchStartIndex: _matchStartIndexForBlock(i),
@@ -369,15 +369,14 @@ class SessionViewState extends ConsumerState<SessionView> {
                 prompt: PromptArea(
                   session: widget.session,
                   fontSize: fontSize,
-                  aiEnabled: configLoader?.config.ai.enabled ?? false,
-                  aiProvider: configLoader?.config.ai.provider ?? 'gemini',
-                  geminiModel: configLoader?.config.ai.geminiModel ?? 'gemma-3-27b-it',
-                  anthropicMode: configLoader?.config.ai.anthropicMode ?? 'claude-code',
-                  commandSuggestions: configLoader?.config.ai.commandSuggestions ?? true,
-                  smartHistorySearch: configLoader?.config.ai.smartHistorySearch ?? true,
-                  shareHistory: configLoader?.config.ai.shareHistory ?? false,
-                  promptChips: configLoader?.config.general.promptChips ??
-                      const ['shell', 'cwd', 'gitBranch', 'gitChanges'],
+                  aiEnabled: configLoader.config.ai.enabled,
+                  aiProvider: configLoader.config.ai.provider,
+                  geminiModel: configLoader.config.ai.geminiModel,
+                  anthropicMode: configLoader.config.ai.anthropicMode,
+                  commandSuggestions: configLoader.config.ai.commandSuggestions,
+                  smartHistorySearch: configLoader.config.ai.smartHistorySearch,
+                  shareHistory: configLoader.config.ai.shareHistory,
+                  promptChips: configLoader.config.general.promptChips,
                   promptInputKey: _promptKey,
                   cursorStyle: cursorStyle,
                 ),

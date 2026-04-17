@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/bolan_theme.dart';
 import '../../core/workspace/workspace.dart';
+import '../../core/workspace/workspace_secrets.dart';
 import '../../providers/workspace_provider.dart';
 import '../shared/bolan_button.dart';
 
@@ -240,8 +241,9 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
   late TextEditingController _color;
   late TextEditingController _gitName;
   late TextEditingController _gitEmail;
-  late TextEditingController _defaultCwd;
   late List<MapEntry<String, String>> _envEntries;
+  List<MapEntry<String, String>> _secretEntries = [];
+  bool _secretsLoaded = false;
 
   @override
   void initState() {
@@ -251,11 +253,21 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
     _gitName = TextEditingController(text: widget.workspace.gitName ?? '');
     _gitEmail =
         TextEditingController(text: widget.workspace.gitEmail ?? '');
-    _defaultCwd =
-        TextEditingController(text: widget.workspace.defaultCwd ?? '');
     _envEntries = widget.workspace.envVars.entries
         .map((e) => MapEntry(e.key, e.value))
         .toList();
+    _loadSecrets();
+  }
+
+  Future<void> _loadSecrets() async {
+    final secrets = await WorkspaceSecrets.load(widget.workspace.id);
+    if (!mounted) return;
+    setState(() {
+      _secretEntries = secrets.entries
+          .map((e) => MapEntry(e.key, e.value))
+          .toList();
+      _secretsLoaded = true;
+    });
   }
 
   @override
@@ -264,11 +276,17 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
     _color.dispose();
     _gitName.dispose();
     _gitEmail.dispose();
-    _defaultCwd.dispose();
     super.dispose();
   }
 
   void _save() {
+    // Persist secrets to keychain (not TOML)
+    final secretsMap = {
+      for (final e in _secretEntries)
+        if (e.key.trim().isNotEmpty) e.key.trim(): e.value,
+    };
+    WorkspaceSecrets.save(widget.workspace.id, secretsMap);
+
     widget.onSave(widget.workspace.copyWith(
       name: _name.text.trim().isEmpty ? widget.workspace.name : _name.text.trim(),
       color: _color.text.trim().isEmpty
@@ -277,12 +295,11 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
       gitName: _gitName.text.trim().isEmpty ? null : _gitName.text.trim(),
       gitEmail:
           _gitEmail.text.trim().isEmpty ? null : _gitEmail.text.trim(),
-      defaultCwd:
-          _defaultCwd.text.trim().isEmpty ? null : _defaultCwd.text.trim(),
       envVars: {
         for (final e in _envEntries)
           if (e.key.trim().isNotEmpty) e.key.trim(): e.value,
       },
+      secrets: secretsMap,
     ));
   }
 
@@ -297,8 +314,6 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
           Divider(color: t.blockBorder, height: 12),
           _field('Name', _name, t),
           _field('Color (hex)', _color, t),
-          _field('Default working directory', _defaultCwd, t,
-              hint: 'e.g. ~/Work'),
           Padding(
             padding: const EdgeInsets.only(top: 8, bottom: 4),
             child: Text('Git identity (optional)',
@@ -354,6 +369,65 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
                   () => _envEntries.add(const MapEntry('', ''))),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
+            child: Text('Secrets (stored in OS keychain)', style: _labelStyle(t)),
+          ),
+          if (!_secretsLoaded)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Loading...',
+                style: TextStyle(
+                  color: t.dimForeground,
+                  fontFamily: t.fontFamily,
+                  fontSize: 11,
+                ),
+              ),
+            )
+          else ...[
+            for (var i = 0; i < _secretEntries.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(children: [
+                  Expanded(
+                    child: _envField(
+                      _secretEntries[i].key,
+                      'KEY',
+                      t,
+                      (v) => setState(() => _secretEntries[i] =
+                          MapEntry(v, _secretEntries[i].value)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _secretField(
+                      _secretEntries[i].value,
+                      'secret value',
+                      t,
+                      (v) => setState(() => _secretEntries[i] =
+                          MapEntry(_secretEntries[i].key, v)),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close,
+                        size: 14, color: t.dimForeground),
+                    onPressed: () =>
+                        setState(() => _secretEntries.removeAt(i)),
+                    splashRadius: 16,
+                  ),
+                ]),
+              ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: BolanButton.ghost(
+                label: '+ Add secret',
+                icon: Icons.add,
+                onTap: () => setState(
+                    () => _secretEntries.add(const MapEntry('', ''))),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Row(children: [
             BolanButton.primary(
@@ -453,6 +527,35 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
     return TextFormField(
       initialValue: value,
       onChanged: onChanged,
+      style: TextStyle(
+        color: t.foreground,
+        fontFamily: t.fontFamily,
+        fontSize: 12,
+      ),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: hint,
+        hintStyle: TextStyle(color: t.dimForeground, fontSize: 11),
+        border: OutlineInputBorder(
+          borderSide: BorderSide(color: t.blockBorder),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: t.blockBorder),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      ),
+    );
+  }
+
+  Widget _secretField(String value, String hint, BolonTheme t,
+      ValueChanged<String> onChanged) {
+    return TextFormField(
+      initialValue: value,
+      onChanged: onChanged,
+      obscureText: true,
       style: TextStyle(
         color: t.foreground,
         fontFamily: t.fontFamily,

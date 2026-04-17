@@ -22,26 +22,26 @@ class Workspace {
   final String color;
 
   /// Per-workspace environment variables injected into PTYs at spawn.
-  /// Wired in Phase 5.
   final Map<String, String> envVars;
+
+  /// Secret environment variables stored in the OS keychain, not in
+  /// plaintext TOML. Injected into PTYs the same way as [envVars].
+  /// Loaded asynchronously at workspace switch time.
+  final Map<String, String> secrets;
 
   /// Optional git identity. When set, `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`
   /// (and the committer pair) are injected into PTY env. Wired in Phase 5.
   final String? gitName;
   final String? gitEmail;
 
-  /// Optional default working directory for new tabs. Empty means
-  /// inherit from the global config.
-  final String? defaultCwd;
-
   const Workspace({
     required this.id,
     required this.name,
     required this.color,
     this.envVars = const {},
+    this.secrets = const {},
     this.gitName,
     this.gitEmail,
-    this.defaultCwd,
   });
 
   /// Initial letter for the sidebar icon. First code unit of [name];
@@ -63,17 +63,17 @@ class Workspace {
     String? name,
     String? color,
     Map<String, String>? envVars,
+    Map<String, String>? secrets,
     String? gitName,
     String? gitEmail,
-    String? defaultCwd,
   }) =>
       Workspace(
         id: id ?? this.id,
         name: name ?? this.name,
         color: color ?? this.color,
         envVars: envVars ?? this.envVars,
+        secrets: secrets ?? this.secrets,
         gitName: gitName ?? this.gitName,
         gitEmail: gitEmail ?? this.gitEmail,
-        defaultCwd: defaultCwd ?? this.defaultCwd,
       );
 }

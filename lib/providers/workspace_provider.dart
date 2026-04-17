@@ -38,7 +38,7 @@ final switchWorkspaceActionProvider =
     // Without this, widgets see the previous workspace's config for
     // at least one frame.
     final configLoader = ref.read(configLoaderProvider);
-    await configLoader?.load();
+    await configLoader.load();
   };
 });
 

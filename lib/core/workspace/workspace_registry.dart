@@ -6,6 +6,7 @@ import 'package:toml/toml.dart';
 import '../ai/api_key_storage.dart';
 import 'workspace.dart';
 import 'workspace_paths.dart';
+import 'workspace_secrets.dart';
 
 /// Loads, persists, and CRUDs the list of workspaces from
 /// `~/.config/bolan/workspaces.toml`.
@@ -122,7 +123,11 @@ class WorkspaceRegistry extends ChangeNotifier {
     final next = _workspaces.where((w) => w.id == id).firstOrNull;
     if (next == null) return;
     _activeId = id;
-    WorkspacePaths.setActiveWorkspace(id, next);
+    // Load secrets from keychain into the workspace so they're
+    // available for PTY injection without a separate async step.
+    final secrets = await WorkspaceSecrets.load(id);
+    final withSecrets = next.copyWith(secrets: secrets);
+    WorkspacePaths.setActiveWorkspace(id, withSecrets);
     await save();
     notifyListeners();
   }
@@ -172,6 +177,7 @@ class WorkspaceRegistry extends ChangeNotifier {
       await dir.delete(recursive: true);
     }
     await ApiKeyStorage.deleteAllForWorkspace(id);
+    await WorkspaceSecrets.deleteAll(id);
     _workspaces = _workspaces.where((w) => w.id != id).toList();
     if (_activeId == id) {
       _activeId = _workspaces.first.id;
@@ -202,7 +208,6 @@ class WorkspaceRegistry extends ChangeNotifier {
             .map((k, v) => MapEntry(k, v.toString())),
         gitName: m['git_name'] as String?,
         gitEmail: m['git_email'] as String?,
-        defaultCwd: m['default_cwd'] as String?,
       );
 
   Workspace _defaultWorkspace() => const Workspace(
@@ -222,7 +227,6 @@ class WorkspaceRegistry extends ChangeNotifier {
       sb.writeln('color = "${w.color}"');
       if (w.gitName != null) sb.writeln('git_name = "${w.gitName}"');
       if (w.gitEmail != null) sb.writeln('git_email = "${w.gitEmail}"');
-      if (w.defaultCwd != null) sb.writeln('default_cwd = "${w.defaultCwd}"');
       if (w.envVars.isNotEmpty) {
         sb.writeln('[workspaces.env]');
         for (final entry in w.envVars.entries) {
