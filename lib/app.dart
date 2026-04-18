@@ -1,7 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/app_version.dart';
 import 'providers/theme_provider.dart';
+import 'providers/update_provider.dart';
 import 'ui/shell/terminal_shell.dart';
 
 /// Root widget for the Bolan terminal emulator.
@@ -29,8 +34,237 @@ class BolonApp extends ConsumerWidget {
           decoration: TextDecoration.none,
           color: theme.foreground,
         ),
-        child: const TerminalShell(),
+        child: PlatformMenuBar(
+          menus: _buildMenus(ref),
+          child: const TerminalShell(),
+        ),
       ),
     );
+  }
+
+  List<PlatformMenuItem> _buildMenus(WidgetRef ref) {
+    if (!Platform.isMacOS) return const [];
+
+    return [
+      // ── App menu ──
+      PlatformMenu(
+        label: 'Bolan',
+        menus: [
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'About Bolan',
+              onSelected: () => _showAbout(),
+            ),
+            PlatformMenuItem(
+              label: 'Check for Updates...',
+              onSelected: () =>
+                  ref.read(updateProvider).check(force: true),
+            ),
+          ]),
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Settings...',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.comma, meta: true),
+              onSelected: null,
+            ),
+          ]),
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Quit Bolan',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyQ, meta: true),
+              onSelected: null,
+            ),
+          ]),
+        ],
+      ),
+
+      // ── File menu ──
+      PlatformMenu(
+        label: 'File',
+        menus: [
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'New Tab',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyT, meta: true),
+              onSelected: null,
+            ),
+          ]),
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Close Tab',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyW, meta: true),
+              onSelected: null,
+            ),
+            PlatformMenuItem(
+              label: 'Close Pane',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyW, meta: true, shift: true),
+              onSelected: null,
+            ),
+          ]),
+        ],
+      ),
+
+      // ── Edit menu ──
+      PlatformMenu(
+        label: 'Edit',
+        menus: [
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Copy',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyC, meta: true),
+              onSelected: null,
+            ),
+            PlatformMenuItem(
+              label: 'Paste',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyV, meta: true),
+              onSelected: null,
+            ),
+            PlatformMenuItem(
+              label: 'Select All',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyA, meta: true),
+              onSelected: null,
+            ),
+          ]),
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Find...',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyF, meta: true),
+              onSelected: null,
+            ),
+            PlatformMenuItem(
+              label: 'Clear',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyK, meta: true),
+              onSelected: null,
+            ),
+          ]),
+        ],
+      ),
+
+      // ── Shell menu ──
+      PlatformMenu(
+        label: 'Shell',
+        menus: [
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Split Right',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyD, meta: true),
+              onSelected: null,
+            ),
+            PlatformMenuItem(
+              label: 'Split Down',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyD, meta: true, shift: true),
+              onSelected: null,
+            ),
+          ]),
+        ],
+      ),
+
+      // ── View menu ──
+      PlatformMenu(
+        label: 'View',
+        menus: [
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Toggle Sidebar',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.backslash, meta: true),
+              onSelected: null,
+            ),
+          ]),
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Zoom In',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.equal, meta: true),
+              onSelected: null,
+            ),
+            PlatformMenuItem(
+              label: 'Zoom Out',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.minus, meta: true),
+              onSelected: null,
+            ),
+          ]),
+        ],
+      ),
+
+      // ── Window menu ──
+      PlatformMenu(
+        label: 'Window',
+        menus: [
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Previous Tab',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.bracketLeft, meta: true,
+                  shift: true),
+              onSelected: null,
+            ),
+            PlatformMenuItem(
+              label: 'Next Tab',
+              shortcut: const SingleActivator(
+                  LogicalKeyboardKey.bracketRight, meta: true,
+                  shift: true),
+              onSelected: null,
+            ),
+          ]),
+        ],
+      ),
+
+      // ── Help menu ──
+      PlatformMenu(
+        label: 'Help',
+        menus: [
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: "What's New in v$appVersion",
+              onSelected: () => _openUrl(
+                  'https://github.com/AzeemHassni/bolan.sh/releases/tag/v$appVersion'),
+            ),
+            PlatformMenuItem(
+              label: 'GitHub Repository',
+              onSelected: () => _openUrl(
+                  'https://github.com/AzeemHassni/bolan.sh'),
+            ),
+            PlatformMenuItem(
+              label: 'Report an Issue',
+              onSelected: () => _openUrl(
+                  'https://github.com/AzeemHassni/bolan.sh/issues/new'),
+            ),
+          ]),
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Check for Updates...',
+              onSelected: () =>
+                  ref.read(updateProvider).check(force: true),
+            ),
+          ]),
+        ],
+      ),
+    ];
+  }
+
+  static void _openUrl(String url) {
+    if (Platform.isMacOS) {
+      Process.run('open', [url]);
+    } else if (Platform.isLinux) {
+      Process.run('xdg-open', [url]);
+    }
+  }
+
+  static void _showAbout() {
+    _openUrl('https://github.com/AzeemHassni/bolan.sh');
   }
 }
