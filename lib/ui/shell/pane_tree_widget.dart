@@ -276,7 +276,7 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
         } else {
           // Try Flutter text selection via copy intent
           final focused = primaryFocus?.context;
-          if (focused != null) {
+          if (focused != null && focused.mounted) {
             Actions.maybeInvoke<CopySelectionTextIntent>(
               focused,
               CopySelectionTextIntent.copy,
@@ -297,7 +297,7 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
         }
       case 'select_all':
         final focused = primaryFocus?.context;
-        if (focused != null) {
+        if (focused != null && focused.mounted) {
           Actions.maybeInvoke<SelectAllTextIntent>(
             focused,
             const SelectAllTextIntent(SelectionChangedCause.keyboard),
