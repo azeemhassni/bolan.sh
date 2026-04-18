@@ -506,8 +506,29 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     final notifier = ref.read(updateProvider);
     await notifier.check(force: force);
     if (!mounted) return;
+
     if (notifier.state.status == UpdateStatus.available) {
-      setState(() => _showUpdateDialog = true);
+      if (force) {
+        // Manual check: show the full update dialog
+        setState(() => _showUpdateDialog = true);
+      } else {
+        // Auto check: download silently in the background.
+        // When done, the toast will appear prompting restart.
+        notifier.download();
+        // Listen for completion to show restart prompt
+        void listener() {
+          if (!mounted) return;
+          final s = notifier.state;
+          if (s.status == UpdateStatus.readyToRestart) {
+            setState(() => _showUpdateToast = true);
+            notifier.removeListener(listener);
+          } else if (s.status == UpdateStatus.error ||
+              s.status == UpdateStatus.idle) {
+            notifier.removeListener(listener);
+          }
+        }
+        notifier.addListener(listener);
+      }
     }
   }
 
