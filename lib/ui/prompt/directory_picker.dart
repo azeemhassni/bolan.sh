@@ -215,29 +215,30 @@ class _DirectoryPickerState extends State<DirectoryPicker> {
 
         // Entries
         Flexible(
-          child: _error != null
-              ? _buildEmpty(theme, _error!)
-              : _filtered.isEmpty
-                  ? _buildEmpty(theme, 'No matching folders')
-                  : ListView(
-                      padding:
-                          const EdgeInsets.symmetric(vertical: 4),
-                      children: [
-                        _buildRow(
-                          theme,
-                          icon: Icons.arrow_upward,
-                          label: '..',
-                          onTap: _navigateUp,
-                        ),
-                        for (final name in _filtered)
-                          _buildRow(
-                            theme,
-                            icon: Icons.folder_outlined,
-                            label: name,
-                            onTap: () => _navigateInto(name),
-                          ),
-                      ],
-                    ),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            children: [
+              if (_currentPath != '/')
+                _buildRow(
+                  theme,
+                  icon: Icons.arrow_upward,
+                  label: '..',
+                  onTap: _navigateUp,
+                ),
+              if (_error != null)
+                _buildEmpty(theme, _error!)
+              else if (_filtered.isEmpty)
+                _buildEmpty(theme, 'No subdirectories')
+              else
+                for (final name in _filtered)
+                  _buildRow(
+                    theme,
+                    icon: Icons.folder_outlined,
+                    label: name,
+                    onTap: () => _navigateInto(name),
+                  ),
+            ],
+          ),
         ),
 
         // Footer — confirm action
