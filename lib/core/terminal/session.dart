@@ -37,6 +37,7 @@ class TerminalSession extends ChangeNotifier {
   CommandBlock? _activeBlock;
   bool _commandRunning = false;
   bool _usedAltBuffer = false;
+  int _cursorYAtCommandStart = 0;
   // Counts in-place redraw sequences (cursor positioning + erase
   // line/screen) — TUI apps like Claude/Ink that DON'T use the alt
   // screen buffer still rewrite text in place using these primitives,
@@ -610,6 +611,7 @@ class TerminalSession extends ChangeNotifier {
           }
           _usedAltBuffer = false;
           _redrawSequenceCount = 0;
+          _cursorYAtCommandStart = terminal.buffer.absoluteCursorY;
           _activeBlock = CommandBlock(
             id: _uuid.v4(),
             command: command,
@@ -648,19 +650,24 @@ class TerminalSession extends ChangeNotifier {
       return;
     }
 
-    // Skip output for TUI programs:
-    // 1. Used the alternate screen buffer (vim, nano, less, top, etc.)
-    // 2. Heavy in-place redraw activity where most of the output is
-    //    cursor positioning (Claude Code, Ink CLIs). We use a ratio
-    //    rather than an absolute threshold: commands like `laravel new`
-    //    and `npm install` produce hundreds of real output lines with
-    //    a handful of redraws (progress bars, interactive prompts),
-    //    while true TUIs are almost entirely redraws.
+    // TUI programs (vim, nano, Claude Code, etc.) produce output that
+    // is mostly cursor positioning and would be garbled if captured as
+    // raw bytes. Instead, read the terminal's rendered buffer — what
+    // was actually on screen. This gives clean output for TUIs like
+    // Claude Code that print a summary on exit.
     final capturedLength = _outputCapture.length;
     final isTui = _usedAltBuffer ||
         (_redrawSequenceCount > 50 && capturedLength > 0 &&
             _redrawSequenceCount / (capturedLength / 100) > 5);
     if (isTui) {
+      final (plain, colored) = _readRenderedBuffer();
+      _blocks.add(_activeBlock!.copyWith(
+        output: plain,
+        rawOutput: colored,
+        exitCode: exitCode ?? -1,
+        finishedAt: DateTime.now(),
+        isRunning: false,
+      ));
       _activeBlock = null;
       _commandRunning = false;
       _outputCapture.clear();
@@ -858,6 +865,118 @@ class TerminalSession extends ChangeNotifier {
   /// the line. We simulate this by keeping only the text after the
   /// last `\r` on each line. This cleans up progress bars, spinners,
   /// and interactive prompts that redraw in place.
+  /// Reads the terminal's rendered buffer as text with ANSI SGR color
+  /// codes reconstructed from cell attributes. Used for TUI programs
+  /// where the raw byte capture is garbled but the terminal buffer
+  /// has the properly rendered result with colors intact.
+  (String plain, String colored) _readRenderedBuffer() {
+    final buf = terminal.buffer;
+    final plainBuf = StringBuffer();
+    final colorBuf = StringBuffer();
+
+    var lastFg = 0;
+    var lastBg = 0;
+    var lastFlags = 0;
+    var lineCount = 0;
+
+    // Start from where the cursor was when the command began, not
+    // from the top of the buffer. This avoids capturing output from
+    // previous commands. Uses cursor Y (not buffer height) because
+    // circular buffers don't grow past their max size.
+    final startRow = _cursorYAtCommandStart;
+
+    for (var row = startRow; row < buf.height; row++) {
+      final line = buf.lines[row];
+
+      if (row > startRow) {
+        plainBuf.write('\n');
+        colorBuf.write('\n');
+      }
+
+      // Walk cells manually instead of using getText() which skips
+      // empty cells (codepoint 0). Empty cells are visual spaces —
+      // TUIs use cursor positioning to lay out text, leaving gaps
+      // that must be preserved as spaces.
+      final width = buf.viewWidth;
+      final plainLineBuf = StringBuffer();
+      for (var col = 0; col < width; col++) {
+        final fg = line.getForeground(col);
+        final bg = line.getBackground(col);
+        final flags = line.getAttributes(col);
+        final cp = line.getCodePoint(col);
+        final ch = cp > 0 ? cp : 0x20; // empty cell = space
+
+        if (fg != lastFg || bg != lastBg || flags != lastFlags) {
+          colorBuf.write(_cellAttrsToSgr(fg, bg, flags));
+          lastFg = fg;
+          lastBg = bg;
+          lastFlags = flags;
+        }
+
+        colorBuf.writeCharCode(ch);
+        plainLineBuf.writeCharCode(ch);
+      }
+
+      final plainLine = plainLineBuf.toString().trimRight();
+      plainBuf.write(plainLine);
+      if (plainLine.isNotEmpty) lineCount = row - startRow + 1;
+    }
+
+    // Reset at the end
+    if (lastFg != 0 || lastBg != 0 || lastFlags != 0) {
+      colorBuf.write('\x1B[0m');
+    }
+
+    // Trim trailing empty lines
+    final plainLines = plainBuf.toString().split('\n');
+    while (plainLines.length > lineCount && plainLines.isNotEmpty) {
+      plainLines.removeLast();
+    }
+    final colorLines = colorBuf.toString().split('\n');
+    while (colorLines.length > lineCount && colorLines.isNotEmpty) {
+      colorLines.removeLast();
+    }
+
+    return (plainLines.join('\n'), colorLines.join('\n'));
+  }
+
+  /// Converts xterm.dart cell attributes back to an ANSI SGR sequence.
+  static String _cellAttrsToSgr(int fg, int bg, int flags) {
+    final codes = <String>['0']; // reset first
+
+    // Flags
+    if (flags & CellAttr.bold != 0) codes.add('1');
+    if (flags & CellAttr.faint != 0) codes.add('2');
+    if (flags & CellAttr.italic != 0) codes.add('3');
+    if (flags & CellAttr.underline != 0) codes.add('4');
+    if (flags & CellAttr.inverse != 0) codes.add('7');
+    if (flags & CellAttr.strikethrough != 0) codes.add('9');
+
+    // Foreground
+    final fgType = fg & CellColor.typeMask;
+    final fgVal = fg & CellColor.valueMask;
+    if (fgType == CellColor.named) {
+      codes.add(fgVal < 8 ? '${30 + fgVal}' : '${90 + fgVal - 8}');
+    } else if (fgType == CellColor.palette) {
+      codes.add('38;5;$fgVal');
+    } else if (fgType == CellColor.rgb) {
+      codes.add('38;2;${(fgVal >> 16) & 0xFF};${(fgVal >> 8) & 0xFF};${fgVal & 0xFF}');
+    }
+
+    // Background
+    final bgType = bg & CellColor.typeMask;
+    final bgVal = bg & CellColor.valueMask;
+    if (bgType == CellColor.named) {
+      codes.add(bgVal < 8 ? '${40 + bgVal}' : '${100 + bgVal - 8}');
+    } else if (bgType == CellColor.palette) {
+      codes.add('48;5;$bgVal');
+    } else if (bgType == CellColor.rgb) {
+      codes.add('48;2;${(bgVal >> 16) & 0xFF};${(bgVal >> 8) & 0xFF};${bgVal & 0xFF}');
+    }
+
+    return '\x1B[${codes.join(";")}m';
+  }
+
   static String _collapseCarriageReturns(String input) {
     final lines = input.split('\n');
     final result = StringBuffer();
