@@ -138,6 +138,9 @@ class PromptInputState extends State<PromptInput> {
 
   void requestFocus() => _focusNode.requestFocus();
 
+  /// Exposes the text controller for programmatic paste/insert.
+  TextEditingController get controller => _controller;
+
   void selectAll() {
     _controller.selection = TextSelection(
       baseOffset: 0,

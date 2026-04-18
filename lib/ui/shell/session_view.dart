@@ -101,6 +101,26 @@ class SessionViewState extends ConsumerState<SessionView> {
     _terminalController.clearSelection();
   }
 
+  /// Pastes [text] into the prompt input when idle, or sends it to the
+  /// PTY when a command is running.
+  void pasteText(String text) {
+    if (widget.session.isCommandRunning) {
+      widget.session.writeInput(text);
+    } else {
+      final prompt = _promptKey.currentState;
+      if (prompt != null) {
+        final ctrl = prompt.controller;
+        final sel = ctrl.selection;
+        final before = ctrl.text.substring(0, sel.start);
+        final after = ctrl.text.substring(sel.end);
+        ctrl.text = '$before$text$after';
+        ctrl.selection =
+            TextSelection.collapsed(offset: before.length + text.length);
+        prompt.requestFocus();
+      }
+    }
+  }
+
   /// Intercepts text-editor-style shortcuts (Cmd/Option + arrows and
   /// Delete) when a TUI is running, and transforms them into
   /// readline-compatible byte sequences sent directly to the PTY.

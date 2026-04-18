@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart';
@@ -7,8 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/pane/pane_node.dart';
 import '../../core/platform/native_context_menu.dart';
+import '../../core/terminal/command_block.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/session_provider.dart';
+import '../blocks/command_block_widget.dart';
 import '../shared/anchored_popover.dart';
 import '../shared/popover_menu.dart';
 import 'pane_divider.dart';
@@ -72,7 +75,7 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
     final Widget content = Listener(
       onPointerDown: (event) {
         if (event.buttons == kSecondaryMouseButton) {
-          _showNativeContextMenu();
+          _showNativeContextMenu(event.position);
         }
       },
       child: GestureDetector(
@@ -191,21 +194,73 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
   }
 
 
-  Future<void> _showNativeContextMenu() async {
+  /// Walks the element tree under SessionView to find the
+  /// [CommandBlockWidget] that visually contains [globalPosition].
+  ///
+  /// Each block builds a `SliverMainAxisGroup`, so the block element's
+  /// own render object is a `RenderSliver` — not hit-testable by point.
+  /// We check the topmost `RenderBox` in each descendant subtree
+  /// instead (the block's SliverToBoxAdapter children — prompt line,
+  /// header, body).
+  CommandBlock? _blockAtPosition(Offset globalPosition) {
+    CommandBlock? found;
+
+    bool topmostBoxContains(Element element) {
+      var hit = false;
+      void visit(Element e) {
+        if (hit) return;
+        final ro = e.findRenderObject();
+        if (ro is RenderBox) {
+          if (ro.attached && ro.hasSize) {
+            final local = ro.globalToLocal(globalPosition);
+            if (ro.paintBounds.contains(local)) hit = true;
+          }
+          return; // don't recurse into a box's children
+        }
+        e.visitChildren(visit);
+      }
+      element.visitChildren(visit);
+      return hit;
+    }
+
+    void visitor(Element element) {
+      if (found != null) return;
+      if (element.widget is CommandBlockWidget) {
+        if (topmostBoxContains(element)) {
+          found = (element.widget as CommandBlockWidget).block;
+        }
+        return;
+      }
+      element.visitChildren(visitor);
+    }
+
+    _sessionViewKey.currentContext?.visitChildElements(visitor);
+    return found;
+  }
+
+  Future<void> _showNativeContextMenu(Offset globalPosition) async {
+    final contextBlock = _blockAtPosition(globalPosition);
     final notifier = ref.read(currentSessionNotifierProvider);
     notifier.setFocusedPane(widget.leaf.id);
-
-    final mod = Platform.isMacOS ? '⌘' : 'Ctrl+';
-    final shift = Platform.isMacOS ? '⇧' : 'Shift+';
 
     final selectedId = await NativeContextMenu.show([
       const NativeMenuItem(id: 'copy', label: 'Copy', shortcut: 'c'),
       const NativeMenuItem(id: 'paste', label: 'Paste', shortcut: 'v'),
+      const NativeMenuItem(id: 'select_all', label: 'Select All', shortcut: 'a'),
+      const NativeMenuItem.separator(),
+      const NativeMenuItem(id: 'copy_cwd', label: 'Copy CWD'),
+      NativeMenuItem(
+        id: 'open_cwd',
+        label: Platform.isMacOS ? 'Open in Finder' : 'Open in File Manager',
+      ),
+      const NativeMenuItem(id: 'copy_markdown', label: 'Copy as Markdown'),
+      const NativeMenuItem.separator(),
+      const NativeMenuItem(id: 'clear', label: 'Clear', shortcut: 'k'),
       const NativeMenuItem.separator(),
       const NativeMenuItem(id: 'split_right', label: 'Split Right', shortcut: 'd'),
       const NativeMenuItem(id: 'split_down', label: 'Split Down'),
       if (!widget.isSinglePane)
-        NativeMenuItem(id: 'close_pane', label: 'Close Pane'),
+        const NativeMenuItem(id: 'close_pane', label: 'Close Pane'),
     ]);
 
     if (selectedId == null) return;
@@ -238,7 +293,35 @@ class _LeafPaneWidgetState extends ConsumerState<_LeafPaneWidget> {
       case 'paste':
         final data = await Clipboard.getData(Clipboard.kTextPlain);
         if (data?.text != null && data!.text!.isNotEmpty) {
-          widget.leaf.session.writeInput(data.text!);
+          _sessionViewKey.currentState?.pasteText(data.text!);
+        }
+      case 'select_all':
+        final focused = primaryFocus?.context;
+        if (focused != null) {
+          Actions.maybeInvoke<SelectAllTextIntent>(
+            focused,
+            const SelectAllTextIntent(SelectionChangedCause.keyboard),
+          );
+        }
+      case 'clear':
+        widget.leaf.session.clearBlocks();
+        widget.leaf.session.terminal.buffer.clear();
+      case 'copy_cwd':
+        await Clipboard.setData(
+          ClipboardData(text: widget.leaf.session.cwd),
+        );
+      case 'open_cwd':
+        final cwd = widget.leaf.session.cwd;
+        if (Platform.isMacOS) {
+          unawaited(Process.run('open', [cwd]));
+        } else {
+          unawaited(Process.run('xdg-open', [cwd]));
+        }
+      case 'copy_markdown':
+        final block = contextBlock ?? widget.leaf.session.blocks.lastOrNull;
+        if (block != null && block.hasOutput) {
+          final md = '```\n\$ ${block.command}\n${block.output}\n```';
+          await Clipboard.setData(ClipboardData(text: md));
         }
       case 'split_right':
         notifier.splitPane(Axis.horizontal);

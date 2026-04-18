@@ -16,13 +16,39 @@ struct _MyApplication {
 
 // --- Native context menu ---
 
-// Stores the selected menu item id after gtk_menu_popup.
+// Pending method call – responded asynchronously when the menu closes.
+static FlMethodCall* g_pending_call = nullptr;
+// Stores the selected menu item id (set by the activate callback).
 static gchar* g_selected_menu_id = nullptr;
 
 static void context_menu_item_activated(GtkMenuItem* item, gpointer user_data) {
   g_free(g_selected_menu_id);
   const gchar* id = (const gchar*)g_object_get_data(G_OBJECT(item), "item-id");
   g_selected_menu_id = g_strdup(id);
+}
+
+// Deferred response – runs on the next main-loop idle after deactivate,
+// so the item "activate" signal has already set g_selected_menu_id.
+static gboolean on_menu_respond_idle(gpointer user_data) {
+  if (g_pending_call == nullptr) return G_SOURCE_REMOVE;
+
+  if (g_selected_menu_id != nullptr) {
+    fl_method_call_respond_success(
+        g_pending_call, fl_value_new_string(g_selected_menu_id), nullptr);
+  } else {
+    fl_method_call_respond_success(
+        g_pending_call, fl_value_new_null(), nullptr);
+  }
+
+  g_object_unref(g_pending_call);
+  g_pending_call = nullptr;
+  return G_SOURCE_REMOVE;
+}
+
+// Called when the popup menu is dismissed (user picked an item or clicked away).
+static void on_menu_deactivate(GtkMenuShell* menu, gpointer user_data) {
+  // Defer to idle so that the item "activate" signal fires first.
+  g_idle_add(on_menu_respond_idle, nullptr);
 }
 
 static void context_menu_method_call(FlMethodChannel* channel,
@@ -72,21 +98,23 @@ static void context_menu_method_call(FlMethodChannel* channel,
     g_free(g_selected_menu_id);
     g_selected_menu_id = nullptr;
 
-    // gtk_menu_popup_at_pointer blocks until the menu is dismissed.
-    gtk_menu_popup_at_pointer(menu, nullptr);
+    // Hold on to the method call so we can respond from the deactivate callback.
+    g_pending_call = FL_METHOD_CALL(g_object_ref(method_call));
 
-    // After menu is dismissed, return the selected id (or null).
-    if (g_selected_menu_id != nullptr) {
-      fl_method_call_respond_success(
-          method_call,
-          fl_value_new_string(g_selected_menu_id), nullptr);
-    } else {
-      fl_method_call_respond_success(
-          method_call, fl_value_new_null(), nullptr);
-    }
+    g_signal_connect(menu, "deactivate",
+                     G_CALLBACK(on_menu_deactivate), nullptr);
 
-    g_object_ref_sink(menu);
-    g_object_unref(menu);
+    // Attach the menu to the Flutter view so it has a valid parent GdkWindow.
+    GtkWidget* view = GTK_WIDGET(user_data);
+    gtk_menu_attach_to_widget(menu, view, nullptr);
+
+    // Use the deprecated gtk_menu_popup – it positions at the pointer without
+    // requiring a GdkEvent (which Flutter consumes before GTK sees it).
+    G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+    gtk_menu_popup(menu, nullptr, nullptr, nullptr, nullptr,
+                   0, GDK_CURRENT_TIME);
+    G_GNUC_END_IGNORE_DEPRECATIONS
+    // Response happens asynchronously in on_menu_deactivate.
   } else {
     fl_method_call_respond_not_implemented(method_call, nullptr);
   }
@@ -151,7 +179,8 @@ static void my_application_activate(GApplication* application) {
       "bolan/context_menu",
       FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(
-      context_menu_channel, context_menu_method_call, nullptr, nullptr);
+      context_menu_channel, context_menu_method_call,
+      GTK_WIDGET(view), nullptr);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
