@@ -935,16 +935,21 @@ class PromptInputState extends State<PromptInput> {
 
   bool _isGitCommitWithoutMessage(String cmd) {
     final trimmed = cmd.trim();
-    if (trimmed == 'git commit' || trimmed == 'git commit -m' ||
-        trimmed == 'git commit --message') {
-      return true;
-    }
+    // Bare `git commit` should go through normal execution (opens
+    // the user's $EDITOR). Only intercept when -m or --message is
+    // present but has no value — that's when the user wants AI to
+    // write the message.
+    if (trimmed == 'git commit') return false;
     if (!trimmed.startsWith('git commit')) return false;
+    // Must have -m or --message flag to be a candidate
+    if (!trimmed.contains('-m') && !trimmed.contains('--message')) {
+      return false;
+    }
     // Has -m with an actual value — don't intercept
     final mFlag = RegExp(r'-m\s+\S');
     final msgFlag = RegExp(r'--message\s+\S|--message=\S');
     if (mFlag.hasMatch(trimmed) || msgFlag.hasMatch(trimmed)) return false;
-    // git commit with other flags but no message value
+    // -m or --message present but no value — generate with AI
     return true;
   }
 
@@ -1034,6 +1039,9 @@ class PromptInputState extends State<PromptInput> {
     setState(() {
       _showCommitPanel = false;
       _commitMessage = '';
+    });
+    _withoutListener(() {
+      _controller.text = '';
     });
     _focusNode.requestFocus();
   }
