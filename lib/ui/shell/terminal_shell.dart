@@ -45,7 +45,10 @@ import 'tab_bar.dart';
 /// Owns the [ConfigLoader] and syncs config changes to Riverpod providers
 /// so the UI updates live when settings change.
 class TerminalShell extends ConsumerStatefulWidget {
-  const TerminalShell({super.key});
+  /// Global key so the menu bar can invoke actions on this state.
+  static final globalKey = GlobalKey<_TerminalShellState>();
+
+  TerminalShell() : super(key: globalKey);
 
   @override
   ConsumerState<TerminalShell> createState() => _TerminalShellState();
@@ -382,6 +385,11 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     if (target.id == registry.activeId) return;
     ref.read(switchWorkspaceActionProvider)(target.id);
   }
+
+  /// Public accessors for the menu bar.
+  void toggleSidebar() => _toggleSidebar();
+  void openSettings() => _openSettings();
+  void quitWithConfirm() => _quitWithConfirm();
 
   void _openSettings() {
     ref.read(currentSessionNotifierProvider).openSettingsTab();

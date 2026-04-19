@@ -5,8 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/app_version.dart';
+import 'providers/font_size_provider.dart';
+import 'providers/session_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/update_provider.dart';
+import 'ui/shell/session_view.dart';
 import 'ui/shell/terminal_shell.dart';
 
 /// Root widget for the Bolan terminal emulator.
@@ -36,7 +39,7 @@ class BolonApp extends ConsumerWidget {
         ),
         child: PlatformMenuBar(
           menus: _buildMenus(ref),
-          child: const TerminalShell(),
+          child: TerminalShell(),
         ),
       ),
     );
@@ -61,59 +64,67 @@ class BolonApp extends ConsumerWidget {
                   ref.read(updateProvider).check(force: true),
             ),
           ]),
-          const PlatformMenuItemGroup(members: [
+          PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Settings...',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.comma, meta: true),
-              onSelected: null,
+              onSelected: () =>
+                  TerminalShell.globalKey.currentState?.openSettings(),
             ),
           ]),
-          const PlatformMenuItemGroup(members: [
+          PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Quit Bolan',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.keyQ, meta: true),
-              onSelected: null,
+              onSelected: () =>
+                  TerminalShell.globalKey.currentState?.quitWithConfirm(),
             ),
           ]),
         ],
       ),
 
       // ── File menu ──
-      const PlatformMenu(
+      PlatformMenu(
         label: 'File',
         menus: [
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'New Tab',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.keyT, meta: true),
-              onSelected: null,
+              onSelected: () =>
+                  ref.read(currentSessionNotifierProvider).createTab(),
             ),
           ]),
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Close Tab',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.keyW, meta: true),
-              onSelected: null,
+              onSelected: () {
+                final s = ref.read(currentSessionProvider);
+                ref.read(currentSessionNotifierProvider)
+                    .closeTab(s.activeTabIndex);
+              },
             ),
             PlatformMenuItem(
               label: 'Close Pane',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.keyW, meta: true, shift: true),
-              onSelected: null,
+              onSelected: () =>
+                  ref.read(currentSessionNotifierProvider).closePane(),
             ),
           ]),
         ],
       ),
 
       // ── Edit menu ──
-      const PlatformMenu(
+      PlatformMenu(
         label: 'Edit',
         menus: [
-          PlatformMenuItemGroup(members: [
+          const PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Copy',
               shortcut: SingleActivator(
@@ -136,88 +147,107 @@ class BolonApp extends ConsumerWidget {
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Find...',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.keyF, meta: true),
-              onSelected: null,
-            ),
-            PlatformMenuItem(
-              label: 'Clear',
-              shortcut: SingleActivator(
-                  LogicalKeyboardKey.keyK, meta: true),
-              onSelected: null,
+              onSelected: () {
+                final s = ref.read(currentSessionProvider);
+                final tab = s.activeTab;
+                if (tab != null && tab.focusedPaneId != null) {
+                  SessionViewState.of(tab.focusedPaneId!)?.toggleFindBar();
+                }
+              },
             ),
           ]),
         ],
       ),
 
       // ── Shell menu ──
-      const PlatformMenu(
+      PlatformMenu(
         label: 'Shell',
         menus: [
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Split Right',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.keyD, meta: true),
-              onSelected: null,
+              onSelected: () => ref
+                  .read(currentSessionNotifierProvider)
+                  .splitPane(Axis.horizontal),
             ),
             PlatformMenuItem(
               label: 'Split Down',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.keyD, meta: true, shift: true),
-              onSelected: null,
+              onSelected: () => ref
+                  .read(currentSessionNotifierProvider)
+                  .splitPane(Axis.vertical),
             ),
           ]),
         ],
       ),
 
       // ── View menu ──
-      const PlatformMenu(
+      PlatformMenu(
         label: 'View',
         menus: [
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Toggle Sidebar',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.backslash, meta: true),
-              onSelected: null,
+              onSelected: () =>
+                  TerminalShell.globalKey.currentState?.toggleSidebar(),
             ),
           ]),
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Zoom In',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.equal, meta: true),
-              onSelected: null,
+              onSelected: () =>
+                  ref.read(fontSizeProvider.notifier).increase(),
             ),
             PlatformMenuItem(
               label: 'Zoom Out',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.minus, meta: true),
-              onSelected: null,
+              onSelected: () =>
+                  ref.read(fontSizeProvider.notifier).decrease(),
             ),
           ]),
         ],
       ),
 
       // ── Window menu ──
-      const PlatformMenu(
+      PlatformMenu(
         label: 'Window',
         menus: [
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Previous Tab',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.bracketLeft, meta: true,
                   shift: true),
-              onSelected: null,
+              onSelected: () {
+                final s = ref.read(currentSessionProvider);
+                final count = s.tabs.length;
+                if (count <= 1) return;
+                final i = (s.activeTabIndex - 1) % count;
+                ref.read(currentSessionNotifierProvider).switchTab(i);
+              },
             ),
             PlatformMenuItem(
               label: 'Next Tab',
-              shortcut: SingleActivator(
+              shortcut: const SingleActivator(
                   LogicalKeyboardKey.bracketRight, meta: true,
                   shift: true),
-              onSelected: null,
+              onSelected: () {
+                final s = ref.read(currentSessionProvider);
+                final count = s.tabs.length;
+                if (count <= 1) return;
+                final i = (s.activeTabIndex + 1) % count;
+                ref.read(currentSessionNotifierProvider).switchTab(i);
+              },
             ),
           ]),
         ],
