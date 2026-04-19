@@ -21,6 +21,10 @@ class Workspace {
   /// prevents running prod commands in a personal workspace.
   final String color;
 
+  /// Whether this workspace is enabled. Disabled workspaces are
+  /// hidden from the sidebar and can't be switched to.
+  final bool enabled;
+
   /// Per-workspace environment variables injected into PTYs at spawn.
   final Map<String, String> envVars;
 
@@ -38,6 +42,7 @@ class Workspace {
     required this.id,
     required this.name,
     required this.color,
+    this.enabled = true,
     this.envVars = const {},
     this.secrets = const {},
     this.gitName,
@@ -62,6 +67,7 @@ class Workspace {
     String? id,
     String? name,
     String? color,
+    bool? enabled,
     Map<String, String>? envVars,
     Map<String, String>? secrets,
     String? gitName,
@@ -71,6 +77,7 @@ class Workspace {
         id: id ?? this.id,
         name: name ?? this.name,
         color: color ?? this.color,
+        enabled: enabled ?? this.enabled,
         envVars: envVars ?? this.envVars,
         secrets: secrets ?? this.secrets,
         gitName: gitName ?? this.gitName,

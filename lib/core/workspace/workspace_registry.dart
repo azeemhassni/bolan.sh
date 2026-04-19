@@ -204,6 +204,7 @@ class WorkspaceRegistry extends ChangeNotifier {
         id: m['id'] as String,
         name: (m['name'] as String?) ?? (m['id'] as String),
         color: (m['color'] as String?) ?? '#888888',
+        enabled: (m['enabled'] as bool?) ?? true,
         envVars: ((m['env'] as Map<String, dynamic>?) ?? const {})
             .map((k, v) => MapEntry(k, v.toString())),
         gitName: m['git_name'] as String?,
@@ -225,6 +226,7 @@ class WorkspaceRegistry extends ChangeNotifier {
       sb.writeln('id = "${w.id}"');
       sb.writeln('name = "${w.name}"');
       sb.writeln('color = "${w.color}"');
+      if (!w.enabled) sb.writeln('enabled = false');
       if (w.gitName != null) sb.writeln('git_name = "${w.gitName}"');
       if (w.gitEmail != null) sb.writeln('git_email = "${w.gitEmail}"');
       if (w.envVars.isNotEmpty) {

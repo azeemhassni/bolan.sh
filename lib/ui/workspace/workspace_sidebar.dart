@@ -106,12 +106,13 @@ class _WorkspaceSidebarState extends ConsumerState<WorkspaceSidebar> {
                 ),
               ),
               for (final w in registry.workspaces)
-                _WorkspaceItem(
-                  workspace: w,
-                  isActive: w.id == activeId,
-                  theme: theme,
-                  onTap: () => _switchTo(w.id),
-                ),
+                if (w.enabled)
+                  _WorkspaceItem(
+                    workspace: w,
+                    isActive: w.id == activeId,
+                    theme: theme,
+                    onTap: () => _switchTo(w.id),
+                  ),
               const Spacer(),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),

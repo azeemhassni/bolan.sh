@@ -39,7 +39,7 @@ class _WorkspacesTabState extends ConsumerState<WorkspacesTab> {
             workspace: w,
             isActive: w.id == registry.activeId,
             isExpanded: _expandedId == w.id,
-            canDelete: registry.workspaces.length > 1,
+            canDelete: registry.workspaces.length > 1 && w.id != registry.activeId,
             theme: theme,
             onToggleExpand: () => setState(
                 () => _expandedId = _expandedId == w.id ? null : w.id),
@@ -187,10 +187,28 @@ class _WorkspaceRow extends StatelessWidget {
                         ),
                       ),
                     )
-                  else
+                  else if (workspace.enabled)
                     BolanButton.ghost(
                       label: 'Switch',
                       onTap: onSwitch,
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: theme.statusChipBg,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'disabled',
+                        style: TextStyle(
+                          color: theme.dimForeground,
+                          fontFamily: theme.fontFamily,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   Icon(
                     isExpanded
@@ -206,6 +224,7 @@ class _WorkspaceRow extends StatelessWidget {
           if (isExpanded)
             _WorkspaceEditor(
               workspace: workspace,
+              isActive: isActive,
               theme: theme,
               canDelete: canDelete,
               onSave: onSave,
@@ -220,12 +239,14 @@ class _WorkspaceRow extends StatelessWidget {
 class _WorkspaceEditor extends StatefulWidget {
   final Workspace workspace;
   final BolonTheme theme;
+  final bool isActive;
   final bool canDelete;
   final ValueChanged<Workspace> onSave;
   final VoidCallback onDelete;
 
   const _WorkspaceEditor({
     required this.workspace,
+    required this.isActive,
     required this.theme,
     required this.canDelete,
     required this.onSave,
@@ -312,6 +333,36 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Divider(color: t.blockBorder, height: 12),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Enabled',
+                    style: TextStyle(
+                      color: t.foreground,
+                      fontFamily: t.fontFamily,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ),
+                Switch(
+                  value: widget.workspace.enabled,
+                  onChanged: widget.isActive
+                      ? null // can't disable the active workspace
+                      : (v) {
+                          widget.onSave(
+                              widget.workspace.copyWith(enabled: v));
+                        },
+                  activeTrackColor: t.cursor,
+                  inactiveTrackColor: t.statusChipBg,
+                ),
+              ],
+            ),
+          ),
           _field('Name', _name, t),
           _field('Color (hex)', _color, t),
           Padding(
@@ -450,29 +501,32 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
     final t = widget.theme;
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: t.blockBackground,
-        title: Text('Delete "${widget.workspace.name}"?',
-            style: TextStyle(color: t.foreground, fontFamily: t.fontFamily)),
-        content: Text(
-          'This permanently removes the workspace, its config, '
-          'history, snippets, and saved tab layout. This cannot be undone.',
-          style: TextStyle(
-              color: t.dimForeground, fontFamily: t.fontFamily, fontSize: 12),
-        ),
-        actions: [
-          BolanButton(
-            label: 'Cancel',
-            onTap: () => Navigator.of(ctx).pop(),
+      builder: (ctx) => BolonThemeProvider(
+        theme: t,
+        child: AlertDialog(
+          backgroundColor: t.blockBackground,
+          title: Text('Delete "${widget.workspace.name}"?',
+              style: TextStyle(color: t.foreground, fontFamily: t.fontFamily)),
+          content: Text(
+            'This permanently removes the workspace, its config, '
+            'history, snippets, and saved tab layout. This cannot be undone.',
+            style: TextStyle(
+                color: t.dimForeground, fontFamily: t.fontFamily, fontSize: 12),
           ),
-          BolanButton.danger(
-            label: 'Delete',
+          actions: [
+            BolanButton(
+              label: 'Cancel',
+              onTap: () => Navigator.of(ctx).pop(),
+            ),
+            BolanButton.danger(
+              label: 'Delete',
             onTap: () {
               Navigator.of(ctx).pop();
               widget.onDelete();
             },
           ),
         ],
+        ),
       ),
     );
   }
