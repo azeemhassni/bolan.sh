@@ -367,7 +367,7 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
           _field('Color (hex)', _color, t),
           Padding(
             padding: const EdgeInsets.only(top: 8, bottom: 4),
-            child: Text('Git identity (optional)',
+            child: Text('Git identity (optional, requires Git 2.31+)',
                 style: _labelStyle(t)),
           ),
           Row(children: [

@@ -33,8 +33,9 @@ class Workspace {
   /// Loaded asynchronously at workspace switch time.
   final Map<String, String> secrets;
 
-  /// Optional git identity. When set, `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`
-  /// (and the committer pair) are injected into PTY env. Wired in Phase 5.
+  /// Optional git identity. When set, injected into PTY env via
+  /// `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_N`/`GIT_CONFIG_VALUE_N` so the
+  /// identity is visible to both commits and `git config` queries.
   final String? gitName;
   final String? gitEmail;
 

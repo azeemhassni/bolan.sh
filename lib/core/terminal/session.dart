@@ -193,13 +193,21 @@ class TerminalSession extends ChangeNotifier {
     // workspace-scoped) but our TERM_* are sacrosanct.
     final ws = WorkspacePaths.activeWorkspace;
     final wsGitEnv = <String, String>{};
+    // Use GIT_CONFIG_COUNT/KEY/VALUE so workspace git identity is
+    // visible to `git config` queries, not just commits.
+    var gitConfigIndex = 0;
     if (ws?.gitName != null && ws!.gitName!.isNotEmpty) {
-      wsGitEnv['GIT_AUTHOR_NAME'] = ws.gitName!;
-      wsGitEnv['GIT_COMMITTER_NAME'] = ws.gitName!;
+      wsGitEnv['GIT_CONFIG_KEY_$gitConfigIndex'] = 'user.name';
+      wsGitEnv['GIT_CONFIG_VALUE_$gitConfigIndex'] = ws.gitName!;
+      gitConfigIndex++;
     }
     if (ws?.gitEmail != null && ws!.gitEmail!.isNotEmpty) {
-      wsGitEnv['GIT_AUTHOR_EMAIL'] = ws.gitEmail!;
-      wsGitEnv['GIT_COMMITTER_EMAIL'] = ws.gitEmail!;
+      wsGitEnv['GIT_CONFIG_KEY_$gitConfigIndex'] = 'user.email';
+      wsGitEnv['GIT_CONFIG_VALUE_$gitConfigIndex'] = ws.gitEmail!;
+      gitConfigIndex++;
+    }
+    if (gitConfigIndex > 0) {
+      wsGitEnv['GIT_CONFIG_COUNT'] = '$gitConfigIndex';
     }
     final pty = Pty.start(
       resolvedShell,
