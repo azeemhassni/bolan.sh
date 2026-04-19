@@ -40,6 +40,7 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
   KeyAction? _recording;
   KeyAction? _conflictWith;
   KeyBinding? _pendingBinding;
+  String? _selectedWorkspaceId;
   final FocusNode _recorderFocus = FocusNode();
 
   late Map<KeyAction, KeyBinding> _overrides;
@@ -294,31 +295,71 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                for (final (id, name) in widget.otherWorkspaces)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: TextButton(
-                      onPressed: () => _copyFrom(id),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          side: BorderSide(color: t.blockBorder, width: 1),
-                        ),
-                      ),
-                      child: Text(
-                        name,
+                Container(
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: t.blockBackground,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: t.blockBorder, width: 1),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedWorkspaceId,
+                      hint: Text(
+                        'Select workspace',
                         style: TextStyle(
-                          color: t.foreground,
+                          color: t.dimForeground,
                           fontFamily: t.fontFamily,
                           fontSize: 13,
                         ),
                       ),
+                      dropdownColor: t.blockBackground,
+                      style: TextStyle(
+                        color: t.foreground,
+                        fontFamily: t.fontFamily,
+                        fontSize: 13,
+                      ),
+                      icon: Icon(Icons.expand_more,
+                          size: 16, color: t.dimForeground),
+                      items: [
+                        for (final (id, name) in widget.otherWorkspaces)
+                          DropdownMenuItem(value: id, child: Text(name)),
+                      ],
+                      onChanged: (v) =>
+                          setState(() => _selectedWorkspaceId = v),
                     ),
                   ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: _selectedWorkspaceId != null
+                      ? () => _copyFrom(_selectedWorkspaceId!)
+                      : null,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    backgroundColor: _selectedWorkspaceId != null
+                        ? t.cursor.withAlpha(30)
+                        : null,
+                  ),
+                  child: Text(
+                    'Apply',
+                    style: TextStyle(
+                      color: _selectedWorkspaceId != null
+                          ? t.cursor
+                          : t.dimForeground,
+                      fontFamily: t.fontFamily,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ],
             ),
           ],
