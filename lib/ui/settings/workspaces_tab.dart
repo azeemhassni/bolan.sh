@@ -75,7 +75,7 @@ class _WorkspacesTabState extends ConsumerState<WorkspacesTab> {
           Align(
             alignment: Alignment.centerLeft,
             child: BolanButton.ghost(
-              label: '+ New Workspace',
+              label: 'New Workspace',
               icon: Icons.add,
               onTap: () => setState(() => _adding = true),
             ),
@@ -414,7 +414,7 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
           Align(
             alignment: Alignment.centerLeft,
             child: BolanButton.ghost(
-              label: '+ Add variable',
+              label: 'Add variable',
               icon: Icons.add,
               onTap: () => setState(
                   () => _envEntries.add(const MapEntry('', ''))),
@@ -472,7 +472,7 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
             Align(
               alignment: Alignment.centerLeft,
               child: BolanButton.ghost(
-                label: '+ Add secret',
+                label: 'Add secret',
                 icon: Icons.add,
                 onTap: () => setState(
                     () => _secretEntries.add(const MapEntry('', ''))),
