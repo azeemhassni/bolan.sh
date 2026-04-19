@@ -399,6 +399,7 @@ class SessionViewState extends ConsumerState<SessionView> {
                   promptChips: configLoader.config.general.promptChips,
                   promptInputKey: _promptKey,
                   cursorStyle: cursorStyle,
+                  keybindingOverrides: configLoader.config.keybindingOverrides,
                 ),
               ),
             ),

@@ -10,9 +10,11 @@ import '../../core/ai/ai_provider_helper.dart';
 import '../../core/ai/local_llm_provider.dart';
 import '../../core/ai/model_manager.dart';
 import '../../core/config/config_loader.dart';
+import '../../core/config/keybinding.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../core/pane/pane_manager.dart';
 import '../../core/pane/pane_node.dart';
+// ignore: unused_import
 import '../../core/platform_shortcuts.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../providers/config_provider.dart';
@@ -26,6 +28,7 @@ import '../ai/memory_warning_dialog.dart';
 import '../ai/model_download_dialog.dart';
 import '../ai/model_download_toast.dart';
 import '../palette/command_palette.dart';
+import '../settings/keybindings_tab.dart';
 import '../settings/settings_screen.dart';
 import '../shared/confirm_dialog.dart';
 import '../update/update_dialog.dart';
@@ -166,24 +169,39 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   /// Global key handler: forwards printable key presses to the focused pane's
   /// prompt input, so typing anywhere automatically goes to the right pane.
   bool _globalKeyHandler(KeyEvent event) {
+    // Don't intercept keys while the shortcut recorder is active.
+    if (KeybindingsTab.isRecording) return false;
+
     final isDown = event is KeyDownEvent;
     final isRepeat = event is KeyRepeatEvent;
     if (!isDown && !isRepeat) return false;
 
-    final meta = isPrimaryModifierPressed;
-    final shift = HardwareKeyboard.instance.isShiftPressed;
-    final alt = HardwareKeyboard.instance.isAltPressed;
+    final metaDown = HardwareKeyboard.instance.isMetaPressed;
+    final ctrlDown = HardwareKeyboard.instance.isControlPressed;
+    final shiftDown = HardwareKeyboard.instance.isShiftPressed;
+    final altDown = HardwareKeyboard.instance.isAltPressed;
     final key = event.logicalKey;
+    final overrides = ref.read(keybindingOverridesProvider);
+
+    KeyAction? action() => matchAction(
+          metaDown: metaDown,
+          ctrlDown: ctrlDown,
+          shiftDown: shiftDown,
+          altDown: altDown,
+          pressed: key,
+          overrides: overrides,
+        );
 
     // ── Repeating shortcuts (act on hold) ──
     // Zoom in/out should keep firing while the user holds the key,
     // matching browser/IDE convention. Done before the
     // single-fire-only guard below.
-    if (meta && key == LogicalKeyboardKey.equal) {
+    final a = action();
+    if (a == KeyAction.zoomIn) {
       ref.read(fontSizeProvider.notifier).increase();
       return true;
     }
-    if (meta && key == LogicalKeyboardKey.minus) {
+    if (a == KeyAction.zoomOut) {
       ref.read(fontSizeProvider.notifier).decrease();
       return true;
     }
@@ -193,112 +211,105 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     if (!isDown) return false;
 
     // ── Global shortcuts (always work, any focus state) ──
-
-    if (meta && shift && key == LogicalKeyboardKey.keyP) {
-      _togglePalette();
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.keyQ) {
-      _quitWithConfirm();
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.comma) {
-      _openSettings();
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.backslash) {
-      _toggleSidebar();
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.keyT) {
-      ref.read(currentSessionNotifierProvider).createTab();
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.keyW && shift) {
-      _closePaneWithConfirm();
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.keyW) {
-      _closeTabWithConfirm();
-      return true;
-    }
-    // Ctrl+Tab / Ctrl+Shift+Tab — next/previous tab (browser convention,
-    // works the same way on macOS, Linux, and Windows).
-    final ctrl = HardwareKeyboard.instance.isControlPressed;
-    if (ctrl && key == LogicalKeyboardKey.tab) {
-      _switchTab(shift ? -1 : 1);
-      return true;
-    }
-    if (meta && shift && key == LogicalKeyboardKey.arrowLeft) {
-      final s = ref.read(currentSessionProvider);
-      if (s.activeTabIndex > 0) {
-        ref.read(currentSessionNotifierProvider)
-            .reorderTab(s.activeTabIndex, s.activeTabIndex - 1);
-      }
-      return true;
-    }
-    if (meta && shift && key == LogicalKeyboardKey.arrowRight) {
-      final s = ref.read(currentSessionProvider);
-      if (s.activeTabIndex < s.tabs.length - 1) {
-        ref.read(currentSessionNotifierProvider)
-            .reorderTab(s.activeTabIndex, s.activeTabIndex + 2);
-      }
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.keyD && shift) {
-      ref.read(currentSessionNotifierProvider).splitPane(Axis.vertical);
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.keyD) {
-      ref.read(currentSessionNotifierProvider).splitPane(Axis.horizontal);
-      return true;
-    }
-    if (meta && alt && key == LogicalKeyboardKey.arrowLeft) {
-      ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.left);
-      return true;
-    }
-    if (meta && alt && key == LogicalKeyboardKey.arrowRight) {
-      ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.right);
-      return true;
-    }
-    if (meta && alt && key == LogicalKeyboardKey.arrowUp) {
-      ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.up);
-      return true;
-    }
-    if (meta && alt && key == LogicalKeyboardKey.arrowDown) {
-      ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.down);
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.keyF) {
-      final s = ref.read(currentSessionProvider);
-      final tab = s.activeTab;
-      if (tab != null && tab.focusedPaneId != null) {
-        SessionViewState.of(tab.focusedPaneId!)?.toggleFindBar();
-      }
-      return true;
-    }
-    if (meta && key == LogicalKeyboardKey.digit0) {
-      ref.read(fontSizeProvider.notifier).reset();
-      return true;
-    }
-    // Ctrl+1–9 — switch workspace by position.
-    if (ctrl && !meta && !alt && !shift) {
-      const digitKeys = [
-        LogicalKeyboardKey.digit1,
-        LogicalKeyboardKey.digit2,
-        LogicalKeyboardKey.digit3,
-        LogicalKeyboardKey.digit4,
-        LogicalKeyboardKey.digit5,
-        LogicalKeyboardKey.digit6,
-        LogicalKeyboardKey.digit7,
-        LogicalKeyboardKey.digit8,
-        LogicalKeyboardKey.digit9,
-      ];
-      final idx = digitKeys.indexOf(key);
-      if (idx >= 0) {
-        _switchWorkspace(idx);
+    switch (a) {
+      case KeyAction.togglePalette:
+        _togglePalette();
         return true;
-      }
+      case KeyAction.quit:
+        _quitWithConfirm();
+        return true;
+      case KeyAction.openSettings:
+        _openSettings();
+        return true;
+      case KeyAction.toggleSidebar:
+        _toggleSidebar();
+        return true;
+      case KeyAction.newTab:
+        ref.read(currentSessionNotifierProvider).createTab();
+        return true;
+      case KeyAction.closePane:
+        _closePaneWithConfirm();
+        return true;
+      case KeyAction.closeTab:
+        _closeTabWithConfirm();
+        return true;
+      case KeyAction.nextTab:
+        _switchTab(1);
+        return true;
+      case KeyAction.previousTab:
+        _switchTab(-1);
+        return true;
+      case KeyAction.reorderTabLeft:
+        final s = ref.read(currentSessionProvider);
+        if (s.activeTabIndex > 0) {
+          ref.read(currentSessionNotifierProvider)
+              .reorderTab(s.activeTabIndex, s.activeTabIndex - 1);
+        }
+        return true;
+      case KeyAction.reorderTabRight:
+        final s = ref.read(currentSessionProvider);
+        if (s.activeTabIndex < s.tabs.length - 1) {
+          ref.read(currentSessionNotifierProvider)
+              .reorderTab(s.activeTabIndex, s.activeTabIndex + 2);
+        }
+        return true;
+      case KeyAction.splitDown:
+        ref.read(currentSessionNotifierProvider).splitPane(Axis.vertical);
+        return true;
+      case KeyAction.splitRight:
+        ref.read(currentSessionNotifierProvider).splitPane(Axis.horizontal);
+        return true;
+      case KeyAction.navigatePaneLeft:
+        ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.left);
+        return true;
+      case KeyAction.navigatePaneRight:
+        ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.right);
+        return true;
+      case KeyAction.navigatePaneUp:
+        ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.up);
+        return true;
+      case KeyAction.navigatePaneDown:
+        ref.read(currentSessionNotifierProvider).navigatePane(AxisDirection.down);
+        return true;
+      case KeyAction.find:
+        final s = ref.read(currentSessionProvider);
+        final tab = s.activeTab;
+        if (tab != null && tab.focusedPaneId != null) {
+          SessionViewState.of(tab.focusedPaneId!)?.toggleFindBar();
+        }
+        return true;
+      case KeyAction.resetZoom:
+        ref.read(fontSizeProvider.notifier).reset();
+        return true;
+      case KeyAction.workspace1:
+        _switchWorkspace(0);
+        return true;
+      case KeyAction.workspace2:
+        _switchWorkspace(1);
+        return true;
+      case KeyAction.workspace3:
+        _switchWorkspace(2);
+        return true;
+      case KeyAction.workspace4:
+        _switchWorkspace(3);
+        return true;
+      case KeyAction.workspace5:
+        _switchWorkspace(4);
+        return true;
+      case KeyAction.workspace6:
+        _switchWorkspace(5);
+        return true;
+      case KeyAction.workspace7:
+        _switchWorkspace(6);
+        return true;
+      case KeyAction.workspace8:
+        _switchWorkspace(7);
+        return true;
+      case KeyAction.workspace9:
+        _switchWorkspace(8);
+        return true;
+      default:
+        break;
     }
 
     // Don't forward keys when palette is open
@@ -311,8 +322,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     final promptState = PaneFocusRegistry.get(tab.focusedPaneId!);
     if (promptState == null) return false;
 
-    // Cmd+L — focus prompt and select all
-    if (meta && key == LogicalKeyboardKey.keyL) {
+    if (a == KeyAction.focusPrompt) {
       promptState.requestFocus();
       promptState.selectAll();
       return true;
@@ -347,8 +357,8 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
 
     final isPrintable = event.character != null &&
         event.character!.isNotEmpty &&
-        !HardwareKeyboard.instance.isControlPressed &&
-        !HardwareKeyboard.instance.isMetaPressed;
+        !ctrlDown &&
+        !metaDown;
 
     if (isPrintable) {
       promptState.requestFocus();
@@ -579,12 +589,13 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   }
 
   List<AppAction> _buildActions() {
-    final mod = Platform.isMacOS ? '⌘' : 'Ctrl+';
+    final o = ref.read(keybindingOverridesProvider);
+    String kb(KeyAction a) => bindingFor(a, o).label;
     return [
       AppAction(
         id: 'new_tab',
         label: 'New Tab',
-        shortcut: '${mod}T',
+        shortcut: kb(KeyAction.newTab),
         icon: Icons.add,
         keywords: const ['tab', 'create'],
         callback: () => ref.read(currentSessionNotifierProvider).createTab(),
@@ -592,7 +603,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AppAction(
         id: 'close_tab',
         label: 'Close Tab',
-        shortcut: '${mod}W',
+        shortcut: kb(KeyAction.closeTab),
         icon: Icons.close,
         keywords: const ['tab', 'close', 'remove'],
         callback: _closeTabWithConfirm,
@@ -600,7 +611,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AppAction(
         id: 'split_right',
         label: 'Split Pane Right',
-        shortcut: '${mod}D',
+        shortcut: kb(KeyAction.splitRight),
         icon: Icons.vertical_split,
         keywords: const ['split', 'pane', 'horizontal'],
         callback: () =>
@@ -609,7 +620,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AppAction(
         id: 'split_down',
         label: 'Split Pane Down',
-        shortcut: '$mod⇧D',
+        shortcut: kb(KeyAction.splitDown),
         icon: Icons.horizontal_split,
         keywords: const ['split', 'pane', 'vertical'],
         callback: () =>
@@ -618,7 +629,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AppAction(
         id: 'close_pane',
         label: 'Close Pane',
-        shortcut: '$mod⇧W',
+        shortcut: kb(KeyAction.closePane),
         icon: Icons.close_fullscreen,
         keywords: const ['pane', 'close'],
         callback: _closePaneWithConfirm,
@@ -626,7 +637,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AppAction(
         id: 'settings',
         label: 'Settings',
-        shortcut: '$mod,',
+        shortcut: kb(KeyAction.openSettings),
         icon: Icons.settings_outlined,
         keywords: const ['preferences', 'config', 'options'],
         callback: _openSettings,
@@ -641,7 +652,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AppAction(
         id: 'focus_prompt',
         label: 'Focus Prompt',
-        shortcut: '${mod}L',
+        shortcut: kb(KeyAction.focusPrompt),
         icon: Icons.terminal,
         keywords: const ['focus', 'input', 'prompt'],
         callback: () {
@@ -654,7 +665,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AppAction(
         id: 'next_tab',
         label: 'Next Tab',
-        shortcut: '$mod}',
+        shortcut: kb(KeyAction.nextTab),
         icon: Icons.arrow_forward,
         keywords: const ['tab', 'switch', 'next'],
         callback: () => _switchTab(1),
@@ -662,7 +673,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AppAction(
         id: 'prev_tab',
         label: 'Previous Tab',
-        shortcut: '$mod{',
+        shortcut: kb(KeyAction.previousTab),
         icon: Icons.arrow_back,
         keywords: const ['tab', 'switch', 'previous'],
         callback: () => _switchTab(-1),
@@ -670,7 +681,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AppAction(
         id: 'increase_font',
         label: 'Increase Font Size',
-        shortcut: '$mod+',
+        shortcut: kb(KeyAction.zoomIn),
         icon: Icons.text_increase,
         keywords: const ['font', 'zoom', 'bigger'],
         callback: () => ref.read(fontSizeProvider.notifier).increase(),
@@ -678,7 +689,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AppAction(
         id: 'decrease_font',
         label: 'Decrease Font Size',
-        shortcut: '$mod-',
+        shortcut: kb(KeyAction.zoomOut),
         icon: Icons.text_decrease,
         keywords: const ['font', 'zoom', 'smaller'],
         callback: () => ref.read(fontSizeProvider.notifier).decrease(),
@@ -686,7 +697,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       AppAction(
         id: 'reset_font',
         label: 'Reset Font Size',
-        shortcut: '${mod}0',
+        shortcut: kb(KeyAction.resetZoom),
         icon: Icons.format_size,
         keywords: const ['font', 'reset', 'default'],
         callback: () => ref.read(fontSizeProvider.notifier).reset(),

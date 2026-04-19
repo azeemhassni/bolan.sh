@@ -12,12 +12,17 @@ import '../../core/ai/model_manager.dart';
 import '../../core/app_version.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
+import '../../core/config/config_validator.dart';
+import '../../core/config/keybinding.dart';
+import '../../core/workspace/workspace_paths.dart';
+import 'package:toml/toml.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/theme_registry.dart';
 import '../../providers/model_download_provider.dart';
 import '../shared/bolan_button.dart';
 import '../shared/bolan_components.dart';
 import 'font_picker.dart';
+import 'keybindings_tab.dart';
 import 'prompt_editor.dart';
 import 'theme_editor.dart';
 import 'workspaces_tab.dart';
@@ -57,6 +62,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   static const _tabs = [
     'General', 'Editor', 'Appearance', 'AI', 'Prompt', 'Workspaces',
+    'Keybindings',
   ];
   static const _tabIcons = [
     Icons.settings_outlined,
@@ -65,6 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     Icons.auto_awesome_outlined,
     Icons.terminal_outlined,
     Icons.workspaces_outlined,
+    Icons.keyboard_outlined,
   ];
   static const _maxContentWidth = 860.0;
 
@@ -280,6 +287,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       3 => _buildAiTab(theme),
       4 => _buildPromptTab(theme),
       5 => const [WorkspacesTab()],
+      6 => [_buildKeybindingsTab(theme)],
       _ => [],
     };
   }
@@ -609,6 +617,54 @@ class _SettingsScreenState extends State<SettingsScreen>
         },
       ),
     ];
+  }
+
+  // ---- Keybindings Tab ----
+
+  Widget _buildKeybindingsTab(BolonTheme theme) {
+    return FutureBuilder<List<(String, String)>>(
+      future: _loadOtherWorkspaces(),
+      builder: (ctx, snap) {
+        return KeybindingsTab(
+          overrides: _config.keybindingOverrides,
+          theme: theme,
+          onChanged: (overrides) {
+            _config = _config.copyWith(keybindingOverrides: overrides);
+            _save();
+          },
+          otherWorkspaces: snap.data ?? const [],
+          loadFromWorkspace: _loadKeybindingsFrom,
+        );
+      },
+    );
+  }
+
+  Future<List<(String, String)>> _loadOtherWorkspaces() async {
+    final file = WorkspacePaths.registryFile();
+    if (!await file.exists()) return const [];
+    final doc = TomlDocument.parse(await file.readAsString()).toMap();
+    final activeId = (doc['active'] as String?) ?? 'default';
+    final list = (doc['workspaces'] as List<dynamic>?) ?? const [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .where((m) => m['id'] != activeId)
+        .map((m) => (
+              m['id'] as String,
+              (m['name'] as String?) ?? (m['id'] as String),
+            ))
+        .toList();
+  }
+
+  Future<Map<KeyAction, KeyBinding>> _loadKeybindingsFrom(
+      String workspaceId) async {
+    final file = WorkspacePaths.configFileFor(workspaceId);
+    if (!await file.exists()) return const {};
+    final doc = TomlDocument.parse(await file.readAsString()).toMap();
+    final raw = doc['keybindings'] as Map<String, dynamic>?;
+    if (raw == null) return const {};
+    return const ConfigValidator()
+        .validate({'keybindings': raw})
+        .keybindingOverrides;
   }
 
   // ---- General Tab ----

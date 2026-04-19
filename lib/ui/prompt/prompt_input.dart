@@ -9,6 +9,7 @@ import '../../core/ai/features/git_commit.dart';
 import '../../core/ai/features/nlp_to_command.dart';
 import '../../core/ai/history_sanitizer.dart';
 import '../../core/completion/completion_engine.dart';
+import '../../core/config/keybinding.dart';
 import '../../core/platform_shortcuts.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -34,6 +35,7 @@ class PromptInput extends StatefulWidget {
   final bool smartHistorySearch;
   final bool shareHistory;
   final String cursorStyle;
+  final Map<KeyAction, KeyBinding> keybindingOverrides;
 
   const PromptInput({
     super.key,
@@ -47,6 +49,7 @@ class PromptInput extends StatefulWidget {
     this.smartHistorySearch = true,
     this.shareHistory = false,
     this.cursorStyle = 'bar',
+    this.keybindingOverrides = const {},
   });
 
   @override
@@ -448,6 +451,7 @@ class PromptInputState extends State<PromptInput> {
 
     final ctrl = HardwareKeyboard.instance.isControlPressed;
     final shift = HardwareKeyboard.instance.isShiftPressed;
+    // ignore: unused_local_variable
     final meta = isPrimaryModifierPressed;
 
     // Tab completion popup navigation
@@ -522,11 +526,6 @@ class PromptInputState extends State<PromptInput> {
         _acceptGhostText();
         return KeyEventResult.handled;
 
-      // Ctrl+R — open history search
-      case LogicalKeyboardKey.keyR when ctrl:
-        setState(() => _showHistorySearch = true);
-        return KeyEventResult.handled;
-
       // Escape — dismiss completions/ghost
       case LogicalKeyboardKey.escape:
         if (_completions.isNotEmpty) {
@@ -565,53 +564,67 @@ class PromptInputState extends State<PromptInput> {
         _navigateHistory(back: false);
         return KeyEventResult.handled;
 
-      case LogicalKeyboardKey.keyA when ctrl:
+      default:
+        break;
+    }
+
+    // ── Customizable prompt shortcuts ──
+    final metaDown = HardwareKeyboard.instance.isMetaPressed;
+    final ctrlDown = HardwareKeyboard.instance.isControlPressed;
+    final shiftDown = HardwareKeyboard.instance.isShiftPressed;
+    final altDown = HardwareKeyboard.instance.isAltPressed;
+    final promptAction = matchAction(
+      metaDown: metaDown,
+      ctrlDown: ctrlDown,
+      shiftDown: shiftDown,
+      altDown: altDown,
+      pressed: event.logicalKey,
+      overrides: widget.keybindingOverrides,
+      scope: KeyAction.values.where((a) => a.category == 'Prompt'),
+    );
+
+    switch (promptAction) {
+      case KeyAction.historySearch:
+        setState(() => _showHistorySearch = true);
+        return KeyEventResult.handled;
+      case KeyAction.cursorToStart:
         _controller.selection = const TextSelection.collapsed(offset: 0);
         return KeyEventResult.handled;
-
-      case LogicalKeyboardKey.keyE when ctrl:
+      case KeyAction.cursorToEnd:
         _controller.selection = TextSelection.collapsed(
           offset: _controller.text.length,
         );
         return KeyEventResult.handled;
-
-      case LogicalKeyboardKey.keyU when ctrl:
+      case KeyAction.killLine:
         final pos = _controller.selection.baseOffset;
         _withoutListener(() {
           _controller.text = _controller.text.substring(pos);
           _controller.selection = const TextSelection.collapsed(offset: 0);
         });
         return KeyEventResult.handled;
-
-      case LogicalKeyboardKey.keyK when ctrl:
+      case KeyAction.killToEnd:
         final pos = _controller.selection.baseOffset;
         _withoutListener(() {
           _controller.text = _controller.text.substring(0, pos);
           _controller.selection = TextSelection.collapsed(offset: pos);
         });
         return KeyEventResult.handled;
-
-      case LogicalKeyboardKey.keyW when ctrl:
+      case KeyAction.deleteWordBefore:
         _deleteWordBefore();
         return KeyEventResult.handled;
-
-      case LogicalKeyboardKey.keyC when ctrl:
+      case KeyAction.sendSigint:
         widget.session.writeInput('\x03');
         _controller.clear();
         return KeyEventResult.handled;
-
-      case LogicalKeyboardKey.keyL when ctrl:
+      case KeyAction.clearScrollback:
         widget.session.clearBlocks();
         widget.session.writeInput('\x0c');
         return KeyEventResult.handled;
-
-      // Cmd+K — clear everything (blocks + scrollback)
-      case LogicalKeyboardKey.keyK when meta:
+      case KeyAction.clearAll:
         widget.session.clearBlocks();
         widget.session.terminal.buffer.clear();
         widget.session.writeInput('\x0c');
         return KeyEventResult.handled;
-
       default:
         return KeyEventResult.ignored;
     }

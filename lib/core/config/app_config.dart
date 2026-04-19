@@ -1,3 +1,5 @@
+import 'keybinding.dart';
+
 /// Application configuration data model.
 ///
 /// Loaded from `~/.config/bolan/config.toml`. Every field has a sensible
@@ -9,12 +11,16 @@ class AppConfig {
   final UpdateConfig update;
   final String activeTheme;
 
+  /// User overrides for key bindings. Only non-default bindings are stored.
+  final Map<KeyAction, KeyBinding> keybindingOverrides;
+
   const AppConfig({
     this.general = const GeneralConfig(),
     this.editor = const EditorConfig(),
     this.ai = const AiConfig(),
     this.update = const UpdateConfig(),
     this.activeTheme = 'default-dark',
+    this.keybindingOverrides = const {},
   });
 
   AppConfig copyWith({
@@ -23,6 +29,7 @@ class AppConfig {
     AiConfig? ai,
     UpdateConfig? update,
     String? activeTheme,
+    Map<KeyAction, KeyBinding>? keybindingOverrides,
   }) {
     return AppConfig(
       general: general ?? this.general,
@@ -30,6 +37,7 @@ class AppConfig {
       ai: ai ?? this.ai,
       update: update ?? this.update,
       activeTheme: activeTheme ?? this.activeTheme,
+      keybindingOverrides: keybindingOverrides ?? this.keybindingOverrides,
     );
   }
 }

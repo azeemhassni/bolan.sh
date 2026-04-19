@@ -152,6 +152,14 @@ class ConfigLoader extends ChangeNotifier {
       sb.writeln('skipped_version = "${c.update.skippedVersion}"');
     }
 
+    if (c.keybindingOverrides.isNotEmpty) {
+      sb.writeln();
+      sb.writeln('[keybindings]');
+      for (final entry in c.keybindingOverrides.entries) {
+        sb.writeln('${entry.key.name} = "${entry.value.serialize()}"');
+      }
+    }
+
     return sb.toString();
   }
 }

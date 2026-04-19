@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config/config_loader.dart';
+import '../core/config/keybinding.dart';
 import '../core/notifications/notification_service.dart';
 
 /// Global config loader instance. Loaded in main.dart before runApp
@@ -17,6 +18,14 @@ final configLoaderProvider =
 /// when config values change, even though the ConfigLoader object
 /// reference stays the same.
 final configVersionProvider = StateProvider<int>((ref) => 0);
+
+/// Keybinding overrides from the config. Watches the config loader
+/// so changes take effect immediately.
+final keybindingOverridesProvider =
+    Provider<Map<KeyAction, KeyBinding>>((ref) {
+  final loader = ref.watch(configLoaderProvider);
+  return loader.config.keybindingOverrides;
+});
 
 /// Global notification service instance, set by TerminalShell.
 final notificationServiceProvider =

@@ -1,4 +1,5 @@
 import 'app_config.dart';
+import 'keybinding.dart';
 
 /// Validates and sanitizes config values, falling back to defaults for
 /// any field that is out of range or the wrong type.
@@ -12,6 +13,8 @@ class ConfigValidator {
       ai: _validateAi(raw['ai'] as Map<String, dynamic>?),
       update: _validateUpdate(raw['updates'] as Map<String, dynamic>?),
       activeTheme: _string(raw['theme'], 'default-dark'),
+      keybindingOverrides:
+          _validateKeybindings(raw['keybindings'] as Map<String, dynamic>?),
     );
   }
 
@@ -72,6 +75,26 @@ class ConfigValidator {
       lastCheckTime: _string(raw['last_check_time'], ''),
       skippedVersion: _string(raw['skipped_version'], ''),
     );
+  }
+
+  Map<KeyAction, KeyBinding> _validateKeybindings(Map<String, dynamic>? raw) {
+    if (raw == null) return const {};
+    final result = <KeyAction, KeyBinding>{};
+    for (final entry in raw.entries) {
+      final action = _actionFromId(entry.key);
+      if (action == null) continue;
+      final binding = KeyBinding.parse(entry.value as String);
+      if (binding == null) continue;
+      result[action] = binding;
+    }
+    return result;
+  }
+
+  KeyAction? _actionFromId(String id) {
+    for (final a in KeyAction.values) {
+      if (a.name == id) return a;
+    }
+    return null;
   }
 
   String _string(Object? value, String fallback) {

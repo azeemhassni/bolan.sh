@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/config/keybinding.dart';
 import '../../core/config/prompt_config.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
@@ -33,6 +34,7 @@ class PromptArea extends StatefulWidget {
   final List<String> promptChips;
   final GlobalKey<PromptInputState>? promptInputKey;
   final String cursorStyle;
+  final Map<KeyAction, KeyBinding> keybindingOverrides;
 
   const PromptArea({
     super.key,
@@ -48,6 +50,7 @@ class PromptArea extends StatefulWidget {
     this.promptChips = const ['shell', 'cwd', 'gitBranch', 'gitChanges'],
     this.promptInputKey,
     this.cursorStyle = 'bar',
+    this.keybindingOverrides = const {},
   });
 
   @override
@@ -621,6 +624,7 @@ class _PromptAreaState extends State<PromptArea> {
             smartHistorySearch: widget.aiEnabled && widget.smartHistorySearch,
             shareHistory: widget.aiEnabled && widget.shareHistory,
             cursorStyle: widget.cursorStyle,
+            keybindingOverrides: widget.keybindingOverrides,
           ),
         ],
       ),
