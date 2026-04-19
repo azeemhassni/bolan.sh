@@ -61,18 +61,18 @@ class BolonApp extends ConsumerWidget {
                   ref.read(updateProvider).check(force: true),
             ),
           ]),
-          PlatformMenuItemGroup(members: [
+          const PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Settings...',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.comma, meta: true),
               onSelected: null,
             ),
           ]),
-          PlatformMenuItemGroup(members: [
+          const PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Quit Bolan',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.keyQ, meta: true),
               onSelected: null,
             ),
@@ -81,13 +81,13 @@ class BolonApp extends ConsumerWidget {
       ),
 
       // ── File menu ──
-      PlatformMenu(
+      const PlatformMenu(
         label: 'File',
         menus: [
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'New Tab',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.keyT, meta: true),
               onSelected: null,
             ),
@@ -95,13 +95,13 @@ class BolonApp extends ConsumerWidget {
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Close Tab',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.keyW, meta: true),
               onSelected: null,
             ),
             PlatformMenuItem(
               label: 'Close Pane',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.keyW, meta: true, shift: true),
               onSelected: null,
             ),
@@ -110,25 +110,25 @@ class BolonApp extends ConsumerWidget {
       ),
 
       // ── Edit menu ──
-      PlatformMenu(
+      const PlatformMenu(
         label: 'Edit',
         menus: [
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Copy',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.keyC, meta: true),
               onSelected: null,
             ),
             PlatformMenuItem(
               label: 'Paste',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.keyV, meta: true),
               onSelected: null,
             ),
             PlatformMenuItem(
               label: 'Select All',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.keyA, meta: true),
               onSelected: null,
             ),
@@ -136,13 +136,13 @@ class BolonApp extends ConsumerWidget {
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Find...',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.keyF, meta: true),
               onSelected: null,
             ),
             PlatformMenuItem(
               label: 'Clear',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.keyK, meta: true),
               onSelected: null,
             ),
@@ -151,19 +151,19 @@ class BolonApp extends ConsumerWidget {
       ),
 
       // ── Shell menu ──
-      PlatformMenu(
+      const PlatformMenu(
         label: 'Shell',
         menus: [
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Split Right',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.keyD, meta: true),
               onSelected: null,
             ),
             PlatformMenuItem(
               label: 'Split Down',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.keyD, meta: true, shift: true),
               onSelected: null,
             ),
@@ -172,13 +172,13 @@ class BolonApp extends ConsumerWidget {
       ),
 
       // ── View menu ──
-      PlatformMenu(
+      const PlatformMenu(
         label: 'View',
         menus: [
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Toggle Sidebar',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.backslash, meta: true),
               onSelected: null,
             ),
@@ -186,13 +186,13 @@ class BolonApp extends ConsumerWidget {
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Zoom In',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.equal, meta: true),
               onSelected: null,
             ),
             PlatformMenuItem(
               label: 'Zoom Out',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.minus, meta: true),
               onSelected: null,
             ),
@@ -201,20 +201,20 @@ class BolonApp extends ConsumerWidget {
       ),
 
       // ── Window menu ──
-      PlatformMenu(
+      const PlatformMenu(
         label: 'Window',
         menus: [
           PlatformMenuItemGroup(members: [
             PlatformMenuItem(
               label: 'Previous Tab',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.bracketLeft, meta: true,
                   shift: true),
               onSelected: null,
             ),
             PlatformMenuItem(
               label: 'Next Tab',
-              shortcut: const SingleActivator(
+              shortcut: SingleActivator(
                   LogicalKeyboardKey.bracketRight, meta: true,
                   shift: true),
               onSelected: null,

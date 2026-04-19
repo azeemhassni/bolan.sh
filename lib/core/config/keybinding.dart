@@ -260,9 +260,9 @@ final Map<KeyAction, KeyBinding> defaultKeyBindings = {
   KeyAction.newTab: _primary(LogicalKeyboardKey.keyT),
   KeyAction.closeTab: _primary(LogicalKeyboardKey.keyW),
   KeyAction.closePane: _primary(LogicalKeyboardKey.keyW, shift: true),
-  KeyAction.nextTab: KeyBinding(ctrl: true, key: LogicalKeyboardKey.tab),
+  KeyAction.nextTab: const KeyBinding(ctrl: true, key: LogicalKeyboardKey.tab),
   KeyAction.previousTab:
-      KeyBinding(ctrl: true, shift: true, key: LogicalKeyboardKey.tab),
+      const KeyBinding(ctrl: true, shift: true, key: LogicalKeyboardKey.tab),
   KeyAction.reorderTabLeft:
       _primary(LogicalKeyboardKey.arrowLeft, shift: true),
   KeyAction.reorderTabRight:
@@ -280,37 +280,37 @@ final Map<KeyAction, KeyBinding> defaultKeyBindings = {
   KeyAction.focusPrompt: _primary(LogicalKeyboardKey.keyL),
   // Workspace switching: Ctrl+1–9 on all platforms.
   KeyAction.workspace1:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit1),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit1),
   KeyAction.workspace2:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit2),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit2),
   KeyAction.workspace3:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit3),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit3),
   KeyAction.workspace4:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit4),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit4),
   KeyAction.workspace5:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit5),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit5),
   KeyAction.workspace6:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit6),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit6),
   KeyAction.workspace7:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit7),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit7),
   KeyAction.workspace8:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit8),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit8),
   KeyAction.workspace9:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit9),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit9),
   // Prompt shortcuts.
   KeyAction.historySearch:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyR),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyR),
   KeyAction.cursorToStart:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyA),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyA),
   KeyAction.cursorToEnd:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyE),
-  KeyAction.killLine: KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyU),
-  KeyAction.killToEnd: KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyK),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyE),
+  KeyAction.killLine: const KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyU),
+  KeyAction.killToEnd: const KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyK),
   KeyAction.deleteWordBefore:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyW),
-  KeyAction.sendSigint: KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyC),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyW),
+  KeyAction.sendSigint: const KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyC),
   KeyAction.clearScrollback:
-      KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyL),
+      const KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyL),
   KeyAction.clearAll: _primary(LogicalKeyboardKey.keyK),
 };
 

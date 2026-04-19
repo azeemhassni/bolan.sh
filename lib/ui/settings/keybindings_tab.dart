@@ -104,7 +104,8 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
 
   void _handleRecordedKey(KeyEvent event) {
     if (event is! KeyDownEvent) return;
-    if (_recording == null) return;
+    final action = _recording;
+    if (action == null) return;
 
     final key = event.logicalKey;
     // Ignore bare modifier keys.
@@ -135,11 +136,11 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
 
     // Check if this binding matches the default — if so, remove
     // the override rather than storing a redundant entry.
-    final defaultBinding = defaultKeyBindings[_recording!]!;
+    final defaultBinding = defaultKeyBindings[action]!;
     if (binding == defaultBinding) {
-      _overrides.remove(_recording!);
+      _overrides.remove(action);
     } else {
-      _overrides[_recording!] = binding;
+      _overrides[action] = binding;
     }
 
     setState(() => _stopRecording());

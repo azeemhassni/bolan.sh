@@ -61,7 +61,7 @@ void main() {
 
   group('KeyBinding.serialize', () {
     test('round-trips through parse', () {
-      final original = KeyBinding(
+      const original = KeyBinding(
         meta: true,
         shift: true,
         key: LogicalKeyboardKey.keyD,
@@ -77,7 +77,7 @@ void main() {
     });
 
     test('serializes modifiers in stable order', () {
-      final b = KeyBinding(
+      const b = KeyBinding(
         meta: true,
         ctrl: true,
         shift: true,
@@ -88,14 +88,14 @@ void main() {
     });
 
     test('omits unset modifiers', () {
-      final b = KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyR);
+      const b = KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyR);
       expect(b.serialize(), 'ctrl+keyR');
     });
   });
 
   group('KeyBinding.label', () {
     test('includes spaces between parts', () {
-      final b = KeyBinding(
+      const b = KeyBinding(
         meta: true,
         shift: true,
         key: LogicalKeyboardKey.keyP,
@@ -105,14 +105,14 @@ void main() {
     });
 
     test('no leading space', () {
-      final b = KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyA);
+      const b = KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyA);
       expect(b.label.startsWith(' '), false);
     });
   });
 
   group('KeyBinding.matches', () {
     test('matches exact modifier + key combo', () {
-      final b = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
+      const b = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
       expect(
         b.matches(
           metaDown: true,
@@ -126,7 +126,7 @@ void main() {
     });
 
     test('rejects extra modifier', () {
-      final b = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
+      const b = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
       expect(
         b.matches(
           metaDown: true,
@@ -140,7 +140,7 @@ void main() {
     });
 
     test('rejects wrong key', () {
-      final b = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
+      const b = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
       expect(
         b.matches(
           metaDown: true,
@@ -154,7 +154,7 @@ void main() {
     });
 
     test('rejects missing modifier', () {
-      final b =
+      const b =
           KeyBinding(meta: true, shift: true, key: LogicalKeyboardKey.keyP);
       expect(
         b.matches(
@@ -171,15 +171,15 @@ void main() {
 
   group('KeyBinding equality', () {
     test('equal bindings are equal', () {
-      final a = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
-      final b = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
+      const a = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
+      const b = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
       expect(a, equals(b));
       expect(a.hashCode, b.hashCode);
     });
 
     test('different bindings are not equal', () {
-      final a = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
-      final b = KeyBinding(meta: true, key: LogicalKeyboardKey.keyW);
+      const a = KeyBinding(meta: true, key: LogicalKeyboardKey.keyT);
+      const b = KeyBinding(meta: true, key: LogicalKeyboardKey.keyW);
       expect(a, isNot(equals(b)));
     });
   });
@@ -200,7 +200,7 @@ void main() {
     test('override takes precedence over default', () {
       final overrides = {
         KeyAction.historySearch:
-            KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyH),
+            const KeyBinding(ctrl: true, key: LogicalKeyboardKey.keyH),
       };
       // New binding should match.
       final newResult = matchAction(
