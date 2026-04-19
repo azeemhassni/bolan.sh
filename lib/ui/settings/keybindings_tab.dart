@@ -38,6 +38,8 @@ class KeybindingsTab extends StatefulWidget {
 class _KeybindingsTabState extends State<KeybindingsTab> {
   String _search = '';
   KeyAction? _recording;
+  KeyAction? _conflictWith;
+  KeyBinding? _pendingBinding;
   final FocusNode _recorderFocus = FocusNode();
 
   late Map<KeyAction, KeyBinding> _overrides;
@@ -91,6 +93,29 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
     widget.onChanged(_overrides);
   }
 
+  void _applyBinding(KeyAction action, KeyBinding binding) {
+    final defaultBinding = defaultKeyBindings[action]!;
+    if (binding == defaultBinding) {
+      _overrides.remove(action);
+    } else {
+      _overrides[action] = binding;
+    }
+    setState(() => _stopRecording());
+    widget.onChanged(_overrides);
+  }
+
+  void _confirmConflict() {
+    final action = _recording;
+    final binding = _pendingBinding;
+    final conflict = _conflictWith;
+    if (action == null || binding == null || conflict == null) return;
+
+    // Remove the conflicting binding by resetting it to unbound,
+    // then apply the new one.
+    _overrides.remove(conflict);
+    _applyBinding(action, binding);
+  }
+
   void _startRecording(KeyAction action) {
     setState(() => _recording = action);
     KeybindingsTab.isRecording = true;
@@ -99,6 +124,8 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
 
   void _stopRecording() {
     _recording = null;
+    _conflictWith = null;
+    _pendingBinding = null;
     KeybindingsTab.isRecording = false;
   }
 
@@ -134,17 +161,21 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
       key: key,
     );
 
-    // Check if this binding matches the default — if so, remove
-    // the override rather than storing a redundant entry.
-    final defaultBinding = defaultKeyBindings[action]!;
-    if (binding == defaultBinding) {
-      _overrides.remove(action);
-    } else {
-      _overrides[action] = binding;
+    // Check for conflicts with other actions.
+    for (final other in KeyAction.values) {
+      if (other == action) continue;
+      final otherBinding = _overrides[other] ?? defaultKeyBindings[other]!;
+      if (otherBinding == binding) {
+        // Conflict found — show confirmation instead of applying.
+        setState(() {
+          _conflictWith = other;
+          _pendingBinding = binding;
+        });
+        return;
+      }
     }
 
-    setState(() => _stopRecording());
-    widget.onChanged(_overrides);
+    _applyBinding(action, binding);
   }
 
   @override
@@ -315,9 +346,14 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
                 binding: bindingFor(action, _overrides),
                 isCustom: _overrides.containsKey(action),
                 isRecording: _recording == action,
+                conflictWith: _recording == action ? _conflictWith : null,
+                pendingBinding: _recording == action ? _pendingBinding : null,
                 theme: t,
                 onRecord: () => _startRecording(action),
                 onReset: () => _resetToDefault(action),
+                onConfirmConflict: _confirmConflict,
+                onCancelRecording: () =>
+                    setState(() => _stopRecording()),
               ),
           ],
         ],
@@ -331,18 +367,26 @@ class _ShortcutRow extends StatefulWidget {
   final KeyBinding binding;
   final bool isCustom;
   final bool isRecording;
+  final KeyAction? conflictWith;
+  final KeyBinding? pendingBinding;
   final BolonTheme theme;
   final VoidCallback onRecord;
   final VoidCallback onReset;
+  final VoidCallback onConfirmConflict;
+  final VoidCallback onCancelRecording;
 
   const _ShortcutRow({
     required this.action,
     required this.binding,
     required this.isCustom,
     required this.isRecording,
+    this.conflictWith,
+    this.pendingBinding,
     required this.theme,
     required this.onRecord,
     required this.onReset,
+    required this.onConfirmConflict,
+    required this.onCancelRecording,
   });
 
   @override
@@ -386,7 +430,69 @@ class _ShortcutRowState extends State<_ShortcutRow> {
             ),
 
             // Binding chip or recording state
-            if (widget.isRecording)
+            if (widget.isRecording && widget.conflictWith != null)
+              // Conflict detected — show warning with confirm/cancel.
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: t.ansiRed.withAlpha(20),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                          color: t.ansiRed.withAlpha(100), width: 1),
+                    ),
+                    child: Text(
+                      '${widget.pendingBinding?.label ?? ""}'
+                      ' conflicts with '
+                      '${widget.conflictWith!.displayName}',
+                      style: TextStyle(
+                        color: t.ansiRed,
+                        fontFamily: t.fontFamily,
+                        fontSize: 12,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: widget.onConfirmConflict,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: t.cursor.withAlpha(30),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Reassign',
+                          style: TextStyle(
+                            color: t.cursor,
+                            fontFamily: t.fontFamily,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: widget.onCancelRecording,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Icon(Icons.close,
+                          size: 14, color: t.dimForeground),
+                    ),
+                  ),
+                ],
+              )
+            else if (widget.isRecording)
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
