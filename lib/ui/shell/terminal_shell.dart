@@ -281,6 +281,25 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       ref.read(fontSizeProvider.notifier).reset();
       return true;
     }
+    // Ctrl+1–9 — switch workspace by position.
+    if (ctrl && !meta && !alt && !shift) {
+      const digitKeys = [
+        LogicalKeyboardKey.digit1,
+        LogicalKeyboardKey.digit2,
+        LogicalKeyboardKey.digit3,
+        LogicalKeyboardKey.digit4,
+        LogicalKeyboardKey.digit5,
+        LogicalKeyboardKey.digit6,
+        LogicalKeyboardKey.digit7,
+        LogicalKeyboardKey.digit8,
+        LogicalKeyboardKey.digit9,
+      ];
+      final idx = digitKeys.indexOf(key);
+      if (idx >= 0) {
+        _switchWorkspace(idx);
+        return true;
+      }
+    }
 
     // Don't forward keys when palette is open
     if (_showPalette) return false;
@@ -343,6 +362,15 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     if (count <= 1) return;
     final newIndex = (s.activeTabIndex + delta) % count;
     ref.read(currentSessionNotifierProvider).switchTab(newIndex);
+  }
+
+  void _switchWorkspace(int index) {
+    final registry = ref.read(workspaceRegistryProvider);
+    final enabled = registry.workspaces.where((w) => w.enabled).toList();
+    if (index >= enabled.length) return;
+    final target = enabled[index];
+    if (target.id == registry.activeId) return;
+    ref.read(switchWorkspaceActionProvider)(target.id);
   }
 
   void _openSettings() {
