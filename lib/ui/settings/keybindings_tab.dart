@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/config/keybinding.dart';
 import '../../core/theme/bolan_theme.dart';
+import '../shared/bolan_button.dart';
 
 /// Settings tab for customizing keyboard shortcuts.
 class KeybindingsTab extends StatefulWidget {
@@ -332,33 +333,11 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                TextButton(
-                  onPressed: _selectedWorkspaceId != null
+                BolanButton.ghost(
+                  label: 'Apply',
+                  onTap: _selectedWorkspaceId != null
                       ? () => _copyFrom(_selectedWorkspaceId!)
                       : null,
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    backgroundColor: _selectedWorkspaceId != null
-                        ? t.cursor.withAlpha(30)
-                        : null,
-                  ),
-                  child: Text(
-                    'Apply',
-                    style: TextStyle(
-                      color: _selectedWorkspaceId != null
-                          ? t.cursor
-                          : t.dimForeground,
-                      fontFamily: t.fontFamily,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
                 ),
               ],
             ),
