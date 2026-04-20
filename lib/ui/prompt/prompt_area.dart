@@ -558,11 +558,17 @@ class _PromptAreaState extends State<PromptArea> {
     if (renderer is PowerlineChipRenderer) {
       final chips = visibleChips.map((e) => e.$2).toList();
       final types = visibleChips.map((e) => e.$1).toList();
+      // Use opaque colors by blending fg over the prompt background.
+      // Transparent colors cause visible seams at arrow boundaries.
+      final promptBg = theme.promptBackground;
+      final segColors = chips
+          .map((c) => Color.lerp(promptBg, c.fg, 0.16)!)
+          .toList();
       final segments = <Widget>[];
       for (var i = 0; i < chips.length; i++) {
-        final bg = chips[i].fg.withAlpha(40);
+        final bg = segColors[i];
         final nextBg = i + 1 < chips.length
-            ? chips[i + 1].fg.withAlpha(40)
+            ? segColors[i + 1]
             : Colors.transparent;
         Widget segment = _PowerlineSegmentWidget(
           data: chips[i],
@@ -670,7 +676,10 @@ class _EmptyPopoverMessage extends StatelessWidget {
   }
 }
 
-/// Inline powerline segment used by PromptArea for the powerline style.
+/// Inline powerline segment. The shape is a single path:
+/// - First segment: flat left edge, arrow point on right
+/// - Non-first: concave V-notch on left (matching previous arrow),
+///   arrow point on right — segments interlock like puzzle pieces.
 class _PowerlineSegmentWidget extends StatelessWidget {
   final ChipData data;
   final Color bg;
@@ -696,12 +705,15 @@ class _PowerlineSegmentWidget extends StatelessWidget {
     return CustomPaint(
       painter: _PowerlinePainter(
         bg: bg,
-        nextBg: nextBg,
         arrowWidth: arrowWidth,
+        isFirst: isFirst,
       ),
       child: Padding(
         padding: EdgeInsets.only(
-          left: isFirst ? style.chipPaddingH : style.chipPaddingH + 4,
+          // Non-first segments need extra left padding for the notch.
+          left: isFirst
+              ? style.chipPaddingH
+              : style.chipPaddingH + arrowWidth,
           right: style.chipPaddingH + arrowWidth,
           top: style.chipPaddingV,
           bottom: style.chipPaddingV,
@@ -718,49 +730,63 @@ class _PowerlineSegmentWidget extends StatelessWidget {
   }
 }
 
+/// Paints a single powerline segment as one interlocking shape.
+///
+/// First segment:
+/// ```
+///  ┌──────────╲
+///  │           ╲  (arrow tip)
+///  │           ╱
+///  └──────────╱
+/// ```
+///
+/// Non-first segment (notch on left, arrow on right):
+/// ```
+///  ╲──────────╲
+///   ╲          ╲
+///   ╱          ╱
+///  ╱──────────╱
+/// ```
 class _PowerlinePainter extends CustomPainter {
   final Color bg;
-  final Color nextBg;
   final double arrowWidth;
+  final bool isFirst;
 
   _PowerlinePainter({
     required this.bg,
-    required this.nextBg,
     required this.arrowWidth,
+    required this.isFirst,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final bodyWidth = size.width - arrowWidth;
     final midY = size.height / 2;
+    final rightEdge = size.width - arrowWidth;
 
-    final bodyPaint = Paint()..color = bg;
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, bodyWidth, size.height),
-      bodyPaint,
-    );
+    final path = Path();
 
-    final arrowPath = Path()
-      ..moveTo(bodyWidth, 0)
-      ..lineTo(bodyWidth + arrowWidth, midY)
-      ..lineTo(bodyWidth, size.height)
-      ..close();
-
-    if (nextBg != Colors.transparent) {
-      final gapPaint = Paint()..color = nextBg;
-      final gapPath = Path()
-        ..moveTo(bodyWidth, 0)
-        ..lineTo(size.width, 0)
-        ..lineTo(size.width, size.height)
-        ..lineTo(bodyWidth, size.height)
-        ..close();
-      canvas.drawPath(gapPath, gapPaint);
+    if (isFirst) {
+      // Flat left edge.
+      path.moveTo(0, 0);
+      path.lineTo(rightEdge, 0);
+      path.lineTo(size.width, midY);
+      path.lineTo(rightEdge, size.height);
+      path.lineTo(0, size.height);
+    } else {
+      // Concave notch on left that interlocks with the previous arrow.
+      path.moveTo(0, 0);
+      path.lineTo(arrowWidth, midY);
+      path.lineTo(0, size.height);
+      path.lineTo(rightEdge, size.height);
+      path.lineTo(size.width, midY);
+      path.lineTo(rightEdge, 0);
     }
 
-    canvas.drawPath(arrowPath, bodyPaint);
+    path.close();
+    canvas.drawPath(path, Paint()..color = bg);
   }
 
   @override
   bool shouldRepaint(_PowerlinePainter old) =>
-      bg != old.bg || nextBg != old.nextBg || arrowWidth != old.arrowWidth;
+      bg != old.bg || arrowWidth != old.arrowWidth || isFirst != old.isFirst;
 }
