@@ -112,6 +112,36 @@ class TerminalSession extends ChangeNotifier {
   // Buffer for capturing command output between C and D markers
   final StringBuffer _outputCapture = StringBuffer();
 
+  // Live output stream for inline block rendering during command execution.
+  final StreamController<String> _liveOutputController =
+      StreamController<String>.broadcast();
+  Stream<String> get liveOutput => _liveOutputController.stream;
+  String get liveOutputSnapshot =>
+      _stripForLiveDisplay(_outputCapture.toString());
+
+  static final _oscRe =
+      RegExp(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)');
+  static final _csiNonSgrRe =
+      RegExp(r'\x1B\[[0-9;]*[A-LN-Za-ln-z]');
+  static final _charsetRe = RegExp(r'\x1B[()][0-9A-Za-z]');
+  static final _feRe = RegExp(r'\x1B[<=>]');
+
+  static String _stripForLiveDisplay(String s) {
+    var result = s
+        .replaceAll(_oscRe, '')
+        .replaceAll(_csiNonSgrRe, '')
+        .replaceAll(_charsetRe, '')
+        .replaceAll(_feRe, '');
+    // Strip carriage returns — block display doesn't need them.
+    result = result.replaceAll('\r', '');
+    return result;
+  }
+
+  // TUI mode: detected when the command uses alt-buffer or produces
+  // excessive cursor repositioning (full-screen TUI apps).
+  bool _isTuiMode = false;
+  bool get isTuiMode => _isTuiMode;
+
   /// Set by the listener when an entire command lifecycle (C marker,
   /// output, D marker) arrives in a single PTY chunk. Consumed by the
   /// CommandStart handler to pre-populate _outputCapture so CommandEnd
@@ -483,6 +513,7 @@ class TerminalSession extends ChangeNotifier {
     if (_disposed) return;
     _disposed = true;
     _outputSub?.cancel();
+    _liveOutputController.close();
     _pty.kill();
     _completionEngine?.dispose();
     super.dispose();
@@ -523,15 +554,32 @@ class TerminalSession extends ChangeNotifier {
       // Capture output while a command is running (multi-chunk path).
       if (_commandRunning) {
         _outputCapture.write(decoded);
+        // Emit cleaned output for the live output block — strip
+        // OSC sequences (shell integration markers), CSI non-SGR
+        // (cursor movement), and charset switches so the inline
+        // display only sees plain text + SGR color codes.
+        _liveOutputController.add(_stripForLiveDisplay(decoded));
         // Detect alternate screen buffer usage (vim, less, top, etc.)
         if (!_usedAltBuffer && terminal.isUsingAltBuffer) {
           _usedAltBuffer = true;
+          if (!_isTuiMode) {
+            _isTuiMode = true;
+            notifyListeners();
+          }
         }
         // Count in-place redraw sequences. Catches both classic
         // cursor-up redraws (spinners, progress bars) and Ink-style
         // TUIs (Claude Code, modern Node.js CLIs) that draw via
         // cursor positioning + erase-line on the main screen buffer.
         _redrawSequenceCount += _countRedrawSequences(decoded);
+        // Detect TUI mode from excessive redraw sequences.
+        if (!_isTuiMode &&
+            _redrawSequenceCount > 50 &&
+            _outputCapture.length > 0 &&
+            _redrawSequenceCount / _outputCapture.length > 0.05) {
+          _isTuiMode = true;
+          notifyListeners();
+        }
       }
     });
 
@@ -592,6 +640,7 @@ class TerminalSession extends ChangeNotifier {
           _finalizeBlock(exitCode: null);
         }
         _commandRunning = false;
+        _isTuiMode = false;
         // Shell is back at a primary prompt — leave terminal-passthrough
         // mode (used for continuation prompts and other interactive
         // states with no OSC 133 markers).
@@ -619,6 +668,7 @@ class TerminalSession extends ChangeNotifier {
           }
           _usedAltBuffer = false;
           _redrawSequenceCount = 0;
+          _isTuiMode = false;
           _cursorYAtCommandStart = terminal.buffer.absoluteCursorY;
           _activeBlock = CommandBlock(
             id: _uuid.v4(),
@@ -653,6 +703,7 @@ class TerminalSession extends ChangeNotifier {
       _blocks.clear();
       _activeBlock = null;
       _commandRunning = false;
+      _isTuiMode = false;
       _outputCapture.clear();
       notifyListeners();
       return;
@@ -678,6 +729,7 @@ class TerminalSession extends ChangeNotifier {
       ));
       _activeBlock = null;
       _commandRunning = false;
+      _isTuiMode = false;
       _outputCapture.clear();
       _usedAltBuffer = false;
       _redrawSequenceCount = 0;
@@ -708,6 +760,7 @@ class TerminalSession extends ChangeNotifier {
     final finishedBlock = _blocks.last;
     _activeBlock = null;
     _commandRunning = false;
+    _isTuiMode = false;
     _outputCapture.clear();
 
     // Notify about finished command for long-running notifications

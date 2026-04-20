@@ -15,6 +15,7 @@ import '../../providers/config_provider.dart';
 import '../../providers/font_size_provider.dart';
 import '../../providers/session_provider.dart';
 import '../blocks/command_block_widget.dart';
+import '../blocks/live_output_block.dart';
 import '../prompt/prompt_area.dart';
 import '../prompt/prompt_input.dart';
 import '../shared/font_size_toast.dart';
@@ -141,6 +142,20 @@ class SessionViewState extends ConsumerState<SessionView> {
   /// Returns [KeyEventResult.handled] for intercepted keys (which
   /// prevents xterm's default processing), [ignored] for everything
   /// else so xterm handles it normally.
+  void _scrollToBottomIfPinned() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    // Auto-scroll if within 50px of the bottom.
+    if (pos.pixels >= pos.maxScrollExtent - 50) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(
+              _scrollController.position.maxScrollExtent);
+        }
+      });
+    }
+  }
+
   bool _handleLinkModifier(KeyEvent event) {
     final held = isPrimaryModifierPressed;
     if (held != _linkModifierHeld) {
@@ -426,14 +441,102 @@ class SessionViewState extends ConsumerState<SessionView> {
       },
       child: Stack(
         children: [
-          // Modes:
-          // 1. No shell integration (fish, nushell, etc.) → always raw terminal
-          // 2. Command running → full-screen terminal
-          // 3. Awaiting shell response (e.g. continuation prompt) → terminal
-          // 4. Idle → blocks + Bolan prompt
+          // ── Invisible terminal for keyboard routing ──
+          // During non-TUI commands or awaiting shell response, the
+          // terminal is hidden but still in the tree so keystrokes
+          // reach the PTY. For TUI commands or no-shell-integration,
+          // the terminal is full-screen and visible (below).
+          if (widget.session.hasShellIntegration &&
+              (widget.session.awaitingShellResponse ||
+               (isRunning && !widget.session.isTuiMode)))
+            IgnorePointer(
+              child: Opacity(
+                opacity: 0,
+                child: TerminalView(
+                  widget.session.terminal,
+                  controller: _terminalController,
+                  theme: bolonToXtermTheme(theme),
+                  textStyle: TerminalStyle(
+                    fontSize: fontSize,
+                    height: lineHeight,
+                    fontFamily: fontFamily,
+                  ),
+                  focusNode: _terminalFocusNode,
+                  autofocus: true,
+                  backgroundOpacity: 0,
+                  onKeyEvent: _handleTerminalKey,
+                ),
+              ),
+            ),
+
+          // ── Blocks + prompt layout ──
+          // Visible when idle, awaiting shell response, OR running
+          // a non-TUI command. Hidden only for full-screen terminal.
+          if (widget.session.hasShellIntegration &&
+              !(isRunning && widget.session.isTuiMode))
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => _promptKey.currentState?.requestFocus(),
+              child: _BlocksWithStickyPrompt(
+                scrollController: _scrollController,
+                blocks: [
+                  for (var i = 0; i < blocks.length; i++)
+                    CommandBlockWidget(
+                      key: ValueKey(blocks[i].id),
+                      block: blocks[i],
+                      fontSize: fontSize,
+                      lineHeight: lineHeight,
+                      scrollable: configLoader.config.editor.scrollableBlocks,
+                      cwd: widget.session.cwd,
+                      shellName: widget.session.shellName,
+                      aiEnabled: configLoader.config.ai.enabled,
+                      aiProvider: configLoader.config.ai.provider,
+                      geminiModel: configLoader.config.ai.geminiModel,
+                      anthropicMode: configLoader.config.ai.anthropicMode,
+                      ligatures: configLoader.config.editor.ligatures,
+                      searchHighlight: _buildSearchRegex(),
+                      currentMatchIndex: _findCurrentMatch,
+                      blockMatchStartIndex: _matchStartIndexForBlock(i),
+                      onSecondaryTap: widget.onSecondaryTap,
+                      onRerun: (cmd) => widget.session.writeInput('$cmd\n'),
+                    ),
+                  // ── Live output block for non-TUI commands ──
+                  if (isRunning && !widget.session.isTuiMode)
+                    SliverToBoxAdapter(
+                      child: LiveOutputBlock(
+                        key: ValueKey(
+                            'live-${widget.session.activeBlock?.id}'),
+                        session: widget.session,
+                        fontSize: fontSize,
+                        lineHeight: lineHeight,
+                        ligatures: configLoader.config.editor.ligatures,
+                        onContentGrew: _scrollToBottomIfPinned,
+                      ),
+                    ),
+                ],
+                prompt: PromptArea(
+                  session: widget.session,
+                  fontSize: fontSize,
+                  aiEnabled: configLoader.config.ai.enabled,
+                  aiProvider: configLoader.config.ai.provider,
+                  geminiModel: configLoader.config.ai.geminiModel,
+                  anthropicMode: configLoader.config.ai.anthropicMode,
+                  commandSuggestions: configLoader.config.ai.commandSuggestions,
+                  smartHistorySearch: configLoader.config.ai.smartHistorySearch,
+                  shareHistory: configLoader.config.ai.shareHistory,
+                  promptChips: configLoader.config.general.promptChips,
+                  promptInputKey: _promptKey,
+                  cursorStyle: cursorStyle,
+                  keybindingOverrides: configLoader.config.keybindingOverrides,
+                  promptStyle: configLoader.config.general.promptStyle,
+                ),
+              ),
+            ),
+
+          // ── Full-screen terminal ──
+          // Shown for: no shell integration or TUI mode.
           if (!widget.session.hasShellIntegration ||
-              isRunning ||
-              widget.session.awaitingShellResponse)
+              (isRunning && widget.session.isTuiMode))
             MouseRegion(
               cursor: _hoveredLink != null && _linkModifierHeld
                   ? SystemMouseCursors.click
@@ -477,13 +580,6 @@ class SessionViewState extends ConsumerState<SessionView> {
                   backgroundOpacity: 0,
                   onKeyEvent: _handleTerminalKey,
                 ),
-                // Cursor overlay:
-                //  - Block: paints the character under the cursor
-                //    in inverted colors (xterm.dart's filled rect
-                //    hides the glyph).
-                //  - Underline / Bar: paints a thicker, more
-                //    visible cursor on top of xterm.dart's 1px line
-                //    which is nearly invisible.
                 Positioned.fill(
                   child: IgnorePointer(
                     child: CustomPaint(
@@ -500,7 +596,6 @@ class SessionViewState extends ConsumerState<SessionView> {
                     ),
                   ),
                 ),
-                // Link underline overlay for Cmd+hover URLs.
                 if (_hoveredLink != null && _linkModifierHeld)
                   Positioned.fill(
                     child: IgnorePointer(
@@ -520,52 +615,6 @@ class SessionViewState extends ConsumerState<SessionView> {
               ],
             ),
             ),
-            )
-          else
-            GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () => _promptKey.currentState?.requestFocus(),
-              child: _BlocksWithStickyPrompt(
-                scrollController: _scrollController,
-                blocks: [
-                  for (var i = 0; i < blocks.length; i++)
-                    CommandBlockWidget(
-                      key: ValueKey(blocks[i].id),
-                      block: blocks[i],
-                      fontSize: fontSize,
-                      lineHeight: lineHeight,
-                      scrollable: configLoader.config.editor.scrollableBlocks,
-                      cwd: widget.session.cwd,
-                      shellName: widget.session.shellName,
-                      aiEnabled: configLoader.config.ai.enabled,
-                      aiProvider: configLoader.config.ai.provider,
-                      geminiModel: configLoader.config.ai.geminiModel,
-                      anthropicMode: configLoader.config.ai.anthropicMode,
-                      ligatures: configLoader.config.editor.ligatures,
-                      searchHighlight: _buildSearchRegex(),
-                      currentMatchIndex: _findCurrentMatch,
-                      blockMatchStartIndex: _matchStartIndexForBlock(i),
-                      onSecondaryTap: widget.onSecondaryTap,
-                      onRerun: (cmd) => widget.session.writeInput('$cmd\n'),
-                    ),
-                ],
-                prompt: PromptArea(
-                  session: widget.session,
-                  fontSize: fontSize,
-                  aiEnabled: configLoader.config.ai.enabled,
-                  aiProvider: configLoader.config.ai.provider,
-                  geminiModel: configLoader.config.ai.geminiModel,
-                  anthropicMode: configLoader.config.ai.anthropicMode,
-                  commandSuggestions: configLoader.config.ai.commandSuggestions,
-                  smartHistorySearch: configLoader.config.ai.smartHistorySearch,
-                  shareHistory: configLoader.config.ai.shareHistory,
-                  promptChips: configLoader.config.general.promptChips,
-                  promptInputKey: _promptKey,
-                  cursorStyle: cursorStyle,
-                  keybindingOverrides: configLoader.config.keybindingOverrides,
-                  promptStyle: configLoader.config.general.promptStyle,
-                ),
-              ),
             ),
 
           // Font size toast
