@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -5,7 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
 
+import '../../core/platform_shortcuts.dart';
 import '../../core/terminal/session.dart';
+import '../../core/terminal/url_detector.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/xterm_theme.dart';
 import '../../providers/config_provider.dart';
@@ -63,6 +66,11 @@ class SessionViewState extends ConsumerState<SessionView> {
   MouseMode? _savedMouseMode;
   bool _altWasDown = false;
 
+  // Link hover state for live terminal
+  UrlMatch? _hoveredLink;
+  int _hoveredLinkRow = -1;
+  bool _linkModifierHeld = false;
+
   // Find bar state
   final _findBarKey = GlobalKey<FindBarState>();
   bool _showFindBar = false;
@@ -78,6 +86,7 @@ class SessionViewState extends ConsumerState<SessionView> {
     _terminalFocusNode = FocusNode(debugLabel: 'terminal-${widget.session.id}');
     widget.session.addListener(_onSessionChanged);
     HardwareKeyboard.instance.addHandler(_handleAltForSelection);
+    HardwareKeyboard.instance.addHandler(_handleLinkModifier);
     if (widget.paneId != null) _registry[widget.paneId!] = this;
     // Register prompt for global focus forwarding after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -132,6 +141,123 @@ class SessionViewState extends ConsumerState<SessionView> {
   /// Returns [KeyEventResult.handled] for intercepted keys (which
   /// prevents xterm's default processing), [ignored] for everything
   /// else so xterm handles it normally.
+  bool _handleLinkModifier(KeyEvent event) {
+    final held = isPrimaryModifierPressed;
+    if (held != _linkModifierHeld) {
+      setState(() => _linkModifierHeld = held);
+    }
+    return false;
+  }
+
+  (int row, int col) _cellFromPointer(
+      Offset globalPos, double fontSize, double lineHeight, String fontFamily) {
+    const padding = 8.0;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return (-1, -1);
+    final local = box.globalToLocal(globalPos);
+    final cellSize = _measureCellSize(fontSize, lineHeight, fontFamily);
+    final col = ((local.dx - padding) / cellSize.width).floor();
+    final row = ((local.dy - padding) / cellSize.height).floor();
+    return (row, col);
+  }
+
+  /// Measures the actual monospace cell size for the current font,
+  /// matching the same approach as [_CursorCharPainter._measureCell].
+  static Size? _cachedLinkCellSize;
+  static double? _cachedLinkFontSize;
+  static double? _cachedLinkLineHeight;
+  static String? _cachedLinkFontFamily;
+
+  Size _measureCellSize(
+      double fontSize, double lineHeight, String fontFamily) {
+    if (_cachedLinkCellSize != null &&
+        _cachedLinkFontSize == fontSize &&
+        _cachedLinkLineHeight == lineHeight &&
+        _cachedLinkFontFamily == fontFamily) {
+      return _cachedLinkCellSize!;
+    }
+    const test = 'mmmmmmmmmm';
+    final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
+      fontFamily: fontFamily,
+      fontSize: fontSize,
+      height: lineHeight,
+    ));
+    builder.addText(test);
+    final paragraph = builder.build();
+    paragraph.layout(const ui.ParagraphConstraints(width: double.infinity));
+    final result = Size(
+      paragraph.maxIntrinsicWidth / test.length,
+      paragraph.height,
+    );
+    paragraph.dispose();
+    _cachedLinkCellSize = result;
+    _cachedLinkFontSize = fontSize;
+    _cachedLinkLineHeight = lineHeight;
+    _cachedLinkFontFamily = fontFamily;
+    return result;
+  }
+
+  void _handleTerminalHover(
+      PointerEvent event, double fontSize, double lineHeight,
+      String fontFamily) {
+    final (row, col) =
+        _cellFromPointer(event.position, fontSize, lineHeight, fontFamily);
+    final terminal = widget.session.terminal;
+    final absRow = row + terminal.buffer.scrollBack;
+    final lines = terminal.buffer.lines;
+
+    if (absRow < 0 || absRow >= lines.length || !_linkModifierHeld) {
+      if (_hoveredLink != null) setState(() => _hoveredLink = null);
+      return;
+    }
+
+    final lineText = lines[absRow].getText();
+    final urls = UrlDetector.detectUrls(lineText);
+    UrlMatch? found;
+    for (final match in urls) {
+      if (col >= match.start && col < match.end) {
+        found = match;
+        break;
+      }
+    }
+
+    if (found?.uri != _hoveredLink?.uri || absRow != _hoveredLinkRow) {
+      setState(() {
+        _hoveredLink = found;
+        _hoveredLinkRow = absRow;
+      });
+    }
+  }
+
+  /// Cmd+Click (macOS) / Ctrl+Click (Linux) on the live terminal opens
+  /// URLs found at the clicked position. Uses raw pointer events to
+  /// bypass the gesture arena (xterm.dart's PanGestureRecognizer
+  /// wins over TapGestureRecognizer for mouse events).
+  void _handleTerminalPointerUp(
+      PointerUpEvent event, double fontSize, double lineHeight,
+      String fontFamily) {
+    if (!isPrimaryModifierPressed) return;
+    if (_hoveredLink != null) {
+      Process.run(
+          Platform.isMacOS ? 'open' : 'xdg-open', [_hoveredLink!.uri]);
+      return;
+    }
+    // Fallback: detect URL at click position directly.
+    final (row, col) =
+        _cellFromPointer(event.position, fontSize, lineHeight, fontFamily);
+    final terminal = widget.session.terminal;
+    final absRow = row + terminal.buffer.scrollBack;
+    final lines = terminal.buffer.lines;
+    if (absRow < 0 || absRow >= lines.length) return;
+    final lineText = lines[absRow].getText();
+    for (final match in UrlDetector.detectUrls(lineText)) {
+      if (col >= match.start && col < match.end) {
+        Process.run(Platform.isMacOS ? 'open' : 'xdg-open', [match.uri]);
+        return;
+      }
+    }
+  }
+
   KeyEventResult _handleTerminalKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
@@ -225,6 +351,7 @@ class SessionViewState extends ConsumerState<SessionView> {
     _clearTerminalHighlights();
     widget.session.removeListener(_onSessionChanged);
     HardwareKeyboard.instance.removeHandler(_handleAltForSelection);
+    HardwareKeyboard.instance.removeHandler(_handleLinkModifier);
     // Restore mouseMode if Alt was held when the pane closed.
     if (_savedMouseMode != null) {
       widget.session.terminal.setMouseMode(_savedMouseMode!);
@@ -307,11 +434,28 @@ class SessionViewState extends ConsumerState<SessionView> {
           if (!widget.session.hasShellIntegration ||
               isRunning ||
               widget.session.awaitingShellResponse)
-            Stack(
+            MouseRegion(
+              cursor: _hoveredLink != null && _linkModifierHeld
+                  ? SystemMouseCursors.click
+                  : MouseCursor.defer,
+              onHover: (event) =>
+                  _handleTerminalHover(event, fontSize, lineHeight, fontFamily),
+              onExit: (_) {
+                if (_hoveredLink != null) {
+                  setState(() => _hoveredLink = null);
+                }
+              },
+              child: Listener(
+              onPointerUp: (event) => _handleTerminalPointerUp(
+                  event, fontSize, lineHeight, fontFamily),
+              child: Stack(
               children: [
                 TerminalView(
                   widget.session.terminal,
                   controller: _terminalController,
+                  mouseCursor: _hoveredLink != null && _linkModifierHeld
+                      ? SystemMouseCursors.click
+                      : SystemMouseCursors.text,
                   theme: bolonToXtermTheme(theme),
                   textStyle: TerminalStyle(
                     fontSize: fontSize,
@@ -356,7 +500,26 @@ class SessionViewState extends ConsumerState<SessionView> {
                     ),
                   ),
                 ),
+                // Link underline overlay for Cmd+hover URLs.
+                if (_hoveredLink != null && _linkModifierHeld)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _LinkUnderlinePainter(
+                          row: _hoveredLinkRow -
+                              widget.session.terminal.buffer.scrollBack,
+                          startCol: _hoveredLink!.start,
+                          endCol: _hoveredLink!.end,
+                          cellSize: _measureCellSize(
+                              fontSize, lineHeight, fontFamily),
+                          color: theme.ansiCyan,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
+            ),
+            ),
             )
           else
             GestureDetector(
@@ -791,6 +954,57 @@ class _CursorCharPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CursorCharPainter old) => true;
+}
+
+/// Paints a highlight + underline over a detected URL in the live
+/// terminal when the user holds Cmd/Ctrl and hovers over it.
+class _LinkUnderlinePainter extends CustomPainter {
+  final int row;
+  final int startCol;
+  final int endCol;
+  final Size cellSize;
+  final Color color;
+
+  _LinkUnderlinePainter({
+    required this.row,
+    required this.startCol,
+    required this.endCol,
+    required this.cellSize,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const padding = 8.0;
+
+    final x1 = padding + startCol * cellSize.width;
+    final x2 = padding + endCol * cellSize.width;
+    final top = padding + row * cellSize.height;
+
+    // Highlight background behind the link text.
+    canvas.drawRect(
+      Rect.fromLTWH(x1, top, x2 - x1, cellSize.height),
+      Paint()..color = color.withAlpha(25),
+    );
+
+    // Underline tight against the text baseline.
+    final y = top + cellSize.height - 3;
+    canvas.drawLine(
+      Offset(x1, y),
+      Offset(x2, y),
+      Paint()
+        ..color = color.withAlpha(160)
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_LinkUnderlinePainter old) =>
+      row != old.row ||
+      startCol != old.startCol ||
+      endCol != old.endCol ||
+      cellSize != old.cellSize ||
+      color != old.color;
 }
 
 class _BlocksWithStickyPrompt extends StatefulWidget {
