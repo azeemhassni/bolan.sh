@@ -1,4 +1,5 @@
 import 'keybinding.dart';
+import 'prompt_style.dart';
 
 /// Application configuration data model.
 ///
@@ -59,6 +60,9 @@ class GeneralConfig {
   /// Whether to show a confirmation dialog before quitting the app.
   final bool confirmOnQuit;
 
+  /// Visual style for prompt bar chips (shape, spacing, separators).
+  final PromptStyleConfig promptStyle;
+
   const GeneralConfig({
     this.shell = '',
     this.workingDirectory = '',
@@ -68,6 +72,7 @@ class GeneralConfig {
     this.longRunningThresholdSeconds = 10,
     this.startupCommands = const [],
     this.confirmOnQuit = true,
+    this.promptStyle = const PromptStyleConfig(),
   });
 }
 

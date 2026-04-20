@@ -1,5 +1,6 @@
 import 'app_config.dart';
 import 'keybinding.dart';
+import 'prompt_style.dart';
 
 /// Validates and sanitizes config values, falling back to defaults for
 /// any field that is out of range or the wrong type.
@@ -31,7 +32,55 @@ class ConfigValidator {
           raw['long_running_threshold_seconds'], 10, min: 1, max: 3600),
       startupCommands: _stringList(raw['startup_commands'], const []),
       confirmOnQuit: _bool(raw['confirm_on_quit'], true),
+      promptStyle: _validatePromptStyle(
+          _toStringMap(raw['prompt_style'])),
     );
+  }
+
+  PromptStyleConfig _validatePromptStyle(Map<String, dynamic>? raw) {
+    if (raw == null) return const PromptStyleConfig();
+    final presetStr = _oneOf(raw['preset'],
+        ['bolan', 'powerline', 'starship', 'minimal', 'custom'], 'bolan');
+    final preset = PromptPreset.values.byName(presetStr);
+    if (preset != PromptPreset.custom) {
+      return PromptStyleConfig.fromPreset(preset);
+    }
+    return PromptStyleConfig(
+      preset: PromptPreset.custom,
+      chipShape: _enumByName(
+          raw['chip_shape'], ChipShape.values, ChipShape.roundedRect),
+      cornerRadius: _double(raw['corner_radius'], 4, min: 0, max: 999),
+      borderWidth: _double(raw['border_width'], 1, min: 0, max: 4),
+      chipSpacing: _double(raw['chip_spacing'], 6, min: 0, max: 24),
+      chipPaddingH: _double(raw['chip_padding_h'], 4, min: 0, max: 24),
+      chipPaddingV: _double(raw['chip_padding_v'], 2, min: 0, max: 12),
+      separator: _enumByName(
+          raw['separator'], SeparatorKind.values, SeparatorKind.gap),
+      separatorChar: _string(raw['separator_char'], ''),
+      filledBackground: _bool(raw['filled_background'], false),
+      perSegmentColors: _bool(raw['per_segment_colors'], false),
+      showBorder: _bool(raw['show_border'], true),
+      showIcons: _bool(raw['show_icons'], true),
+      fontWeight: _oneOf(
+          raw['font_weight'], ['normal', 'w500', 'bold'], 'bold'),
+    );
+  }
+
+  Map<String, dynamic>? _toStringMap(Object? value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return null;
+  }
+
+  T _enumByName<T extends Enum>(Object? value, List<T> values, T fallback) {
+    if (value is String) {
+      for (final v in values) {
+        if (v.name == value) return v;
+      }
+    }
+    return fallback;
   }
 
   EditorConfig _validateEditor(Map<String, dynamic>? raw) {

@@ -7,6 +7,7 @@ import 'package:toml/toml.dart';
 import '../workspace/workspace_paths.dart';
 import 'app_config.dart';
 import 'config_validator.dart';
+import 'prompt_style.dart';
 
 /// Loads, watches, and saves the TOML config file.
 ///
@@ -113,6 +114,28 @@ class ConfigLoader extends ChangeNotifier {
     sb.writeln('prompt_chips = [${c.general.promptChips.map((e) => '"$e"').join(', ')}]');
     if (c.general.startupCommands.isNotEmpty) {
       sb.writeln('startup_commands = [${c.general.startupCommands.map((e) => '"$e"').join(', ')}]');
+    }
+    sb.writeln();
+
+    sb.writeln('[general.prompt_style]');
+    final ps = c.general.promptStyle;
+    sb.writeln('preset = "${ps.preset.name}"');
+    if (ps.preset == PromptPreset.custom) {
+      sb.writeln('chip_shape = "${ps.chipShape.name}"');
+      sb.writeln('corner_radius = ${ps.cornerRadius}');
+      sb.writeln('border_width = ${ps.borderWidth}');
+      sb.writeln('chip_spacing = ${ps.chipSpacing}');
+      sb.writeln('chip_padding_h = ${ps.chipPaddingH}');
+      sb.writeln('chip_padding_v = ${ps.chipPaddingV}');
+      sb.writeln('separator = "${ps.separator.name}"');
+      if (ps.separatorChar.isNotEmpty) {
+        sb.writeln('separator_char = "${ps.separatorChar}"');
+      }
+      sb.writeln('filled_background = ${ps.filledBackground}');
+      sb.writeln('per_segment_colors = ${ps.perSegmentColors}');
+      sb.writeln('show_border = ${ps.showBorder}');
+      sb.writeln('show_icons = ${ps.showIcons}');
+      sb.writeln('font_weight = "${ps.fontWeight}"');
     }
     sb.writeln();
 
