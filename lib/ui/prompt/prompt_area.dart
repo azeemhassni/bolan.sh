@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 
 import '../../core/config/keybinding.dart';
 import '../../core/config/prompt_config.dart';
+import '../../core/config/prompt_style.dart';
+import 'chip_renderer.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../shared/anchored_popover.dart';
@@ -35,6 +37,7 @@ class PromptArea extends StatefulWidget {
   final GlobalKey<PromptInputState>? promptInputKey;
   final String cursorStyle;
   final Map<KeyAction, KeyBinding> keybindingOverrides;
+  final PromptStyleConfig promptStyle;
 
   const PromptArea({
     super.key,
@@ -51,6 +54,7 @@ class PromptArea extends StatefulWidget {
     this.promptInputKey,
     this.cursorStyle = 'bar',
     this.keybindingOverrides = const {},
+    this.promptStyle = const PromptStyleConfig(),
   });
 
   @override
@@ -292,167 +296,115 @@ class _PromptAreaState extends State<PromptArea> {
     }
   }
 
-  List<Widget> _buildChip(String chipId, BolonTheme theme) {
-    final type = PromptChipMeta.fromId(chipId);
-    if (type == null) return [];
-
+  /// Returns chip data for the given chip type, or null if the chip
+  /// should be hidden (e.g. no git branch detected).
+  ChipData? _chipData(PromptChipType type, BolonTheme theme) {
+    final fw = parseFontWeight(widget.promptStyle.fontWeight);
     switch (type) {
       case PromptChipType.shell:
-        return [
-          StatusChip(
-            text: widget.session.shellName,
-            fg: theme.statusShellFg,
-            bg: theme.statusChipBg,
-            svgIcon: 'assets/icons/ic_terminal.svg',
-          ),
-        ];
-
+        return ChipData(
+          text: widget.session.shellName,
+          fg: theme.statusShellFg,
+          bg: theme.statusChipBg,
+          svgIcon: 'assets/icons/ic_terminal.svg',
+        );
       case PromptChipType.cwd:
-        if (widget.session.abbreviatedCwd.isEmpty) return [];
-        return [
-          GestureDetector(
-            key: _cwdChipKey,
-            onTap: _openDirectoryPicker,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: StatusChip(
-                text: widget.session.abbreviatedCwd,
-                fg: theme.statusCwdFg,
-                bg: theme.statusChipBg,
-                svgIcon: 'assets/icons/ic_folder_code.svg',
-              ),
-            ),
-          ),
-        ];
-
+        if (widget.session.abbreviatedCwd.isEmpty) return null;
+        return ChipData(
+          text: widget.session.abbreviatedCwd,
+          fg: theme.statusCwdFg,
+          bg: theme.statusChipBg,
+          svgIcon: 'assets/icons/ic_folder_code.svg',
+        );
       case PromptChipType.gitBranch:
-        if (widget.session.gitBranch.isEmpty) return [];
-        return [
-          GestureDetector(
-            key: _branchChipKey,
-            onTap: _openBranchPicker,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: StatusChip(
-                text: '${widget.session.gitBranch}${widget.session.gitDirty ? " !" : ""}',
-                fg: theme.statusGitFg,
-                bg: theme.statusChipBg,
-                svgIcon: 'assets/icons/ic_git.svg',
-              ),
-            ),
-          ),
-        ];
-
+        if (widget.session.gitBranch.isEmpty) return null;
+        return ChipData(
+          text: '${widget.session.gitBranch}${widget.session.gitDirty ? " !" : ""}',
+          fg: theme.statusGitFg,
+          bg: theme.statusChipBg,
+          svgIcon: 'assets/icons/ic_git.svg',
+        );
       case PromptChipType.gitChanges:
-        if (!widget.session.hasGitStats) return [];
-        return [
-          GestureDetector(
-            onTap: _openDiffOverlay,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: StatusChip(
-                fg: theme.foreground,
-                bg: theme.statusChipBg,
-                svgIcon: 'assets/icons/ic_diff.svg',
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${widget.session.gitFilesChanged}',
-                      style: TextStyle(
-                        color: theme.foreground,
-                        fontFamily: theme.fontFamily,
-                        fontSize: StatusChip.textSizeFor(widget.fontSize),
-                        fontWeight: StatusChip.textWeight,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '+${widget.session.gitInsertions}',
-                      style: TextStyle(
-                        color: theme.exitSuccessFg,
-                        fontFamily: theme.fontFamily,
-                        fontSize: StatusChip.textSizeFor(widget.fontSize),
-                        fontWeight: StatusChip.textWeight,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '-${widget.session.gitDeletions}',
-                      style: TextStyle(
-                        color: theme.exitFailureFg,
-                        fontFamily: theme.fontFamily,
-                        fontSize: StatusChip.textSizeFor(widget.fontSize),
-                        fontWeight: StatusChip.textWeight,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                  ],
+        if (!widget.session.hasGitStats) return null;
+        return ChipData(
+          fg: theme.foreground,
+          bg: theme.statusChipBg,
+          svgIcon: 'assets/icons/ic_diff.svg',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${widget.session.gitFilesChanged}',
+                style: TextStyle(
+                  color: theme.foreground,
+                  fontFamily: theme.fontFamily,
+                  fontSize: StatusChip.textSizeFor(widget.fontSize),
+                  fontWeight: fw,
+                  decoration: TextDecoration.none,
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Text(
+                '+${widget.session.gitInsertions}',
+                style: TextStyle(
+                  color: theme.exitSuccessFg,
+                  fontFamily: theme.fontFamily,
+                  fontSize: StatusChip.textSizeFor(widget.fontSize),
+                  fontWeight: fw,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '-${widget.session.gitDeletions}',
+                style: TextStyle(
+                  color: theme.exitFailureFg,
+                  fontFamily: theme.fontFamily,
+                  fontSize: StatusChip.textSizeFor(widget.fontSize),
+                  fontWeight: fw,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
           ),
-        ];
-
+        );
       case PromptChipType.username:
-        return [
-          StatusChip(
-            text: Platform.environment['USER'] ?? 'user',
-            fg: theme.ansiYellow,
-            bg: theme.statusChipBg,
-            icon: Icons.person_outline,
-          ),
-        ];
-
+        return ChipData(
+          text: Platform.environment['USER'] ?? 'user',
+          fg: theme.ansiYellow,
+          bg: theme.statusChipBg,
+          icon: Icons.person_outline,
+        );
       case PromptChipType.hostname:
-        return [
-          StatusChip(
-            text: Platform.localHostname,
-            fg: theme.ansiCyan,
-            bg: theme.statusChipBg,
-            icon: Icons.computer,
-          ),
-        ];
-
+        return ChipData(
+          text: Platform.localHostname,
+          fg: theme.ansiCyan,
+          bg: theme.statusChipBg,
+          icon: Icons.computer,
+        );
       case PromptChipType.time12h:
-        return [
-          StatusChip(
-            text: DateFormat('hh:mm a').format(DateTime.now()),
-            fg: theme.ansiRed,
-            bg: theme.statusChipBg,
-            icon: Icons.schedule,
-          ),
-        ];
-
+        return ChipData(
+          text: DateFormat('hh:mm a').format(DateTime.now()),
+          fg: theme.ansiRed,
+          bg: theme.statusChipBg,
+          icon: Icons.schedule,
+        );
       case PromptChipType.time24h:
-        return [
-          StatusChip(
-            text: DateFormat('HH:mm').format(DateTime.now()),
-            fg: theme.ansiRed,
-            bg: theme.statusChipBg,
-            icon: Icons.schedule,
-          ),
-        ];
-
+        return ChipData(
+          text: DateFormat('HH:mm').format(DateTime.now()),
+          fg: theme.ansiRed,
+          bg: theme.statusChipBg,
+          icon: Icons.schedule,
+        );
       case PromptChipType.date:
-        return [
-          StatusChip(
-            text: DateFormat('MMM d, y').format(DateTime.now()),
-            fg: theme.ansiGreen,
-            bg: theme.statusChipBg,
-            icon: Icons.calendar_today,
-          ),
-        ];
-
+        return ChipData(
+          text: DateFormat('MMM d, y').format(DateTime.now()),
+          fg: theme.ansiGreen,
+          bg: theme.statusChipBg,
+          icon: Icons.calendar_today,
+        );
       case PromptChipType.nvm:
-        if (!widget.session.hasNvmrc) return [];
-        // Label rules:
-        //   - match: show the full active version (`v21.7.4`).
-        //   - mismatch: show the .nvmrc spec with a "≠active" hint
-        //     (`21 (≠22.13.0)`), tinted yellow so it's noticeable.
-        //   - no active version detected yet: show the .nvmrc spec.
+        if (!widget.session.hasNvmrc) return null;
         final requested = widget.session.nvmrcVersion;
         final active = widget.session.nodeVersion.replaceFirst('v', '');
         final matches = widget.session.nvmVersionMatches;
@@ -464,119 +416,183 @@ class _PromptAreaState extends State<PromptArea> {
         } else {
           label = '$requested (≠$active)';
         }
-        return [
-          GestureDetector(
-            key: _nvmChipKey,
-            onTap: _openNvmPicker,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: StatusChip(
-                text: label,
-                fg: matches ? theme.ansiGreen : theme.ansiYellow,
-                bg: theme.statusChipBg,
-                svgIcon: 'assets/icons/ic_nodejs.svg',
-              ),
-            ),
-          ),
-        ];
-
+        return ChipData(
+          text: label,
+          fg: matches ? theme.ansiGreen : theme.ansiYellow,
+          bg: theme.statusChipBg,
+          svgIcon: 'assets/icons/ic_nodejs.svg',
+        );
       case PromptChipType.kubectl:
-        if (!widget.session.hasKubeContext) return [];
+        if (!widget.session.hasKubeContext) return null;
         final ctx = widget.session.kubeContext;
         final ns = widget.session.kubeNamespace;
-        final label = ns.isEmpty ? ctx : '$ctx · $ns';
-        return [
-          GestureDetector(
-            key: _kubeChipKey,
-            onTap: _openKubePicker,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: StatusChip(
-                text: label,
-                fg: theme.ansiBlue,
-                bg: theme.statusChipBg,
-                svgIcon: 'assets/icons/ic_kubernetes.svg',
-              ),
-            ),
-          ),
-        ];
-
+        return ChipData(
+          text: ns.isEmpty ? ctx : '$ctx · $ns',
+          fg: theme.ansiBlue,
+          bg: theme.statusChipBg,
+          svgIcon: 'assets/icons/ic_kubernetes.svg',
+        );
       case PromptChipType.pythonVenv:
-        // Prefer the actually-active venv reported by the shell hook;
-        // fall back to filesystem detection of `pyvenv.cfg` in cwd
-        // ancestors if the shell hasn't emitted yet.
         final activePath = widget.session.activeVirtualEnv;
         final hasActive = activePath.isNotEmpty;
         final hasOnDisk = widget.session.hasPythonVenv;
-        if (!hasActive && !hasOnDisk) return [];
+        if (!hasActive && !hasOnDisk) return null;
         final name = hasActive
             ? activePath.split('/').last
             : widget.session.pythonVenvName;
         final ver = widget.session.pythonVenvVersion;
-        final label = ver.isNotEmpty && !hasActive
-            ? '$name ($ver)'
-            : name;
-        return [
-          GestureDetector(
-            onTap: hasActive ? null : _activatePythonVenv,
-            child: MouseRegion(
-              cursor: hasActive
-                  ? SystemMouseCursors.basic
-                  : SystemMouseCursors.click,
-              child: StatusChip(
-                text: label,
-                fg: theme.ansiYellow,
-                bg: theme.statusChipBg,
-                svgIcon: 'assets/icons/ic_python.svg',
-              ),
-            ),
-          ),
-        ];
-
+        return ChipData(
+          text: ver.isNotEmpty && !hasActive ? '$name ($ver)' : name,
+          fg: theme.ansiYellow,
+          bg: theme.statusChipBg,
+          svgIcon: 'assets/icons/ic_python.svg',
+        );
       case PromptChipType.awsProfile:
-        if (!widget.session.hasAwsProfile) return [];
-        return [
-          StatusChip(
-            text: widget.session.awsProfile,
-            fg: theme.ansiYellow,
-            bg: theme.statusChipBg,
-            svgIcon: 'assets/icons/ic_aws.svg',
-          ),
-        ];
-
+        if (!widget.session.hasAwsProfile) return null;
+        return ChipData(
+          text: widget.session.awsProfile,
+          fg: theme.ansiYellow,
+          bg: theme.statusChipBg,
+          svgIcon: 'assets/icons/ic_aws.svg',
+        );
       case PromptChipType.gcpProject:
-        if (!widget.session.hasGcpProject) return [];
-        return [
-          StatusChip(
-            text: widget.session.gcpProject,
-            fg: theme.ansiBlue,
-            bg: theme.statusChipBg,
-            svgIcon: 'assets/icons/ic_gcp.svg',
-          ),
-        ];
-
+        if (!widget.session.hasGcpProject) return null;
+        return ChipData(
+          text: widget.session.gcpProject,
+          fg: theme.ansiBlue,
+          bg: theme.statusChipBg,
+          svgIcon: 'assets/icons/ic_gcp.svg',
+        );
       case PromptChipType.terraformWorkspace:
-        if (!widget.session.hasTerraformWorkspace) return [];
-        return [
-          StatusChip(
-            text: widget.session.terraformWorkspace,
-            fg: theme.ansiMagenta,
-            bg: theme.statusChipBg,
-            svgIcon: 'assets/icons/ic_terraform.svg',
-          ),
-        ];
-
+        if (!widget.session.hasTerraformWorkspace) return null;
+        return ChipData(
+          text: widget.session.terraformWorkspace,
+          fg: theme.ansiMagenta,
+          bg: theme.statusChipBg,
+          svgIcon: 'assets/icons/ic_terraform.svg',
+        );
       case PromptChipType.dockerContext:
-        if (!widget.session.hasDockerContext) return [];
-        return [
-          StatusChip(
-            text: widget.session.dockerContext,
-            fg: theme.ansiCyan,
-            bg: theme.statusChipBg,
-            svgIcon: 'assets/icons/ic_docker.svg',
-          ),
-        ];
+        if (!widget.session.hasDockerContext) return null;
+        return ChipData(
+          text: widget.session.dockerContext,
+          fg: theme.ansiCyan,
+          bg: theme.statusChipBg,
+          svgIcon: 'assets/icons/ic_docker.svg',
+        );
     }
+  }
+
+  /// Wraps a rendered chip in the interactive wrapper (GestureDetector
+  /// + MouseRegion) for chips that support clicking.
+  Widget _wrapInteractive(
+      PromptChipType type, Widget chip, BolonTheme theme) {
+    switch (type) {
+      case PromptChipType.cwd:
+        return GestureDetector(
+          key: _cwdChipKey,
+          onTap: _openDirectoryPicker,
+          child: MouseRegion(
+              cursor: SystemMouseCursors.click, child: chip),
+        );
+      case PromptChipType.gitBranch:
+        return GestureDetector(
+          key: _branchChipKey,
+          onTap: _openBranchPicker,
+          child: MouseRegion(
+              cursor: SystemMouseCursors.click, child: chip),
+        );
+      case PromptChipType.gitChanges:
+        return GestureDetector(
+          onTap: _openDiffOverlay,
+          child: MouseRegion(
+              cursor: SystemMouseCursors.click, child: chip),
+        );
+      case PromptChipType.nvm:
+        return GestureDetector(
+          key: _nvmChipKey,
+          onTap: _openNvmPicker,
+          child: MouseRegion(
+              cursor: SystemMouseCursors.click, child: chip),
+        );
+      case PromptChipType.kubectl:
+        return GestureDetector(
+          key: _kubeChipKey,
+          onTap: _openKubePicker,
+          child: MouseRegion(
+              cursor: SystemMouseCursors.click, child: chip),
+        );
+      case PromptChipType.pythonVenv:
+        final hasActive = widget.session.activeVirtualEnv.isNotEmpty;
+        return GestureDetector(
+          onTap: hasActive ? null : _activatePythonVenv,
+          child: MouseRegion(
+            cursor: hasActive
+                ? SystemMouseCursors.basic
+                : SystemMouseCursors.click,
+            child: chip,
+          ),
+        );
+      default:
+        return chip;
+    }
+  }
+
+  Widget _buildChipsBar(BolonTheme theme) {
+    final renderer = PromptChipRenderer.forStyle(widget.promptStyle);
+    final fontSize = widget.fontSize;
+
+    // Collect visible chips with their data and types.
+    final visibleChips = <(PromptChipType, ChipData)>[];
+    for (final chipId in widget.promptChips) {
+      final type = PromptChipMeta.fromId(chipId);
+      if (type == null) continue;
+      final data = _chipData(type, theme);
+      if (data == null) continue;
+      visibleChips.add((type, data));
+    }
+
+    if (visibleChips.isEmpty) return const SizedBox.shrink();
+
+    // For powerline, use inline segment building so each segment
+    // knows its neighbor's color for the arrow fill.
+    if (renderer is PowerlineChipRenderer) {
+      final chips = visibleChips.map((e) => e.$2).toList();
+      final types = visibleChips.map((e) => e.$1).toList();
+      final segments = <Widget>[];
+      for (var i = 0; i < chips.length; i++) {
+        final bg = chips[i].fg.withAlpha(40);
+        final nextBg = i + 1 < chips.length
+            ? chips[i + 1].fg.withAlpha(40)
+            : Colors.transparent;
+        Widget segment = _PowerlineSegmentWidget(
+          data: chips[i],
+          bg: bg,
+          nextBg: nextBg,
+          isFirst: i == 0,
+          fontSize: fontSize,
+          theme: theme,
+          style: widget.promptStyle,
+        );
+        segment = _wrapInteractive(types[i], segment, theme);
+        segments.add(segment);
+      }
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: segments,
+        ),
+      );
+    }
+
+    // Default / Starship / Minimal: render each chip individually.
+    final rendered = <Widget>[];
+    for (final (type, data) in visibleChips) {
+      Widget chip = renderer.buildChip(data, fontSize, theme);
+      chip = _wrapInteractive(type, chip, theme);
+      rendered.add(chip);
+    }
+    return renderer.buildLayout(rendered);
   }
 
   @override
@@ -601,14 +617,7 @@ class _PromptAreaState extends State<PromptArea> {
             padding: const EdgeInsets.only(
               left: 12, right: 12, top: 10, bottom: 12,
             ),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final chipId in widget.promptChips)
-                  ..._buildChip(chipId, theme),
-              ],
-            ),
+            child: _buildChipsBar(theme),
           ),
 
           // Text input
@@ -659,4 +668,99 @@ class _EmptyPopoverMessage extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Inline powerline segment used by PromptArea for the powerline style.
+class _PowerlineSegmentWidget extends StatelessWidget {
+  final ChipData data;
+  final Color bg;
+  final Color nextBg;
+  final bool isFirst;
+  final double fontSize;
+  final BolonTheme theme;
+  final PromptStyleConfig style;
+
+  const _PowerlineSegmentWidget({
+    required this.data,
+    required this.bg,
+    required this.nextBg,
+    required this.isFirst,
+    required this.fontSize,
+    required this.theme,
+    required this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final arrowWidth = fontSize * 0.7;
+    return CustomPaint(
+      painter: _PowerlinePainter(
+        bg: bg,
+        nextBg: nextBg,
+        arrowWidth: arrowWidth,
+      ),
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: isFirst ? style.chipPaddingH : style.chipPaddingH + 4,
+          right: style.chipPaddingH + arrowWidth,
+          top: style.chipPaddingV,
+          bottom: style.chipPaddingV,
+        ),
+        child: buildChipContent(
+          data: data,
+          fontSize: fontSize,
+          theme: theme,
+          fontWeight: parseFontWeight(style.fontWeight),
+          showIcon: style.showIcons,
+        ),
+      ),
+    );
+  }
+}
+
+class _PowerlinePainter extends CustomPainter {
+  final Color bg;
+  final Color nextBg;
+  final double arrowWidth;
+
+  _PowerlinePainter({
+    required this.bg,
+    required this.nextBg,
+    required this.arrowWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bodyWidth = size.width - arrowWidth;
+    final midY = size.height / 2;
+
+    final bodyPaint = Paint()..color = bg;
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, bodyWidth, size.height),
+      bodyPaint,
+    );
+
+    final arrowPath = Path()
+      ..moveTo(bodyWidth, 0)
+      ..lineTo(bodyWidth + arrowWidth, midY)
+      ..lineTo(bodyWidth, size.height)
+      ..close();
+
+    if (nextBg != Colors.transparent) {
+      final gapPaint = Paint()..color = nextBg;
+      final gapPath = Path()
+        ..moveTo(bodyWidth, 0)
+        ..lineTo(size.width, 0)
+        ..lineTo(size.width, size.height)
+        ..lineTo(bodyWidth, size.height)
+        ..close();
+      canvas.drawPath(gapPath, gapPaint);
+    }
+
+    canvas.drawPath(arrowPath, bodyPaint);
+  }
+
+  @override
+  bool shouldRepaint(_PowerlinePainter old) =>
+      bg != old.bg || nextBg != old.nextBg || arrowWidth != old.arrowWidth;
 }
