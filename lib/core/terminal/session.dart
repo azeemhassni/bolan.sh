@@ -572,13 +572,22 @@ class TerminalSession extends ChangeNotifier {
         // TUIs (Claude Code, modern Node.js CLIs) that draw via
         // cursor positioning + erase-line on the main screen buffer.
         _redrawSequenceCount += _countRedrawSequences(decoded);
-        // Detect TUI mode from excessive redraw sequences.
-        if (!_isTuiMode &&
-            _redrawSequenceCount > 50 &&
-            _outputCapture.length > 0 &&
-            _redrawSequenceCount / _outputCapture.length > 0.05) {
-          _isTuiMode = true;
-          notifyListeners();
+        // Detect TUI mode from excessive redraw sequences or
+        // full-screen cursor addressing (less -X, git log pager).
+        if (!_isTuiMode) {
+          final isTui = (_redrawSequenceCount > 50 &&
+                  _outputCapture.length > 0 &&
+                  _redrawSequenceCount / _outputCapture.length > 0.05) ||
+              // Cursor home + clear screen = full-screen app.
+              (decoded.contains('\x1B[H') &&
+                  (decoded.contains('\x1B[2J') ||
+                   decoded.contains('\x1B[J'))) ||
+              // Cursor hide = interactive app waiting for input.
+              decoded.contains('\x1B[?25l');
+          if (isTui) {
+            _isTuiMode = true;
+            notifyListeners();
+          }
         }
       }
     });

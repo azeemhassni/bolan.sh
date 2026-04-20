@@ -387,15 +387,22 @@ class SessionViewState extends ConsumerState<SessionView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
-      // Command just started → focus the terminal
+      // Command just started or switched to TUI → focus the terminal
       if (isRunning && !_wasRunning) {
         _terminalFocusNode.requestFocus();
-        // Wait two frames for TerminalView to layout and autoResize,
-        // then re-send dimensions so the program gets the correct size.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           final t = widget.session.terminal;
           widget.session.resize(t.viewHeight, t.viewWidth);
+        });
+      }
+      // Mid-command TUI transition (e.g. git log → less): re-request
+      // focus since the invisible terminal was removed and the
+      // full-screen terminal just mounted.
+      if (isRunning && widget.session.isTuiMode) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _terminalFocusNode.requestFocus();
         });
       }
 
