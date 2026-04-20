@@ -195,21 +195,21 @@ class MinimalChipRenderer extends PromptChipRenderer {
   @override
   Widget buildLayout(List<Widget> chips) {
     if (chips.isEmpty) return const SizedBox.shrink();
+    final gap = style.chipSpacing > 0 ? style.chipSpacing : 6.0;
     final separated = <Widget>[];
     for (var i = 0; i < chips.length; i++) {
       separated.add(chips[i]);
-      if (i < chips.length - 1 &&
-          style.separator == SeparatorKind.character &&
-          style.separatorChar.isNotEmpty) {
-        separated.add(Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Text(
-            style.separatorChar,
-            style: const TextStyle(
-              decoration: TextDecoration.none,
-            ),
-          ),
-        ));
+      if (i < chips.length - 1) {
+        if (style.separator == SeparatorKind.character &&
+            style.separatorChar.isNotEmpty) {
+          separated.add(_SeparatorText(
+            char: style.separatorChar,
+            colorHex: style.separatorColorHex,
+            gap: gap,
+          ));
+        } else {
+          separated.add(SizedBox(width: gap));
+        }
       }
     }
     return Wrap(
@@ -411,4 +411,48 @@ class _PowerlinePainter extends CustomPainter {
   @override
   bool shouldRepaint(_PowerlinePainter old) =>
       bg != old.bg || nextBg != old.nextBg || arrowWidth != old.arrowWidth;
+}
+
+// ── Separator text widget ─────────────────────────────────────
+
+/// Renders the separator character between chips in minimal/custom styles.
+/// Uses [colorHex] if set, otherwise falls back to [BolonTheme.dimForeground].
+class _SeparatorText extends StatelessWidget {
+  final String char;
+  final String colorHex;
+  final double gap;
+
+  const _SeparatorText({
+    required this.char,
+    required this.colorHex,
+    required this.gap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = BolonTheme.of(context);
+    final color = _parseHexColor(colorHex) ?? theme.dimForeground;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: gap),
+      child: Text(
+        char,
+        style: TextStyle(
+          color: color,
+          fontFamily: theme.fontFamily,
+          decoration: TextDecoration.none,
+        ),
+      ),
+    );
+  }
+}
+
+/// Parses a hex color string like "#7AA2F7" into a [Color].
+/// Returns null if the string is empty or malformed.
+Color? _parseHexColor(String hex) {
+  if (hex.isEmpty) return null;
+  final clean = hex.replaceFirst('#', '');
+  if (clean.length != 6) return null;
+  final v = int.tryParse(clean, radix: 16);
+  if (v == null) return null;
+  return Color(0xFF000000 | v);
 }

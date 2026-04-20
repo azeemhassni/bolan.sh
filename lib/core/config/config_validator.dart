@@ -57,6 +57,7 @@ class ConfigValidator {
       separator: _enumByName(
           raw['separator'], SeparatorKind.values, SeparatorKind.gap),
       separatorChar: _string(raw['separator_char'], ''),
+      separatorColorHex: _string(raw['separator_color'], ''),
       filledBackground: _bool(raw['filled_background'], false),
       perSegmentColors: _bool(raw['per_segment_colors'], false),
       showBorder: _bool(raw['show_border'], true),

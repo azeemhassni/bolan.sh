@@ -561,9 +561,14 @@ class _PromptAreaState extends State<PromptArea> {
       // Use opaque colors by blending fg over the prompt background.
       // Transparent colors cause visible seams at arrow boundaries.
       final promptBg = theme.promptBackground;
-      final segColors = chips
-          .map((c) => Color.lerp(promptBg, c.fg, 0.16)!)
-          .toList();
+      final usePerSegment = widget.promptStyle.perSegmentColors;
+      final segColors = usePerSegment
+          ? chips.map((c) => Color.lerp(promptBg, c.fg, 0.16)!).toList()
+          : List.filled(
+              chips.length,
+              Color.lerp(promptBg, theme.statusChipBg, 0.3) ??
+                  theme.statusChipBg,
+            );
       final segments = <Widget>[];
       for (var i = 0; i < chips.length; i++) {
         final bg = segColors[i];

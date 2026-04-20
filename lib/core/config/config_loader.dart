@@ -131,6 +131,9 @@ class ConfigLoader extends ChangeNotifier {
       if (ps.separatorChar.isNotEmpty) {
         sb.writeln('separator_char = "${ps.separatorChar}"');
       }
+      if (ps.separatorColorHex.isNotEmpty) {
+        sb.writeln('separator_color = "${ps.separatorColorHex}"');
+      }
       sb.writeln('filled_background = ${ps.filledBackground}');
       sb.writeln('per_segment_colors = ${ps.perSegmentColors}');
       sb.writeln('show_border = ${ps.showBorder}');

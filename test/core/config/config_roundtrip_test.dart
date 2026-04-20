@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:bolan/core/config/app_config.dart';
 import 'package:bolan/core/config/config_loader.dart';
 import 'package:bolan/core/config/config_validator.dart';
+import 'package:bolan/core/config/prompt_style.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -169,6 +170,36 @@ void main() {
       expect(updated.ai.enabled, true);
       expect(updated.update.autoCheck, false);
       expect(updated.update.skippedVersion, '2.0.0');
+    });
+
+    test('save → load preserves custom prompt style', () async {
+      final original = AppConfig(
+        general: GeneralConfig(
+          promptStyle: const PromptStyleConfig.powerline().copyWith(
+            preset: PromptPreset.custom,
+            chipShape: ChipShape.roundedRect,
+            cornerRadius: 12,
+            chipSpacing: 10,
+          ),
+        ),
+      );
+
+      final writer = ConfigLoader(configPathOverride: configPath);
+      await writer.save(original);
+
+      // Debug: print the TOML
+      final toml = File(configPath).readAsStringSync();
+      // ignore: avoid_print
+      print('Written TOML:\n$toml');
+
+      final reader = ConfigLoader(configPathOverride: configPath);
+      await reader.load();
+      final loaded = reader.config;
+
+      expect(loaded.general.promptStyle.preset, PromptPreset.custom);
+      expect(loaded.general.promptStyle.chipShape, ChipShape.roundedRect);
+      expect(loaded.general.promptStyle.cornerRadius, 12);
+      expect(loaded.general.promptStyle.chipSpacing, 10);
     });
 
     test('copyWith on UpdateConfig preserves fields', () {

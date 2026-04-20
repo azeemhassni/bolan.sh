@@ -4,6 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/config/prompt_config.dart';
 import '../../core/config/prompt_style.dart';
 import '../../core/theme/bolan_theme.dart';
+import '../prompt/chip_renderer.dart';
+import '../shared/bolan_components.dart';
 
 /// Visual editor for prompt bar chip configuration.
 ///
@@ -107,10 +109,24 @@ class _PromptEditorState extends State<PromptEditor> {
           selected: widget.promptStyle.preset,
           theme: theme,
           onChanged: (preset) {
-            widget.onStyleChanged(
-                PromptStyleConfig.fromPreset(preset));
+            if (preset == PromptPreset.custom) {
+              // Seed custom from the current style so the user
+              // starts editing from the current look.
+              widget.onStyleChanged(
+                  widget.promptStyle.copyWith(preset: PromptPreset.custom));
+            } else {
+              widget.onStyleChanged(PromptStyleConfig.fromPreset(preset));
+            }
           },
         ),
+        if (widget.promptStyle.preset == PromptPreset.custom) ...[
+          const SizedBox(height: 16),
+          _CustomStyleControls(
+            style: widget.promptStyle,
+            theme: theme,
+            onChanged: widget.onStyleChanged,
+          ),
+        ],
         const SizedBox(height: 24),
 
         // Header
@@ -393,6 +409,377 @@ class _ReorderData {
   _ReorderData(this.chipId, this.index);
 }
 
+// ── Custom style controls ───────────────────────────────────
+
+class _CustomStyleControls extends StatelessWidget {
+  final PromptStyleConfig style;
+  final BolonTheme theme;
+  final ValueChanged<PromptStyleConfig> onChanged;
+
+  const _CustomStyleControls({
+    required this.style,
+    required this.theme,
+    required this.onChanged,
+  });
+
+  /// Whether the current shape has a visible container (background/border).
+  bool get _hasContainer =>
+      style.chipShape == ChipShape.roundedRect ||
+      style.chipShape == ChipShape.pill;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.blockBackground,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.blockBorder, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Live preview ──
+          _CustomStylePreview(
+            key: ValueKey('preview_${style.chipShape.name}_${style.separator.name}'),
+            style: style,
+            theme: theme,
+          ),
+          const SizedBox(height: 16),
+          Divider(color: theme.blockBorder, height: 1),
+          const SizedBox(height: 16),
+
+          // ── Shape ──
+          BolanField(
+            label: 'Chip shape',
+            child: BolanSegmentedControl(
+              value: style.chipShape.name,
+              options: ChipShape.values.map((s) => s.name).toList(),
+              onChanged: (v) => onChanged(style.copyWith(
+                chipShape: ChipShape.values.byName(v),
+              )),
+            ),
+          ),
+
+          // Corner radius: only for roundedRect (pill is always 999,
+          // trapezoid/none have no radius).
+          if (style.chipShape == ChipShape.roundedRect)
+            BolanField(
+              label: 'Corner radius',
+              child: BolanSlider(
+                value: style.cornerRadius,
+                min: 0,
+                max: 20,
+                step: 1,
+                suffix: 'px',
+                onChanged: (v) =>
+                    onChanged(style.copyWith(cornerRadius: v)),
+              ),
+            ),
+
+          // Border: not relevant for trapezoid or none.
+          if (_hasContainer)
+            BolanField(
+              label: 'Border width',
+              child: BolanSlider(
+                value: style.borderWidth,
+                min: 0,
+                max: 3,
+                step: 0.5,
+                suffix: 'px',
+                onChanged: (v) =>
+                    onChanged(style.copyWith(borderWidth: v)),
+              ),
+            ),
+
+          // Spacing: not relevant for trapezoid (segments are joined).
+          if (style.chipShape != ChipShape.trapezoid)
+            BolanField(
+              label: 'Chip spacing',
+              child: BolanSlider(
+                value: style.chipSpacing,
+                min: 0,
+                max: 20,
+                step: 1,
+                suffix: 'px',
+                onChanged: (v) =>
+                    onChanged(style.copyWith(chipSpacing: v)),
+              ),
+            ),
+
+          // Padding: relevant for all shapes with containers.
+          if (style.chipShape != ChipShape.none)
+            Row(
+              children: [
+                Expanded(
+                  child: BolanField(
+                    label: 'Horizontal padding',
+                    child: BolanSlider(
+                      value: style.chipPaddingH,
+                      min: 0,
+                      max: 16,
+                      step: 1,
+                      suffix: 'px',
+                      onChanged: (v) =>
+                          onChanged(style.copyWith(chipPaddingH: v)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: BolanField(
+                    label: 'Vertical padding',
+                    child: BolanSlider(
+                      value: style.chipPaddingV,
+                      min: 0,
+                      max: 8,
+                      step: 1,
+                      suffix: 'px',
+                      onChanged: (v) =>
+                          onChanged(style.copyWith(chipPaddingV: v)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+          // Separator: not relevant for trapezoid (uses arrows).
+          if (style.chipShape != ChipShape.trapezoid)
+            BolanField(
+              label: 'Separator',
+              child: BolanSegmentedControl(
+                value: style.separator.name,
+                options:
+                    SeparatorKind.values.map((s) => s.name).toList(),
+                onChanged: (v) => onChanged(style.copyWith(
+                  separator: SeparatorKind.values.byName(v),
+                )),
+              ),
+            ),
+
+          if (style.separator == SeparatorKind.character &&
+              style.chipShape != ChipShape.trapezoid) ...[
+            BolanField(
+              label: 'Separator character',
+              child: BolanTextField(
+                value: style.separatorChar,
+                hint: '│',
+                onChanged: (v) =>
+                    onChanged(style.copyWith(separatorChar: v)),
+              ),
+            ),
+            BolanField(
+              label: 'Separator color',
+              help: 'Hex color (e.g. #7AA2F7). Leave empty for theme default.',
+              child: BolanTextField(
+                value: style.separatorColorHex,
+                hint: '#888888',
+                onChanged: (v) =>
+                    onChanged(style.copyWith(separatorColorHex: v)),
+              ),
+            ),
+          ],
+
+          // ── Typography ──
+          BolanField(
+            label: 'Font weight',
+            child: BolanSegmentedControl(
+              value: style.fontWeight,
+              options: const ['normal', 'w500', 'bold'],
+              onChanged: (v) =>
+                  onChanged(style.copyWith(fontWeight: v)),
+            ),
+          ),
+
+          // ── Toggles ──
+          // Filled background: not relevant for none (no container)
+          // or trapezoid (always filled).
+          if (_hasContainer)
+            BolanToggle(
+              label: 'Filled background',
+              help: 'Fill chips with a tinted background color',
+              value: style.filledBackground,
+              onChanged: (v) =>
+                  onChanged(style.copyWith(filledBackground: v)),
+            ),
+          if (_hasContainer)
+            BolanToggle(
+              label: 'Show border',
+              value: style.showBorder,
+              onChanged: (v) =>
+                  onChanged(style.copyWith(showBorder: v)),
+            ),
+          BolanToggle(
+            label: 'Show icons',
+            value: style.showIcons,
+            onChanged: (v) =>
+                onChanged(style.copyWith(showIcons: v)),
+          ),
+          // Per-segment colors: only relevant for trapezoid.
+          if (style.chipShape == ChipShape.trapezoid)
+            BolanToggle(
+              label: 'Per-segment colors',
+              help: 'Each chip gets a distinct background color',
+              value: style.perSegmentColors,
+              onChanged: (v) =>
+                  onChanged(style.copyWith(perSegmentColors: v)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Live preview of the custom prompt style with sample chip data.
+class _CustomStylePreview extends StatelessWidget {
+  final PromptStyleConfig style;
+  final BolonTheme theme;
+
+  const _CustomStylePreview({super.key, required this.style, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    const fontSize = 13.0;
+    final sampleChips = [
+      ChipData(
+        text: 'zsh',
+        fg: theme.statusShellFg,
+        bg: theme.statusChipBg,
+        svgIcon: 'assets/icons/ic_terminal.svg',
+      ),
+      ChipData(
+        text: '~/Code/project',
+        fg: theme.statusCwdFg,
+        bg: theme.statusChipBg,
+        svgIcon: 'assets/icons/ic_folder_code.svg',
+      ),
+      ChipData(
+        text: 'main',
+        fg: theme.statusGitFg,
+        bg: theme.statusChipBg,
+        svgIcon: 'assets/icons/ic_git.svg',
+      ),
+    ];
+
+    final renderer = PromptChipRenderer.forStyle(style);
+
+    // Powerline needs special handling for interlocking segments.
+    if (renderer is PowerlineChipRenderer) {
+      final promptBg = theme.promptBackground;
+      final usePerSegment = style.perSegmentColors;
+      final defaultBg =
+          Color.lerp(promptBg, theme.statusChipBg, 0.3) ?? theme.statusChipBg;
+      final segments = <Widget>[];
+      for (var i = 0; i < sampleChips.length; i++) {
+        final bg = usePerSegment
+            ? Color.lerp(promptBg, sampleChips[i].fg, 0.16)!
+            : defaultBg;
+        final arrowWidth = fontSize * 0.7;
+        segments.add(
+          CustomPaint(
+            painter: _PowerlinePreviewSegmentPainter(
+              bg: bg,
+              arrowWidth: arrowWidth,
+              isFirst: i == 0,
+            ),
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: i == 0
+                    ? style.chipPaddingH
+                    : style.chipPaddingH + arrowWidth,
+                right: style.chipPaddingH + arrowWidth,
+                top: style.chipPaddingV,
+                bottom: style.chipPaddingV,
+              ),
+              child: buildChipContent(
+                data: sampleChips[i],
+                fontSize: fontSize,
+                theme: theme,
+                fontWeight: parseFontWeight(style.fontWeight),
+                showIcon: style.showIcons,
+              ),
+            ),
+          ),
+        );
+      }
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.promptBackground,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: IntrinsicHeight(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: segments,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Default / Starship / Minimal renderers.
+    final rendered = sampleChips
+        .map((data) => renderer.buildChip(data, fontSize, theme))
+        .toList();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      decoration: BoxDecoration(
+        color: theme.promptBackground,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: renderer.buildLayout(rendered),
+    );
+  }
+}
+
+/// Simplified powerline segment painter for the preview.
+class _PowerlinePreviewSegmentPainter extends CustomPainter {
+  final Color bg;
+  final double arrowWidth;
+  final bool isFirst;
+
+  _PowerlinePreviewSegmentPainter({
+    required this.bg,
+    required this.arrowWidth,
+    required this.isFirst,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final midY = size.height / 2;
+    final rightEdge = size.width - arrowWidth;
+    final path = Path();
+    if (isFirst) {
+      path.moveTo(0, 0);
+      path.lineTo(rightEdge, 0);
+      path.lineTo(size.width, midY);
+      path.lineTo(rightEdge, size.height);
+      path.lineTo(0, size.height);
+    } else {
+      path.moveTo(0, 0);
+      path.lineTo(arrowWidth, midY);
+      path.lineTo(0, size.height);
+      path.lineTo(rightEdge, size.height);
+      path.lineTo(size.width, midY);
+      path.lineTo(rightEdge, 0);
+    }
+    path.close();
+    canvas.drawPath(path, Paint()..color = bg);
+  }
+
+  @override
+  bool shouldRepaint(_PowerlinePreviewSegmentPainter old) =>
+      bg != old.bg || arrowWidth != old.arrowWidth || isFirst != old.isFirst;
+}
+
 Widget _chipIcon(PromptChipType? type, Color color, double size) {
   if (type == null) return SizedBox(width: size, height: size);
 
@@ -434,13 +821,12 @@ class _PromptStylePicker extends StatelessWidget {
       runSpacing: 8,
       children: [
         for (final preset in PromptPreset.values)
-          if (preset != PromptPreset.custom)
-            _PresetCard(
-              preset: preset,
-              isSelected: selected == preset,
-              theme: theme,
-              onTap: () => onChanged(preset),
-            ),
+          _PresetCard(
+            preset: preset,
+            isSelected: selected == preset,
+            theme: theme,
+            onTap: () => onChanged(preset),
+          ),
       ],
     );
   }
@@ -480,6 +866,7 @@ class _PresetCardState extends State<_PresetCard> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           width: 140,
+          height: 105,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: isSelected

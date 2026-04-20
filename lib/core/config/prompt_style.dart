@@ -21,6 +21,7 @@ class PromptStyleConfig {
   final double chipPaddingV;
   final SeparatorKind separator;
   final String separatorChar;
+  final String separatorColorHex; // '' = use theme dimForeground
   final bool filledBackground;
   final bool perSegmentColors;
   final bool showBorder;
@@ -37,6 +38,7 @@ class PromptStyleConfig {
     this.chipPaddingV = 2,
     this.separator = SeparatorKind.gap,
     this.separatorChar = '',
+    this.separatorColorHex = '',
     this.filledBackground = false,
     this.perSegmentColors = false,
     this.showBorder = true,
@@ -54,6 +56,7 @@ class PromptStyleConfig {
         chipPaddingV = 2,
         separator = SeparatorKind.powerlineArrow,
         separatorChar = '\uE0B0', //
+        separatorColorHex = '',
         filledBackground = true,
         perSegmentColors = true,
         showBorder = false,
@@ -70,6 +73,7 @@ class PromptStyleConfig {
         chipPaddingV = 4,
         separator = SeparatorKind.gap,
         separatorChar = '',
+        separatorColorHex = '',
         filledBackground = true,
         perSegmentColors = false,
         showBorder = true,
@@ -86,6 +90,7 @@ class PromptStyleConfig {
         chipPaddingV = 0,
         separator = SeparatorKind.character,
         separatorChar = '│',
+        separatorColorHex = '',
         filledBackground = false,
         perSegmentColors = false,
         showBorder = false,
@@ -111,6 +116,7 @@ class PromptStyleConfig {
     double? chipPaddingV,
     SeparatorKind? separator,
     String? separatorChar,
+    String? separatorColorHex,
     bool? filledBackground,
     bool? perSegmentColors,
     bool? showBorder,
@@ -127,6 +133,7 @@ class PromptStyleConfig {
         chipPaddingV: chipPaddingV ?? this.chipPaddingV,
         separator: separator ?? this.separator,
         separatorChar: separatorChar ?? this.separatorChar,
+        separatorColorHex: separatorColorHex ?? this.separatorColorHex,
         filledBackground: filledBackground ?? this.filledBackground,
         perSegmentColors: perSegmentColors ?? this.perSegmentColors,
         showBorder: showBorder ?? this.showBorder,
@@ -146,6 +153,9 @@ class PromptStyleConfig {
     m['chip_padding_v'] = chipPaddingV;
     m['separator'] = separator.name;
     if (separatorChar.isNotEmpty) m['separator_char'] = separatorChar;
+    if (separatorColorHex.isNotEmpty) {
+      m['separator_color'] = separatorColorHex;
+    }
     m['filled_background'] = filledBackground;
     m['per_segment_colors'] = perSegmentColors;
     m['show_border'] = showBorder;
@@ -166,6 +176,7 @@ class PromptStyleConfig {
       chipPaddingV == other.chipPaddingV &&
       separator == other.separator &&
       separatorChar == other.separatorChar &&
+      separatorColorHex == other.separatorColorHex &&
       filledBackground == other.filledBackground &&
       perSegmentColors == other.perSegmentColors &&
       showBorder == other.showBorder &&
@@ -183,6 +194,7 @@ class PromptStyleConfig {
         chipPaddingV,
         separator,
         separatorChar,
+        separatorColorHex,
         filledBackground,
         perSegmentColors,
         showBorder,
