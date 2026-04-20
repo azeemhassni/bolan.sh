@@ -1,9 +1,9 @@
-/// Prompt style presets and customization model.
-///
-/// Controls the visual chrome of status chips in the prompt area:
-/// shape, spacing, separators, colors, and typography. Ships with
-/// four presets (Bolan, Powerline, Starship, Minimal) and a custom
-/// mode that exposes every parameter.
+// Prompt style presets and customization model.
+//
+// Controls the visual chrome of status chips in the prompt area:
+// shape, spacing, separators, colors, and typography. Ships with
+// four presets (Bolan, Powerline, Starship, Minimal) and a custom
+// mode that exposes every parameter.
 
 enum PromptPreset { bolan, powerline, starship, minimal, custom }
 

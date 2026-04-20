@@ -285,7 +285,7 @@ class PowerlineChipRenderer extends PromptChipRenderer {
           ? chips[i + 1].fg.withAlpha(40)
           : Colors.transparent;
 
-      Widget segment = _PowerlineSegment(
+      final Widget segment = _PowerlineSegment(
         bg: bg,
         nextBg: nextBg,
         arrowWidth: fontSize * 0.7,

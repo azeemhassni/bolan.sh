@@ -674,7 +674,7 @@ class _CustomStylePreview extends StatelessWidget {
         final bg = usePerSegment
             ? Color.lerp(promptBg, sampleChips[i].fg, 0.16)!
             : defaultBg;
-        final arrowWidth = fontSize * 0.7;
+        const arrowWidth = fontSize * 0.7;
         segments.add(
           CustomPaint(
             painter: _PowerlinePreviewSegmentPainter(
