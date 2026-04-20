@@ -597,20 +597,19 @@ class _SettingsScreenState extends State<SettingsScreen>
     return [
       PromptEditor(
         activeChipIds: _config.general.promptChips,
+        promptStyle: _config.general.promptStyle,
         onChanged: (chips) {
           setState(() {
             _config = _config.copyWith(
-              general: GeneralConfig(
-                shell: _config.general.shell,
-                workingDirectory: _config.general.workingDirectory,
-                restoreSessions: _config.general.restoreSessions,
-                confirmOnQuit: _config.general.confirmOnQuit,
-                notifyLongRunning: _config.general.notifyLongRunning,
-                longRunningThresholdSeconds:
-                    _config.general.longRunningThresholdSeconds,
-                startupCommands: _config.general.startupCommands,
-                promptChips: chips,
-              ),
+              general: _config.general.copyWith(promptChips: chips),
+            );
+          });
+          _save();
+        },
+        onStyleChanged: (style) {
+          setState(() {
+            _config = _config.copyWith(
+              general: _config.general.copyWith(promptStyle: style),
             );
           });
           _save();

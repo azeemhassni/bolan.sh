@@ -74,6 +74,30 @@ class GeneralConfig {
     this.confirmOnQuit = true,
     this.promptStyle = const PromptStyleConfig(),
   });
+
+  GeneralConfig copyWith({
+    String? shell,
+    String? workingDirectory,
+    bool? restoreSessions,
+    List<String>? promptChips,
+    bool? notifyLongRunning,
+    int? longRunningThresholdSeconds,
+    List<String>? startupCommands,
+    bool? confirmOnQuit,
+    PromptStyleConfig? promptStyle,
+  }) =>
+      GeneralConfig(
+        shell: shell ?? this.shell,
+        workingDirectory: workingDirectory ?? this.workingDirectory,
+        restoreSessions: restoreSessions ?? this.restoreSessions,
+        promptChips: promptChips ?? this.promptChips,
+        notifyLongRunning: notifyLongRunning ?? this.notifyLongRunning,
+        longRunningThresholdSeconds:
+            longRunningThresholdSeconds ?? this.longRunningThresholdSeconds,
+        startupCommands: startupCommands ?? this.startupCommands,
+        confirmOnQuit: confirmOnQuit ?? this.confirmOnQuit,
+        promptStyle: promptStyle ?? this.promptStyle,
+      );
 }
 
 class EditorConfig {
