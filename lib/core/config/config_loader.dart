@@ -186,6 +186,33 @@ class ConfigLoader extends ChangeNotifier {
       }
     }
 
+    // Per-workspace overrides for global settings.
+    final o = c.overrides;
+    if (!o.isEmpty) {
+      sb.writeln();
+      sb.writeln('[overrides]');
+      if (o.themeOverride != null) {
+        sb.writeln('theme = "${o.themeOverride}"');
+      }
+      if (o.fontFamilyOverride != null) {
+        sb.writeln('font_family = "${o.fontFamilyOverride}"');
+      }
+      if (o.fontSizeOverride != null) {
+        sb.writeln('font_size = ${o.fontSizeOverride}');
+      }
+      if (o.lineHeightOverride != null) {
+        sb.writeln('line_height = ${o.lineHeightOverride}');
+      }
+      if (o.keybindingOverrides != null &&
+          o.keybindingOverrides!.isNotEmpty) {
+        sb.writeln();
+        sb.writeln('[overrides.keybindings]');
+        for (final entry in o.keybindingOverrides!.entries) {
+          sb.writeln('${entry.key.name} = "${entry.value.serialize()}"');
+        }
+      }
+    }
+
     return sb.toString();
   }
 }

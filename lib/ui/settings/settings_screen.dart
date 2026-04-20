@@ -14,6 +14,7 @@ import '../../core/app_version.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
 import '../../core/config/config_validator.dart';
+import '../../core/config/global_config.dart';
 import '../../core/config/keybinding.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/theme_registry.dart';
@@ -30,6 +31,7 @@ import 'workspaces_tab.dart';
 /// Settings screen with sidebar tab navigation.
 class SettingsScreen extends StatefulWidget {
   final ConfigLoader configLoader;
+  final GlobalConfigLoader globalConfigLoader;
   final ThemeRegistry themeRegistry;
   final int initialTab;
   final int navGeneration;
@@ -37,6 +39,7 @@ class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
     required this.configLoader,
+    required this.globalConfigLoader,
     required this.themeRegistry,
     this.initialTab = 0,
     this.navGeneration = 0,
@@ -49,6 +52,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen>
     with SingleTickerProviderStateMixin {
   late AppConfig _config;
+  late GlobalConfig _globalConfig;
   late int _selectedTab;
   late final AnimationController _toastController;
   late final Animation<double> _toastOpacity;
@@ -60,18 +64,24 @@ class _SettingsScreenState extends State<SettingsScreen>
   String? _themeGenError;
   BolonTheme? _previewTheme;
 
-  static const _tabs = [
-    'General', 'Editor', 'Appearance', 'AI', 'Prompt', 'Workspaces',
-    'Keybindings',
+  // Tab indices: 0-3 = global tabs, 4-7 = workspace tabs.
+  static const _globalTabs = [
+    'Editor', 'Keybindings', 'Updates', 'Workspaces',
   ];
-  static const _tabIcons = [
-    Icons.settings_outlined,
+  static const _globalTabIcons = [
     Icons.edit_outlined,
-    Icons.palette_outlined,
-    Icons.auto_awesome_outlined,
-    Icons.terminal_outlined,
-    Icons.workspaces_outlined,
     Icons.keyboard_outlined,
+    Icons.system_update_outlined,
+    Icons.workspaces_outlined,
+  ];
+  static const _workspaceTabs = [
+    'General', 'Appearance', 'Prompt', 'AI',
+  ];
+  static const _workspaceTabIcons = [
+    Icons.settings_outlined,
+    Icons.palette_outlined,
+    Icons.terminal_outlined,
+    Icons.auto_awesome_outlined,
   ];
   static const _maxContentWidth = 860.0;
 
@@ -80,6 +90,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     super.initState();
     _selectedTab = widget.initialTab;
     _config = widget.configLoader.config;
+    _globalConfig = widget.globalConfigLoader.config;
     _toastController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
@@ -114,7 +125,12 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   void _save() {
     widget.configLoader.save(_config);
-    // Debounce the toast so it doesn't flash on every keystroke
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(milliseconds: 800), _showSavedToast);
+  }
+
+  void _saveGlobal() {
+    widget.globalConfigLoader.save(_globalConfig);
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(milliseconds: 800), _showSavedToast);
   }
@@ -189,13 +205,86 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    for (var i = 0; i < _tabs.length; i++)
+                    // ── Global section ──
+                    Padding(
+                      padding: const EdgeInsets.only(
+                          left: 16, top: 8, bottom: 4),
+                      child: Text(
+                        'GLOBAL',
+                        style: TextStyle(
+                          color: theme.dimForeground,
+                          fontFamily: theme.fontFamily,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ),
+                    for (var i = 0; i < _globalTabs.length; i++)
                       _SidebarTab(
-                        icon: _tabIcons[i],
-                        label: _tabs[i],
+                        icon: _globalTabIcons[i],
+                        label: _globalTabs[i],
                         isSelected: _selectedTab == i,
                         theme: theme,
                         onTap: () => setState(() => _selectedTab = i),
+                      ),
+                    // ── Workspace section ──
+                    Padding(
+                      padding: const EdgeInsets.only(
+                          left: 16, top: 16, bottom: 4),
+                      child: Row(
+                        children: [
+                          Text(
+                            'WORKSPACE',
+                            style: TextStyle(
+                              color: theme.dimForeground,
+                              fontFamily: theme.fontFamily,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(
+                          left: 16, bottom: 6),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _activeWorkspaceColor(theme),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _activeWorkspaceName(),
+                            style: TextStyle(
+                              color: theme.foreground,
+                              fontFamily: theme.fontFamily,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    for (var i = 0; i < _workspaceTabs.length; i++)
+                      _SidebarTab(
+                        icon: _workspaceTabIcons[i],
+                        label: _workspaceTabs[i],
+                        isSelected:
+                            _selectedTab == i + _globalTabs.length,
+                        theme: theme,
+                        onTap: () => setState(() =>
+                            _selectedTab = i + _globalTabs.length),
                       ),
                     const Spacer(),
                     Padding(
@@ -279,17 +368,195 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  String _activeWorkspaceName() {
+    final ws = WorkspacePaths.activeWorkspace;
+    return ws?.name ?? 'Default';
+  }
+
+  Color _activeWorkspaceColor(BolonTheme theme) {
+    final ws = WorkspacePaths.activeWorkspace;
+    return ws?.accentColor ?? theme.cursor;
+  }
+
   List<Widget> _buildTabContent(BolonTheme theme) {
+    // Global tabs: 0=Editor, 1=Keybindings, 2=Updates, 3=Workspaces
+    // Workspace tabs: 4=General, 5=Appearance, 6=Prompt, 7=AI
     return switch (_selectedTab) {
-      0 => _buildGeneralTab(theme),
-      1 => _buildEditorTab(theme),
-      2 => _buildAppearanceTab(theme),
-      3 => _buildAiTab(theme),
-      4 => _buildPromptTab(theme),
-      5 => const [WorkspacesTab()],
-      6 => [_buildKeybindingsTab(theme)],
+      0 => _buildEditorTab(theme),
+      1 => [_buildKeybindingsTab(theme)],
+      2 => _buildUpdatesTab(theme),
+      3 => const [WorkspacesTab()],
+      4 => _buildGeneralTab(theme),
+      5 => _buildAppearanceTab(theme),
+      6 => _buildPromptTab(theme),
+      7 => _buildAiTab(theme),
       _ => [],
     };
+  }
+
+  List<Widget> _buildUpdatesTab(BolonTheme theme) {
+    return [
+      BolanToggle(
+        label: 'Auto-check for updates',
+        help: 'Check for new versions on launch (once per 24 hours)',
+        value: _globalConfig.update.autoCheck,
+        onChanged: (v) {
+          setState(() {
+            _globalConfig = _globalConfig.copyWith(
+              update: _globalConfig.update.copyWith(autoCheck: v),
+            );
+          });
+          _saveGlobal();
+        },
+      ),
+    ];
+  }
+
+  // ignore: unused_element
+  List<Widget> _buildOverridesTab(BolonTheme theme) {
+    final o = _config.overrides;
+    return [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Text(
+          'Override global settings for this workspace only.\n'
+          'Unchecked fields inherit from Global settings.',
+          style: TextStyle(
+            color: theme.dimForeground,
+            fontFamily: theme.fontFamily,
+            fontSize: 12,
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ),
+      _OverrideRow(
+        label: 'Theme',
+        isOverridden: o.themeOverride != null,
+        theme: theme,
+        onToggle: (enabled) {
+          setState(() {
+            _config = _config.copyWith(
+              overrides: enabled
+                  ? o.copyWith(
+                      themeOverride: _globalConfig.activeTheme)
+                  : o.copyWith(clearTheme: true),
+            );
+          });
+          _save();
+        },
+        child: o.themeOverride != null
+            ? BolanDropdown(
+                value: o.themeOverride!,
+                options: widget.themeRegistry.allThemes
+                    .map((t) => t.name)
+                    .toList(),
+                onChanged: (v) {
+                  setState(() {
+                    _config = _config.copyWith(
+                      overrides: o.copyWith(themeOverride: v),
+                    );
+                  });
+                  _save();
+                },
+              )
+            : null,
+      ),
+      _OverrideRow(
+        label: 'Font family',
+        isOverridden: o.fontFamilyOverride != null,
+        theme: theme,
+        onToggle: (enabled) {
+          setState(() {
+            _config = _config.copyWith(
+              overrides: enabled
+                  ? o.copyWith(
+                      fontFamilyOverride: _globalConfig.editor.fontFamily)
+                  : o.copyWith(clearFontFamily: true),
+            );
+          });
+          _save();
+        },
+        child: o.fontFamilyOverride != null
+            ? BolanTextField(
+                value: o.fontFamilyOverride!,
+                hint: 'JetBrains Mono',
+                onChanged: (v) {
+                  setState(() {
+                    _config = _config.copyWith(
+                      overrides: o.copyWith(fontFamilyOverride: v),
+                    );
+                  });
+                  _save();
+                },
+              )
+            : null,
+      ),
+      _OverrideRow(
+        label: 'Font size',
+        isOverridden: o.fontSizeOverride != null,
+        theme: theme,
+        onToggle: (enabled) {
+          setState(() {
+            _config = _config.copyWith(
+              overrides: enabled
+                  ? o.copyWith(
+                      fontSizeOverride: _globalConfig.editor.fontSize)
+                  : o.copyWith(clearFontSize: true),
+            );
+          });
+          _save();
+        },
+        child: o.fontSizeOverride != null
+            ? BolanSlider(
+                value: o.fontSizeOverride!,
+                min: 8,
+                max: 32,
+                step: 1,
+                suffix: 'px',
+                onChanged: (v) {
+                  setState(() {
+                    _config = _config.copyWith(
+                      overrides: o.copyWith(fontSizeOverride: v),
+                    );
+                  });
+                  _save();
+                },
+              )
+            : null,
+      ),
+      _OverrideRow(
+        label: 'Line height',
+        isOverridden: o.lineHeightOverride != null,
+        theme: theme,
+        onToggle: (enabled) {
+          setState(() {
+            _config = _config.copyWith(
+              overrides: enabled
+                  ? o.copyWith(
+                      lineHeightOverride: _globalConfig.editor.lineHeight)
+                  : o.copyWith(clearLineHeight: true),
+            );
+          });
+          _save();
+        },
+        child: o.lineHeightOverride != null
+            ? BolanSlider(
+                value: o.lineHeightOverride!,
+                min: 1.0,
+                max: 2.5,
+                step: 0.1,
+                onChanged: (v) {
+                  setState(() {
+                    _config = _config.copyWith(
+                      overrides: o.copyWith(lineHeightOverride: v),
+                    );
+                  });
+                  _save();
+                },
+              )
+            : null,
+      ),
+    ];
   }
 
   // ---- Appearance Tab ----
@@ -625,11 +892,14 @@ class _SettingsScreenState extends State<SettingsScreen>
       future: _loadOtherWorkspaces(),
       builder: (ctx, snap) {
         return KeybindingsTab(
-          overrides: _config.keybindingOverrides,
+          overrides: _globalConfig.keybindingOverrides,
           theme: theme,
           onChanged: (overrides) {
-            _config = _config.copyWith(keybindingOverrides: overrides);
-            _save();
+            setState(() {
+              _globalConfig = _globalConfig.copyWith(
+                  keybindingOverrides: overrides);
+            });
+            _saveGlobal();
           },
           otherWorkspaces: snap.data ?? const [],
           loadFromWorkspace: _loadKeybindingsFrom,
@@ -751,7 +1021,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       BolanField(
         label: 'Font Family',
         child: FontPicker(
-          selectedFont: _config.editor.fontFamily,
+          selectedFont: _globalConfig.editor.fontFamily,
           theme: theme,
           onSelected: (v) => _updateEditor(fontFamily: v),
         ),
@@ -759,7 +1029,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       BolanField(
         label: 'Font Size',
         child: BolanSlider(
-          value: _config.editor.fontSize,
+          value: _globalConfig.editor.fontSize,
           min: 8,
           max: 32,
           step: 1,
@@ -770,7 +1040,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       BolanField(
         label: 'Line Height',
         child: BolanSlider(
-          value: _config.editor.lineHeight,
+          value: _globalConfig.editor.lineHeight,
           min: 1.0,
           max: 2.0,
           step: 0.1,
@@ -780,7 +1050,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       BolanField(
         label: 'Cursor Style',
         child: BolanSegmentedControl(
-          value: _config.editor.cursorStyle,
+          value: _globalConfig.editor.cursorStyle,
           options: const ['block', 'underline', 'bar'],
           onChanged: (v) => _updateEditor(cursorStyle: v),
         ),
@@ -788,7 +1058,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       BolanField(
         label: 'Scrollback Lines',
         child: BolanSlider(
-          value: _config.editor.scrollbackLines.toDouble(),
+          value: _globalConfig.editor.scrollbackLines.toDouble(),
           min: 1000,
           max: 50000,
           step: 1000,
@@ -798,7 +1068,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       BolanToggle(
         label: 'Ligatures',
         help: 'Enable font ligatures in block output (e.g., => != ->)',
-        value: _config.editor.ligatures,
+        value: _globalConfig.editor.ligatures,
         onChanged: (v) => _updateEditor(ligatures: v),
       ),
     ];
@@ -1067,21 +1337,22 @@ class _SettingsScreenState extends State<SettingsScreen>
     bool? ligatures,
   }) {
     setState(() {
-      _config = _config.copyWith(
+      _globalConfig = _globalConfig.copyWith(
         editor: EditorConfig(
-          fontFamily: fontFamily ?? _config.editor.fontFamily,
-          fontSize: fontSize ?? _config.editor.fontSize,
-          lineHeight: lineHeight ?? _config.editor.lineHeight,
-          cursorStyle: cursorStyle ?? _config.editor.cursorStyle,
-          cursorBlink: cursorBlink ?? _config.editor.cursorBlink,
-          scrollbackLines: scrollbackLines ?? _config.editor.scrollbackLines,
-          blockMode: _config.editor.blockMode,
-          scrollableBlocks: _config.editor.scrollableBlocks,
-          ligatures: ligatures ?? _config.editor.ligatures,
+          fontFamily: fontFamily ?? _globalConfig.editor.fontFamily,
+          fontSize: fontSize ?? _globalConfig.editor.fontSize,
+          lineHeight: lineHeight ?? _globalConfig.editor.lineHeight,
+          cursorStyle: cursorStyle ?? _globalConfig.editor.cursorStyle,
+          cursorBlink: cursorBlink ?? _globalConfig.editor.cursorBlink,
+          scrollbackLines:
+              scrollbackLines ?? _globalConfig.editor.scrollbackLines,
+          blockMode: _globalConfig.editor.blockMode,
+          scrollableBlocks: _globalConfig.editor.scrollableBlocks,
+          ligatures: ligatures ?? _globalConfig.editor.ligatures,
         ),
       );
     });
-    _save();
+    _saveGlobal();
   }
 
   void _updateAi({
@@ -1176,6 +1447,93 @@ class _SidebarTab extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
+/// A row in the Overrides tab: checkbox to enable the override +
+/// the control widget when enabled.
+class _OverrideRow extends StatelessWidget {
+  final String label;
+  final bool isOverridden;
+  final BolonTheme theme;
+  final ValueChanged<bool> onToggle;
+  final Widget? child;
+
+  const _OverrideRow({
+    required this.label,
+    required this.isOverridden,
+    required this.theme,
+    required this.onToggle,
+    this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isOverridden
+              ? theme.cursor.withAlpha(8)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isOverridden
+                ? theme.cursor.withAlpha(40)
+                : theme.blockBorder,
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: Checkbox(
+                    value: isOverridden,
+                    onChanged: (v) => onToggle(v ?? false),
+                    activeColor: theme.cursor,
+                    side: BorderSide(color: theme.dimForeground),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: theme.foreground,
+                    fontFamily: theme.fontFamily,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+                if (!isOverridden) ...[
+                  const SizedBox(width: 12),
+                  Text(
+                    'uses global',
+                    style: TextStyle(
+                      color: theme.dimForeground,
+                      fontFamily: theme.fontFamily,
+                      fontSize: 11,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (isOverridden && child != null) ...[
+              const SizedBox(height: 10),
+              child!,
+            ],
+          ],
         ),
       ),
     );

@@ -121,7 +121,7 @@ class _WorkspaceSidebarState extends ConsumerState<WorkspaceSidebar> {
                   tooltip: 'New workspace',
                   onTap: () =>
                       ref.read(currentSessionNotifierProvider)
-                          .openSettingsTab(initialSettingsTab: 5),
+                          .openSettingsTab(initialSettingsTab: 3),
                 ),
               ),
               const SizedBox(height: 8),

@@ -1,4 +1,5 @@
 import 'app_config.dart';
+import 'global_config.dart';
 import 'keybinding.dart';
 import 'prompt_style.dart';
 
@@ -16,6 +17,26 @@ class ConfigValidator {
       activeTheme: _string(raw['theme'], 'default-dark'),
       keybindingOverrides:
           _validateKeybindings(raw['keybindings'] as Map<String, dynamic>?),
+      overrides: _validateOverrides(
+          _toStringMap(raw['overrides'])),
+    );
+  }
+
+  WorkspaceOverrides _validateOverrides(Map<String, dynamic>? raw) {
+    if (raw == null) return const WorkspaceOverrides();
+    return WorkspaceOverrides(
+      themeOverride: raw['theme'] as String?,
+      fontFamilyOverride: raw['font_family'] as String?,
+      fontSizeOverride: raw['font_size'] is num
+          ? (raw['font_size'] as num).toDouble()
+          : null,
+      lineHeightOverride: raw['line_height'] is num
+          ? (raw['line_height'] as num).toDouble()
+          : null,
+      keybindingOverrides: raw['keybindings'] is Map
+          ? _validateKeybindings(
+              _toStringMap(raw['keybindings']))
+          : null,
     );
   }
 

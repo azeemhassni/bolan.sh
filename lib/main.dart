@@ -11,6 +11,7 @@ import 'app.dart';
 import 'core/ai/ai_provider_helper.dart';
 import 'core/ai/model_manager.dart';
 import 'core/config/config_loader.dart';
+import 'core/config/global_config.dart';
 import 'core/system/linux_desktop_entry.dart';
 import 'core/theme/theme_registry.dart';
 import 'core/workspace/workspace_paths.dart';
@@ -36,11 +37,28 @@ Future<void> main() async {
   // loaded from the keychain into the workspace before any PTY spawns.
   await registry.setActive(registry.activeId);
 
-  // Load config before runApp so SessionNotifier.build() can read
-  // working directory and shell settings on the very first frame.
+  // Load global config (editor, theme, keybindings, updates).
+  // If global.toml doesn't exist, we'll migrate after loading
+  // the workspace config below.
+  final globalConfigLoader = GlobalConfigLoader();
+  final globalFile =
+      File('${WorkspacePaths.rootPath()}/global.toml');
+  final needsMigration = !await globalFile.exists();
+  if (!needsMigration) {
+    await globalConfigLoader.load();
+  }
+  globalConfigLoader.startWatching();
+
+  // Load per-workspace config.
   final configLoader = ConfigLoader();
   await configLoader.load();
   configLoader.startWatching();
+
+  // Migrate: extract global settings from the active workspace's
+  // config into global.toml on first run.
+  if (needsMigration) {
+    await globalConfigLoader.migrateFrom(configLoader.config);
+  }
 
   // Set AI model defaults from config (or system RAM if not configured).
   final recommended = await ModelManager.recommendedSize();
@@ -66,6 +84,7 @@ Future<void> main() async {
       workspaceRegistryProvider.overrideWith((_) => registry),
       themeRegistryProvider.overrideWith((_) => themeRegistry),
       configLoaderProvider.overrideWith((_) => configLoader),
+      globalConfigLoaderProvider.overrideWith((_) => globalConfigLoader),
     ],
     child: const BolonApp(),
   ));

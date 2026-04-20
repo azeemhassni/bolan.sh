@@ -1,3 +1,4 @@
+import 'global_config.dart';
 import 'keybinding.dart';
 import 'prompt_style.dart';
 
@@ -13,7 +14,11 @@ class AppConfig {
   final String activeTheme;
 
   /// User overrides for key bindings. Only non-default bindings are stored.
+  /// Kept for backwards compatibility — new installs use global config.
   final Map<KeyAction, KeyBinding> keybindingOverrides;
+
+  /// Per-workspace overrides for global settings.
+  final WorkspaceOverrides overrides;
 
   const AppConfig({
     this.general = const GeneralConfig(),
@@ -22,6 +27,7 @@ class AppConfig {
     this.update = const UpdateConfig(),
     this.activeTheme = 'default-dark',
     this.keybindingOverrides = const {},
+    this.overrides = const WorkspaceOverrides(),
   });
 
   AppConfig copyWith({
@@ -31,6 +37,7 @@ class AppConfig {
     UpdateConfig? update,
     String? activeTheme,
     Map<KeyAction, KeyBinding>? keybindingOverrides,
+    WorkspaceOverrides? overrides,
   }) {
     return AppConfig(
       general: general ?? this.general,
@@ -39,6 +46,37 @@ class AppConfig {
       update: update ?? this.update,
       activeTheme: activeTheme ?? this.activeTheme,
       keybindingOverrides: keybindingOverrides ?? this.keybindingOverrides,
+      overrides: overrides ?? this.overrides,
+    );
+  }
+
+  /// Resolves the effective config by merging workspace overrides on
+  /// top of global defaults. This is the config consumers should use.
+  static ResolvedConfig resolve(GlobalConfig global, AppConfig workspace) {
+    final o = workspace.overrides;
+    return ResolvedConfig(
+      // Editor: workspace override fields win, rest from global.
+      editor: EditorConfig(
+        fontFamily: o.fontFamilyOverride ?? global.editor.fontFamily,
+        fontSize: o.fontSizeOverride ?? global.editor.fontSize,
+        lineHeight: o.lineHeightOverride ?? global.editor.lineHeight,
+        cursorStyle: global.editor.cursorStyle,
+        cursorBlink: global.editor.cursorBlink,
+        scrollbackLines: global.editor.scrollbackLines,
+        blockMode: global.editor.blockMode,
+        scrollableBlocks: global.editor.scrollableBlocks,
+        ligatures: global.editor.ligatures,
+      ),
+      activeTheme: o.themeOverride ?? global.activeTheme,
+      keybindingOverrides:
+          o.keybindingOverrides ?? global.keybindingOverrides,
+      update: global.update,
+      confirmOnQuit: global.confirmOnQuit,
+      notifyLongRunning: global.notifyLongRunning,
+      longRunningThresholdSeconds: global.longRunningThresholdSeconds,
+      // Workspace-only fields pass through.
+      general: workspace.general,
+      ai: workspace.ai,
     );
   }
 }
@@ -157,6 +195,33 @@ class AiConfig {
     this.commandSuggestions = true,
     this.smartHistorySearch = true,
     this.shareHistory = false,
+  });
+}
+
+/// The merged result of global + workspace config. This is what the
+/// UI and terminal session should read from — never raw AppConfig
+/// or GlobalConfig alone.
+class ResolvedConfig {
+  final EditorConfig editor;
+  final String activeTheme;
+  final Map<KeyAction, KeyBinding> keybindingOverrides;
+  final UpdateConfig update;
+  final bool confirmOnQuit;
+  final bool notifyLongRunning;
+  final int longRunningThresholdSeconds;
+  final GeneralConfig general;
+  final AiConfig ai;
+
+  const ResolvedConfig({
+    this.editor = const EditorConfig(),
+    this.activeTheme = 'default-dark',
+    this.keybindingOverrides = const {},
+    this.update = const UpdateConfig(),
+    this.confirmOnQuit = true,
+    this.notifyLongRunning = true,
+    this.longRunningThresholdSeconds = 10,
+    this.general = const GeneralConfig(),
+    this.ai = const AiConfig(),
   });
 }
 
