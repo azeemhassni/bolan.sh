@@ -132,8 +132,10 @@ class TerminalSession extends ChangeNotifier {
         .replaceAll(_csiNonSgrRe, '')
         .replaceAll(_charsetRe, '')
         .replaceAll(_feRe, '');
-    // Strip carriage returns — block display doesn't need them.
-    result = result.replaceAll('\r', '');
+    // Collapse carriage returns the same way _finalizeBlock does:
+    // keep only the text after the last \r on each line.
+    result = _collapseCarriageReturns(
+        _stripPartialLineMarker(result));
     return result;
   }
 

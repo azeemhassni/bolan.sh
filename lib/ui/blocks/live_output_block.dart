@@ -185,7 +185,8 @@ class _LiveOutputBlockState extends State<LiveOutputBlock> {
             // ── Streaming output body ──
             if (_buffer.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                padding: const EdgeInsets.only(
+                    left: 16, right: 16, top: 4, bottom: 12),
                 child: _buildOutput(theme),
               ),
           ],
@@ -197,18 +198,16 @@ class _LiveOutputBlockState extends State<LiveOutputBlock> {
   Widget _buildOutput(BolonTheme theme) {
     var text = _buffer.toString();
 
-    // Collapse carriage returns (progress bars).
-    text = _collapseCarriageReturns(text);
-    // Collapse runs of blank lines left over from stripped markers.
-    text = text.replaceAll(RegExp(r'\n{2,}'), '\n');
-    // Trim leading/trailing whitespace.
-    text = text.trim();
+    // Match finalized block processing: expand tabs, trim.
+    text = _expandTabs(text).trim();
 
     // Tail only for very long output.
     if (_lineCount > _maxDisplayLines) {
       final lines = text.split('\n');
       text = lines.skip(lines.length - _maxDisplayLines).join('\n');
     }
+
+    if (text.isEmpty) return const SizedBox.shrink();
 
     final parser = AnsiTextParser(
       BolonTheme.of(context),
@@ -224,23 +223,13 @@ class _LiveOutputBlockState extends State<LiveOutputBlock> {
 
     final spans = parser.parse(text, baseStyle: baseStyle);
 
-    return Text.rich(
+    return SelectableText.rich(
       TextSpan(children: spans),
-      style: baseStyle,
+      contextMenuBuilder: (_, __) => const SizedBox.shrink(),
     );
   }
 
-  String _collapseCarriageReturns(String text) {
-    final lines = text.split('\n');
-    final result = <String>[];
-    for (final line in lines) {
-      if (line.contains('\r')) {
-        final parts = line.split('\r');
-        result.add(parts.last);
-      } else {
-        result.add(line);
-      }
-    }
-    return result.join('\n');
+  static String _expandTabs(String input) {
+    return input.replaceAll('\t', '    ');
   }
 }
