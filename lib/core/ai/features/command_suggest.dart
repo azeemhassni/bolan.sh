@@ -73,13 +73,13 @@ Last output:
 $trimmedOutput
 
 Rules:
-- Respond with ONLY the predicted command, nothing else
-- No explanations, no markdown, no alternatives
+- Respond with EXACTLY ONE command on a single line
+- No explanations, no markdown, no alternatives, no numbering
+- Do NOT list multiple commands or options
 - If the last command was a git commit, suggest git push with the correct branch
 - If the last command failed, suggest the corrected version
 - If no good prediction exists, respond with exactly: NONE
 - Be specific: use actual file names, branch names, paths from the context
-- Predict what a developer would naturally do next in this workflow
 
 Command:''';
   }
@@ -87,29 +87,49 @@ Command:''';
   String? _cleanResponse(String response) {
     var cmd = response.trim();
 
-    if (cmd.isEmpty || cmd == 'NONE' || cmd.toLowerCase() == 'none') {
+    if (cmd.isEmpty ||
+        cmd == 'NONE' ||
+        cmd.toLowerCase() == 'none' ||
+        cmd.toLowerCase().startsWith('none')) {
       return null;
     }
 
-    // Strip code fences
+    // Strip code fences — extract only the first fenced block.
     if (cmd.contains('```')) {
       final lines = cmd.split('\n');
       final inner = <String>[];
       var inFence = false;
       for (final line in lines) {
         if (line.trim().startsWith('```')) {
-          inFence = !inFence;
+          if (inFence) break; // only take the first block
+          inFence = true;
           continue;
         }
         if (inFence) inner.add(line);
       }
-      if (inner.isNotEmpty) cmd = inner.join('\n').trim();
+      if (inner.isNotEmpty) cmd = inner.first.trim();
     }
 
+    // Strip prompt prefixes.
     if (cmd.startsWith(r'$ ')) cmd = cmd.substring(2);
     if (cmd.startsWith('> ')) cmd = cmd.substring(2);
 
-    cmd = cmd.trim();
-    return cmd.isEmpty ? null : cmd;
+    // Take only the FIRST line — we want a single command, not a script.
+    final firstLine = cmd.split('\n').first.trim();
+    if (firstLine.isEmpty) return null;
+
+    // Reject if the model returned conversational text instead of a command.
+    if (firstLine.contains('Here is') ||
+        firstLine.contains('I suggest') ||
+        firstLine.contains('You could') ||
+        firstLine.contains('The next') ||
+        firstLine.startsWith('Based on')) {
+      return null;
+    }
+
+    // Reject overly long suggestions (likely explanations, not commands).
+    if (firstLine.length > 200) return null;
+
+    return firstLine;
   }
 }

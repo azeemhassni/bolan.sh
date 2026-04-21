@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/config/keybinding.dart';
 import '../../core/theme/bolan_theme.dart';
+// ignore: unused_import
 import '../shared/bolan_button.dart';
 
 /// Settings tab for customizing keyboard shortcuts.
@@ -16,20 +17,11 @@ class KeybindingsTab extends StatefulWidget {
   final ValueChanged<Map<KeyAction, KeyBinding>> onChanged;
   final BolonTheme theme;
 
-  /// Other workspaces to copy keybindings from. Each entry is (id, name).
-  final List<(String, String)> otherWorkspaces;
-
-  /// Loads keybinding overrides from another workspace's config.
-  final Future<Map<KeyAction, KeyBinding>> Function(String workspaceId)?
-      loadFromWorkspace;
-
   const KeybindingsTab({
     super.key,
     required this.overrides,
     required this.onChanged,
     required this.theme,
-    this.otherWorkspaces = const [],
-    this.loadFromWorkspace,
   });
 
   @override
@@ -41,7 +33,6 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
   KeyAction? _recording;
   KeyAction? _conflictWith;
   KeyBinding? _pendingBinding;
-  String? _selectedWorkspaceId;
   final FocusNode _recorderFocus = FocusNode();
 
   late Map<KeyAction, KeyBinding> _overrides;
@@ -79,18 +70,6 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
     setState(() {
       _overrides.clear();
       _stopRecording();
-    });
-    widget.onChanged(_overrides);
-  }
-
-  Future<void> _copyFrom(String workspaceId) async {
-    final loader = widget.loadFromWorkspace;
-    if (loader == null) return;
-    final imported = await loader(workspaceId);
-    setState(() {
-      _overrides
-        ..clear()
-        ..addAll(imported);
     });
     widget.onChanged(_overrides);
   }
@@ -281,67 +260,6 @@ class _KeybindingsTabState extends State<KeybindingsTab> {
               ],
             ],
           ),
-          if (widget.otherWorkspaces.isNotEmpty &&
-              widget.loadFromWorkspace != null) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(
-                  'Copy from workspace:',
-                  style: TextStyle(
-                    color: t.dimForeground,
-                    fontFamily: t.fontFamily,
-                    fontSize: 13,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  height: 32,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: t.blockBackground,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: t.blockBorder, width: 1),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedWorkspaceId,
-                      hint: Text(
-                        'Select workspace',
-                        style: TextStyle(
-                          color: t.dimForeground,
-                          fontFamily: t.fontFamily,
-                          fontSize: 13,
-                        ),
-                      ),
-                      dropdownColor: t.blockBackground,
-                      style: TextStyle(
-                        color: t.foreground,
-                        fontFamily: t.fontFamily,
-                        fontSize: 13,
-                      ),
-                      icon: Icon(Icons.expand_more,
-                          size: 16, color: t.dimForeground),
-                      items: [
-                        for (final (id, name) in widget.otherWorkspaces)
-                          DropdownMenuItem(value: id, child: Text(name)),
-                      ],
-                      onChanged: (v) =>
-                          setState(() => _selectedWorkspaceId = v),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                BolanButton.ghost(
-                  label: 'Apply',
-                  onTap: _selectedWorkspaceId != null
-                      ? () => _copyFrom(_selectedWorkspaceId!)
-                      : null,
-                ),
-              ],
-            ),
-          ],
           const SizedBox(height: 16),
 
           // Shortcut list

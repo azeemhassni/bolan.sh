@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// ignore: unused_import
 import 'package:toml/toml.dart';
 
 import '../../core/ai/ai_provider_helper.dart';
@@ -13,8 +14,10 @@ import '../../core/ai/model_manager.dart';
 import '../../core/app_version.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/config_loader.dart';
+// ignore: unused_import
 import '../../core/config/config_validator.dart';
 import '../../core/config/global_config.dart';
+// ignore: unused_import
 import '../../core/config/keybinding.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/theme_registry.dart';
@@ -888,52 +891,17 @@ class _SettingsScreenState extends State<SettingsScreen>
   // ---- Keybindings Tab ----
 
   Widget _buildKeybindingsTab(BolonTheme theme) {
-    return FutureBuilder<List<(String, String)>>(
-      future: _loadOtherWorkspaces(),
-      builder: (ctx, snap) {
-        return KeybindingsTab(
-          overrides: _globalConfig.keybindingOverrides,
-          theme: theme,
-          onChanged: (overrides) {
-            setState(() {
-              _globalConfig = _globalConfig.copyWith(
-                  keybindingOverrides: overrides);
-            });
-            _saveGlobal();
-          },
-          otherWorkspaces: snap.data ?? const [],
-          loadFromWorkspace: _loadKeybindingsFrom,
-        );
+    return KeybindingsTab(
+      overrides: _globalConfig.keybindingOverrides,
+      theme: theme,
+      onChanged: (overrides) {
+        setState(() {
+          _globalConfig = _globalConfig.copyWith(
+              keybindingOverrides: overrides);
+        });
+        _saveGlobal();
       },
     );
-  }
-
-  Future<List<(String, String)>> _loadOtherWorkspaces() async {
-    final file = WorkspacePaths.registryFile();
-    if (!await file.exists()) return const [];
-    final doc = TomlDocument.parse(await file.readAsString()).toMap();
-    final activeId = (doc['active'] as String?) ?? 'default';
-    final list = (doc['workspaces'] as List<dynamic>?) ?? const [];
-    return list
-        .whereType<Map<String, dynamic>>()
-        .where((m) => m['id'] != activeId)
-        .map((m) => (
-              m['id'] as String,
-              (m['name'] as String?) ?? (m['id'] as String),
-            ))
-        .toList();
-  }
-
-  Future<Map<KeyAction, KeyBinding>> _loadKeybindingsFrom(
-      String workspaceId) async {
-    final file = WorkspacePaths.configFileFor(workspaceId);
-    if (!await file.exists()) return const {};
-    final doc = TomlDocument.parse(await file.readAsString()).toMap();
-    final raw = doc['keybindings'] as Map<String, dynamic>?;
-    if (raw == null) return const {};
-    return const ConfigValidator()
-        .validate({'keybindings': raw})
-        .keybindingOverrides;
   }
 
   // ---- General Tab ----
