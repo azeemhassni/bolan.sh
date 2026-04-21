@@ -510,10 +510,10 @@ class PromptInputState extends State<PromptInput> {
     }
 
     switch (event.logicalKey) {
-      // Tab — file/command completion
+      // Tab — request shell completions; if none available, accept ghost text
       case LogicalKeyboardKey.tab:
         if (_completions.isEmpty) {
-          _requestCompletion();
+          _requestCompletionOrAcceptGhost();
         } else if (_completions.length == 1) {
           _acceptCompletion(0);
         }
@@ -715,6 +715,41 @@ class PromptInputState extends State<PromptInput> {
 
   // --- Tab completion ---
 
+  /// Requests shell completions first. If the shell returns nothing
+  /// and ghost text is visible, accepts the ghost text instead.
+  Future<void> _requestCompletionOrAcceptGhost() async {
+    if (_completionLoading) return;
+    _completionLoading = true;
+    try {
+      final result = await widget.session.requestCompletion(
+        _controller.text,
+        _controller.selection.baseOffset,
+      );
+      if (!mounted) return;
+
+      if (result.isSingle) {
+        _applyCompletion(result.items.first.text, result);
+      } else if (result.items.isNotEmpty) {
+        final lcp = longestCommonPrefix(result.texts);
+        if (lcp.length > result.prefix.length) {
+          _applyCompletion(lcp, result, addTrailingSpace: false);
+        }
+        setState(() {
+          _completions = result.items;
+          _completionIndex = 0;
+          _activeResult = result;
+        });
+        _updateCompletionOverlay();
+      } else if (_ghostText.isNotEmpty) {
+        // No shell completions — accept ghost text.
+        _acceptGhostText();
+      }
+    } finally {
+      _completionLoading = false;
+    }
+  }
+
+  // ignore: unused_element
   Future<void> _requestCompletion() async {
     if (_completionLoading) return;
     _completionLoading = true;
@@ -732,7 +767,7 @@ class PromptInputState extends State<PromptInput> {
       } else if (result.items.isNotEmpty) {
         final lcp = longestCommonPrefix(result.texts);
         if (lcp.length > result.prefix.length) {
-          _applyCompletion(lcp, result);
+          _applyCompletion(lcp, result, addTrailingSpace: false);
         }
         setState(() {
           _completions = result.items;
@@ -756,11 +791,13 @@ class PromptInputState extends State<PromptInput> {
     _removeCompletionOverlay();
   }
 
-  void _applyCompletion(String completion, CompletionResult result) {
+  void _applyCompletion(String completion, CompletionResult result,
+      {bool addTrailingSpace = true}) {
     final text = _controller.text;
     final before = text.substring(0, result.replaceStart);
     final after = text.substring(result.replaceEnd);
-    final suffix = completion.endsWith('/') ? '' : ' ';
+    final suffix =
+        addTrailingSpace && !completion.endsWith('/') ? ' ' : '';
     final newText = '$before$completion$suffix$after';
     final newPos = result.replaceStart + completion.length + suffix.length;
 
@@ -1130,11 +1167,34 @@ class _GhostTextController extends TextEditingController {
       withComposing: withComposing,
     );
     if (_ghostText.isEmpty || _ghostStyle == null) return base;
+    final hintColor = _ghostStyle?.color?.withAlpha(140) ??
+        const Color(0x8CFFFFFF);
     return TextSpan(
       style: style,
       children: [
         base,
         TextSpan(text: _ghostText, style: _ghostStyle),
+        const TextSpan(text: '  '),
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: hintColor, width: 1),
+            ),
+            child: Text(
+              'Tab ⟶',
+              style: TextStyle(
+                color: hintColor,
+                fontSize: (_ghostStyle?.fontSize ?? 13) * 0.85,
+                fontFamily: _ghostStyle?.fontFamily,
+                decoration: TextDecoration.none,
+                height: 1.0,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
