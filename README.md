@@ -6,6 +6,28 @@
   An open-source terminal for macOS and Linux with AI built in.
 </p>
 
+<p align="center">
+  <a href="https://github.com/azeemhassni/bolan.sh/releases/latest"><img src="https://img.shields.io/github/v/release/azeemhassni/bolan.sh?style=flat-square&color=7AA2F7&label=version" alt="Latest Release"></a>
+  <a href="https://github.com/azeemhassni/bolan.sh/issues"><img src="https://img.shields.io/github/issues/azeemhassni/bolan.sh?style=flat-square&color=F7768E" alt="Issues"></a>
+  <a href="https://github.com/azeemhassni/bolan.sh/stargazers"><img src="https://img.shields.io/github/stars/azeemhassni/bolan.sh?style=flat-square&color=E0AF68" alt="Stars"></a>
+  <a href="https://github.com/azeemhassni/bolan.sh/blob/main/LICENSE"><img src="https://img.shields.io/github/license/azeemhassni/bolan.sh?style=flat-square&color=9ECE6A" alt="License"></a>
+  <a href="https://github.com/azeemhassni/bolan.sh/releases/latest"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-blue?style=flat-square" alt="Platform"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/azeemhassni/bolan.sh/releases/latest">
+    <img src="https://img.shields.io/badge/macOS-Download-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS">
+  </a>
+  &nbsp;
+  <a href="https://github.com/azeemhassni/bolan.sh/releases/latest">
+    <img src="https://img.shields.io/badge/Linux%20x64-Download-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Download for Linux x64">
+  </a>
+  &nbsp;
+  <a href="https://github.com/azeemhassni/bolan.sh/releases/latest">
+    <img src="https://img.shields.io/badge/Linux%20ARM64-Download-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Download for Linux ARM64">
+  </a>
+</p>
+
 ---
 
 I started this because I used Warp and liked it, but I didn't like the deal: turn off telemetry and you lose every AI feature. There's no way to use the nice stuff without sending your data through their servers. Warp is closed source, so you either trust it or you don't.
