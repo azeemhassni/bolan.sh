@@ -121,6 +121,7 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
       // disposal and trigger `state = ...` on a disposed notifier
       // (which would rebuild and register a new disposer mid-iteration).
       _debounceTimer?.cancel();
+      _saveTimer?.cancel();
       _saveLayout();
       for (final t in _tabsForDisposal) {
         if (t.rootPane != null) PaneManager.disposeAll(t.rootPane!);
@@ -143,6 +144,16 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
     _tabsForDisposal = value.tabs;
     _activeTabIndexForDisposal = value.activeTabIndex;
     super.state = value;
+    // Save session layout after every state change so it survives
+    // crashes and force-quits, not just clean dispose.
+    _debounceSave();
+  }
+
+  Timer? _saveTimer;
+
+  void _debounceSave() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(seconds: 2), _saveLayout);
   }
 
   SessionState? _tryRestore() {
