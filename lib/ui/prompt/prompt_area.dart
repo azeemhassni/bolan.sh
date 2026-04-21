@@ -631,21 +631,28 @@ class _PromptAreaState extends State<PromptArea> {
             child: _buildChipsBar(theme),
           ),
 
-          // Text input
-          PromptInput(
-            key: widget.promptInputKey,
-            session: widget.session,
-            fontSize: widget.fontSize,
-            aiEnabled: widget.aiEnabled,
-            aiProvider: widget.aiProvider,
-            geminiModel: widget.geminiModel,
-            anthropicMode: widget.anthropicMode,
-            commandSuggestions: widget.aiEnabled && widget.commandSuggestions,
-            smartHistorySearch: widget.aiEnabled && widget.smartHistorySearch,
-            shareHistory: widget.aiEnabled && widget.shareHistory,
-            cursorStyle: widget.cursorStyle,
-            keybindingOverrides: widget.keybindingOverrides,
-          ),
+          // Text input or running command indicator
+          if (widget.session.isCommandRunning &&
+              !widget.session.isTuiMode)
+            _RunningCommandIndicator(
+              command: widget.session.activeBlock?.command ?? '',
+              fontSize: widget.fontSize,
+            )
+          else
+            PromptInput(
+              key: widget.promptInputKey,
+              session: widget.session,
+              fontSize: widget.fontSize,
+              aiEnabled: widget.aiEnabled,
+              aiProvider: widget.aiProvider,
+              geminiModel: widget.geminiModel,
+              anthropicMode: widget.anthropicMode,
+              commandSuggestions: widget.aiEnabled && widget.commandSuggestions,
+              smartHistorySearch: widget.aiEnabled && widget.smartHistorySearch,
+              shareHistory: widget.aiEnabled && widget.shareHistory,
+              cursorStyle: widget.cursorStyle,
+              keybindingOverrides: widget.keybindingOverrides,
+            ),
         ],
       ),
     );
@@ -676,6 +683,52 @@ class _EmptyPopoverMessage extends StatelessWidget {
             decoration: TextDecoration.none,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Replaces the prompt input when a non-TUI command is running.
+/// Shows the running command text with a spinner.
+class _RunningCommandIndicator extends StatelessWidget {
+  final String command;
+  final double fontSize;
+
+  const _RunningCommandIndicator({
+    required this.command,
+    required this.fontSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = BolonTheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: theme.dimForeground,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              command,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: TextStyle(
+                color: theme.dimForeground,
+                fontFamily: theme.fontFamily,
+                fontSize: fontSize,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

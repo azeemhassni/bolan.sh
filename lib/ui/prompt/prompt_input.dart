@@ -1184,7 +1184,7 @@ class _GhostTextController extends TextEditingController {
               border: Border.all(color: hintColor, width: 1),
             ),
             child: Text(
-              'Tab ⟶',
+              '⟶',
               style: TextStyle(
                 color: hintColor,
                 fontSize: (_ghostStyle?.fontSize ?? 13) * 0.85,
