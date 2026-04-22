@@ -55,6 +55,8 @@ class ConfigValidator {
       confirmOnQuit: _bool(raw['confirm_on_quit'], true),
       inheritWorkingDirectory:
           _bool(raw['inherit_working_directory'], true),
+      hidePromptWhileRunning:
+          _bool(raw['hide_prompt_while_running'], false),
       promptStyle: _validatePromptStyle(
           _toStringMap(raw['prompt_style'])),
     );

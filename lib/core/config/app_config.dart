@@ -101,6 +101,9 @@ class GeneralConfig {
   /// Whether new tabs inherit the active pane's working directory.
   final bool inheritWorkingDirectory;
 
+  /// Whether to hide the prompt bar while a command is running.
+  final bool hidePromptWhileRunning;
+
   /// Visual style for prompt bar chips (shape, spacing, separators).
   final PromptStyleConfig promptStyle;
 
@@ -114,6 +117,7 @@ class GeneralConfig {
     this.startupCommands = const [],
     this.confirmOnQuit = true,
     this.inheritWorkingDirectory = true,
+    this.hidePromptWhileRunning = false,
     this.promptStyle = const PromptStyleConfig(),
   });
 
@@ -127,6 +131,7 @@ class GeneralConfig {
     List<String>? startupCommands,
     bool? confirmOnQuit,
     bool? inheritWorkingDirectory,
+    bool? hidePromptWhileRunning,
     PromptStyleConfig? promptStyle,
   }) =>
       GeneralConfig(
@@ -141,6 +146,8 @@ class GeneralConfig {
         confirmOnQuit: confirmOnQuit ?? this.confirmOnQuit,
         inheritWorkingDirectory:
             inheritWorkingDirectory ?? this.inheritWorkingDirectory,
+        hidePromptWhileRunning:
+            hidePromptWhileRunning ?? this.hidePromptWhileRunning,
         promptStyle: promptStyle ?? this.promptStyle,
       );
 }

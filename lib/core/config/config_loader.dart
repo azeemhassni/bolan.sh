@@ -111,6 +111,7 @@ class ConfigLoader extends ChangeNotifier {
     sb.writeln('notify_long_running = ${c.general.notifyLongRunning}');
     sb.writeln('confirm_on_quit = ${c.general.confirmOnQuit}');
     sb.writeln('inherit_working_directory = ${c.general.inheritWorkingDirectory}');
+    sb.writeln('hide_prompt_while_running = ${c.general.hidePromptWhileRunning}');
     sb.writeln('long_running_threshold_seconds = ${c.general.longRunningThresholdSeconds}');
     sb.writeln('prompt_chips = [${c.general.promptChips.map((e) => '"$e"').join(', ')}]');
     if (c.general.startupCommands.isNotEmpty) {

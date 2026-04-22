@@ -941,6 +941,12 @@ class _SettingsScreenState extends State<SettingsScreen>
         onChanged: (v) => _updateGeneral(inheritWorkingDirectory: v),
       ),
       BolanToggle(
+        label: 'Hide prompt while running',
+        help: 'Hide the prompt bar while a command is executing',
+        value: _config.general.hidePromptWhileRunning,
+        onChanged: (v) => _updateGeneral(hidePromptWhileRunning: v),
+      ),
+      BolanToggle(
         label: 'Confirm on Quit',
         help: 'Ask before closing the app',
         value: _config.general.confirmOnQuit,
@@ -1269,6 +1275,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     bool? restoreSessions,
     bool? notifyLongRunning,
     bool? inheritWorkingDirectory,
+    bool? hidePromptWhileRunning,
   }) {
     setState(() {
       _config = _config.copyWith(
@@ -1277,6 +1284,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           workingDirectory: workingDirectory,
           restoreSessions: restoreSessions,
           confirmOnQuit: confirmOnQuit,
+          hidePromptWhileRunning: hidePromptWhileRunning,
           notifyLongRunning: notifyLongRunning,
           inheritWorkingDirectory: inheritWorkingDirectory,
         ),
