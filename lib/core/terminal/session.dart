@@ -11,6 +11,7 @@ import 'package:xterm/xterm.dart';
 import '../completion/completion_engine.dart';
 import '../workspace/workspace_paths.dart';
 import 'command_block.dart';
+import 'command_parser.dart';
 import 'command_history.dart';
 import 'shell_integration.dart';
 
@@ -119,63 +120,97 @@ class TerminalSession extends ChangeNotifier {
   String get liveOutputSnapshot =>
       _stripForLiveDisplay(_outputCapture.toString());
 
-  /// Commands that spawn interactive shells or sessions without
-  /// Bolan's shell integration. These should go straight to
-  /// full-screen terminal mode.
-  static final _interactiveCommands = RegExp(
-    r'(?:^|&&\s*|\|\|\s*|;\s*|\|\s*)(?:'
-    r'sudo\s+su|'          // sudo su, sudo su -
-    r'su\b|'               // su, su -, su root
-    r'ssh\b|'              // ssh user@host
-    r'docker\s+exec\s.*-[it]|' // docker exec -it
-    r'docker\s+run\s.*-[it]|'  // docker run -it
-    r'docker\s+compose\s+exec\b|' // docker compose exec
-    r'kubectl\s+exec\s.*-[it]|' // kubectl exec -it
-    r'nix-shell\b|'       // nix-shell
-    r'nix\s+develop\b|'   // nix develop
-    r'bash\s*$|'           // bare bash
-    r'zsh\s*$|'            // bare zsh
-    r'fish\s*$|'           // bare fish
-    r'sh\s*$|'             // bare sh
-    r'python\s*$|'         // python REPL
-    r'python3\s*$|'        // python3 REPL
-    r'ipython\b|'          // ipython REPL
-    r'bpython\b|'          // bpython REPL
-    r'node\s*$|'           // node REPL
-    r'deno\s*$|'           // deno REPL
-    r'bun\s+repl\b|'       // bun repl
-    r'irb\s*$|'            // ruby REPL
-    r'pry\s*$|'            // pry (ruby)
-    r'rails\s+console|'   // rails console
-    r'rails\s+c\s*$|'     // rails c (shorthand)
-    r'php\s+artisan\s+tinker|' // laravel tinker
-    r'php\s+-a\s*$|'      // php interactive mode
-    r'lein\s+repl|'        // clojure lein repl
-    r'ghci\s*$|'           // haskell REPL
-    r'erl\s*$|'            // erlang shell
-    r'iex\s*$|'            // elixir REPL
-    r'iex\s+-S\s+mix|'    // iex -S mix (phoenix)
-    r'lua\s*$|'            // lua REPL
-    r'R\s*$|'              // R REPL
-    r'julia\s*$|'          // julia REPL
-    r'scala\s*$|'          // scala REPL
-    r'mysql\b|'            // mysql client
-    r'psql\b|'             // postgresql client
-    r'sqlite3\b|'          // sqlite3
-    r'mongosh\b|'          // mongodb shell (modern)
-    r'mongo\b|'            // mongo shell (legacy)
-    r'redis-cli\b|'        // redis-cli
-    r'telnet\b|'           // telnet
-    r'ftp\b|'              // ftp client
-    r'sftp\b|'             // sftp client
-    r'tmux\b|'             // tmux
-    r'screen\b'            // GNU screen
-    r')',
-  );
+  /// Known interactive command names that spawn shells, REPLs, or
+  /// sessions without Bolan's shell integration.
+  static const _interactiveCommands = <String>{
+    // Shells
+    'su', 'bash', 'zsh', 'fish', 'sh', 'csh', 'tcsh', 'ksh',
+    // Remote
+    'ssh', 'telnet', 'ftp', 'sftp',
+    // Containers
+    'docker', 'kubectl',
+    // Nix
+    'nix-shell', 'nix',
+    // Python
+    'python', 'python3', 'ipython', 'bpython',
+    // JavaScript
+    'node', 'deno', 'bun',
+    // Ruby
+    'irb', 'pry', 'rails',
+    // PHP
+    'php', 'tinker',
+    // JVM
+    'scala', 'ghci', 'lein',
+    // Elixir/Erlang
+    'iex', 'erl',
+    // Other REPLs
+    'lua', 'R', 'julia',
+    // Databases
+    'mysql', 'psql', 'sqlite3', 'mongosh', 'mongo', 'redis-cli',
+    // Terminal multiplexers
+    'tmux', 'screen',
+  };
+
+  /// Commands that need extra argument checking beyond just the
+  /// command name — e.g. `docker exec` is interactive but `docker ps`
+  /// is not.
+  static bool _needsArgCheck(String name, List<String> allNames) {
+    switch (name) {
+      case 'docker':
+        // docker exec -it, docker run -it, docker compose exec
+        return allNames.length == 1; // only if it's the sole command
+      case 'nix':
+        return true; // nix develop is interactive, nix build is not
+      case 'rails':
+        return true; // rails console is interactive, rails server is not
+      case 'php':
+        return true; // php -a / php artisan tinker, not php script.php
+      case 'bun':
+        return true; // bun repl, not bun run
+      case 'lein':
+        return true; // lein repl, not lein build
+      default:
+        return false;
+    }
+  }
 
   static bool _isInteractiveCommand(String cmd) {
-    final trimmed = cmd.trim();
-    return _interactiveCommands.hasMatch(trimmed);
+    final names = extractCommandNames(cmd);
+    if (names.isEmpty) return false;
+
+    for (final name in names) {
+      if (_interactiveCommands.contains(name)) {
+        if (!_needsArgCheck(name, names)) return true;
+        // For commands needing arg checks, inspect the raw command.
+        switch (name) {
+          case 'docker':
+            if (RegExp(r'docker\s+(exec|run)\s.*-[it]').hasMatch(cmd) ||
+                RegExp(r'docker\s+compose\s+exec\b').hasMatch(cmd)) {
+              return true;
+            }
+          case 'nix':
+            if (cmd.contains('nix develop') ||
+                cmd.contains('nix-shell')) {
+              return true;
+            }
+          case 'rails':
+            if (cmd.contains('rails console') ||
+                cmd.contains('rails c')) {
+              return true;
+            }
+          case 'php':
+            if (cmd.contains('artisan tinker') ||
+                RegExp(r'php\s+-a\b').hasMatch(cmd)) {
+              return true;
+            }
+          case 'bun':
+            if (cmd.contains('bun repl')) return true;
+          case 'lein':
+            if (cmd.contains('lein repl')) return true;
+        }
+      }
+    }
+    return false;
   }
 
   static final _oscRe =
@@ -812,7 +847,8 @@ class TerminalSession extends ChangeNotifier {
     // was actually on screen. This gives clean output for TUIs like
     // Claude Code that print a summary on exit.
     final capturedLength = _outputCapture.length;
-    final isTui = _usedAltBuffer ||
+    final isTui = _isTuiMode ||
+        _usedAltBuffer ||
         (_redrawSequenceCount > 50 && capturedLength > 0 &&
             _redrawSequenceCount / (capturedLength / 100) > 5);
     if (isTui) {
