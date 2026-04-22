@@ -119,6 +119,65 @@ class TerminalSession extends ChangeNotifier {
   String get liveOutputSnapshot =>
       _stripForLiveDisplay(_outputCapture.toString());
 
+  /// Commands that spawn interactive shells or sessions without
+  /// Bolan's shell integration. These should go straight to
+  /// full-screen terminal mode.
+  static final _interactiveCommands = RegExp(
+    r'(?:^|&&\s*|\|\|\s*|;\s*|\|\s*)(?:'
+    r'sudo\s+su|'          // sudo su, sudo su -
+    r'su\b|'               // su, su -, su root
+    r'ssh\b|'              // ssh user@host
+    r'docker\s+exec\s.*-[it]|' // docker exec -it
+    r'docker\s+run\s.*-[it]|'  // docker run -it
+    r'docker\s+compose\s+exec\b|' // docker compose exec
+    r'kubectl\s+exec\s.*-[it]|' // kubectl exec -it
+    r'nix-shell\b|'       // nix-shell
+    r'nix\s+develop\b|'   // nix develop
+    r'bash\s*$|'           // bare bash
+    r'zsh\s*$|'            // bare zsh
+    r'fish\s*$|'           // bare fish
+    r'sh\s*$|'             // bare sh
+    r'python\s*$|'         // python REPL
+    r'python3\s*$|'        // python3 REPL
+    r'ipython\b|'          // ipython REPL
+    r'bpython\b|'          // bpython REPL
+    r'node\s*$|'           // node REPL
+    r'deno\s*$|'           // deno REPL
+    r'bun\s+repl\b|'       // bun repl
+    r'irb\s*$|'            // ruby REPL
+    r'pry\s*$|'            // pry (ruby)
+    r'rails\s+console|'   // rails console
+    r'rails\s+c\s*$|'     // rails c (shorthand)
+    r'php\s+artisan\s+tinker|' // laravel tinker
+    r'php\s+-a\s*$|'      // php interactive mode
+    r'lein\s+repl|'        // clojure lein repl
+    r'ghci\s*$|'           // haskell REPL
+    r'erl\s*$|'            // erlang shell
+    r'iex\s*$|'            // elixir REPL
+    r'iex\s+-S\s+mix|'    // iex -S mix (phoenix)
+    r'lua\s*$|'            // lua REPL
+    r'R\s*$|'              // R REPL
+    r'julia\s*$|'          // julia REPL
+    r'scala\s*$|'          // scala REPL
+    r'mysql\b|'            // mysql client
+    r'psql\b|'             // postgresql client
+    r'sqlite3\b|'          // sqlite3
+    r'mongosh\b|'          // mongodb shell (modern)
+    r'mongo\b|'            // mongo shell (legacy)
+    r'redis-cli\b|'        // redis-cli
+    r'telnet\b|'           // telnet
+    r'ftp\b|'              // ftp client
+    r'sftp\b|'             // sftp client
+    r'tmux\b|'             // tmux
+    r'screen\b'            // GNU screen
+    r')',
+  );
+
+  static bool _isInteractiveCommand(String cmd) {
+    final trimmed = cmd.trim();
+    return _interactiveCommands.hasMatch(trimmed);
+  }
+
   static final _oscRe =
       RegExp(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)');
   static final _csiNonSgrRe =
@@ -143,6 +202,7 @@ class TerminalSession extends ChangeNotifier {
   // excessive cursor repositioning (full-screen TUI apps).
   bool _isTuiMode = false;
   bool get isTuiMode => _isTuiMode;
+  Timer? _interactiveTimer;
 
   /// Set by the listener when an entire command lifecycle (C marker,
   /// output, D marker) arrives in a single PTY chunk. Consumed by the
@@ -515,6 +575,7 @@ class TerminalSession extends ChangeNotifier {
     if (_disposed) return;
     _disposed = true;
     _outputSub?.cancel();
+    _interactiveTimer?.cancel();
     _liveOutputController.close();
     _pty.kill();
     _completionEngine?.dispose();
@@ -566,6 +627,7 @@ class TerminalSession extends ChangeNotifier {
           _usedAltBuffer = true;
           if (!_isTuiMode) {
             _isTuiMode = true;
+            _interactiveTimer?.cancel();
             notifyListeners();
           }
         }
@@ -588,6 +650,7 @@ class TerminalSession extends ChangeNotifier {
               decoded.contains('\x1B[?25l');
           if (isTui) {
             _isTuiMode = true;
+            _interactiveTimer?.cancel();
             notifyListeners();
           }
         }
@@ -690,6 +753,29 @@ class TerminalSession extends ChangeNotifier {
             gitBranch: _gitBranch.isNotEmpty ? _gitBranch : null,
           );
           _commandRunning = true;
+          // Immediately switch to TUI mode for commands that spawn
+          // interactive shells or sessions — these won't produce
+          // CommandEnd markers since the child shell lacks Bolan's
+          // shell integration.
+          if (_isInteractiveCommand(command)) {
+            _isTuiMode = true;
+          } else {
+            // Fallback: if the command runs for a while without a
+            // CommandEnd marker, hasn't produced any output, and
+            // hasn't been detected as TUI by other heuristics,
+            // assume it's interactive. Commands that are streaming
+            // output (npm install, sleep loops, etc.) are left in
+            // inline mode.
+            _interactiveTimer?.cancel();
+            _interactiveTimer = Timer(const Duration(seconds: 5), () {
+              if (_commandRunning &&
+                  !_isTuiMode &&
+                  _outputCapture.isEmpty) {
+                _isTuiMode = true;
+                notifyListeners();
+              }
+            });
+          }
           notifyListeners();
         }
 

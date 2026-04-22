@@ -488,7 +488,13 @@ class SessionViewState extends ConsumerState<SessionView> {
               !(isRunning && widget.session.isTuiMode))
             GestureDetector(
               behavior: HitTestBehavior.translucent,
-              onTap: () => _promptKey.currentState?.requestFocus(),
+              onTap: () {
+                if (isRunning) {
+                  _terminalFocusNode.requestFocus();
+                } else {
+                  _promptKey.currentState?.requestFocus();
+                }
+              },
               child: _BlocksWithStickyPrompt(
                 scrollController: _scrollController,
                 blocks: [

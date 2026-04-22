@@ -339,8 +339,17 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       return true;
     }
 
-    // Don't interfere during command execution
+    // Ctrl+C during command execution → send SIGINT regardless of focus.
     final session = tab.focusedSession;
+    if (session != null &&
+        session.isCommandRunning &&
+        ctrlDown &&
+        key == LogicalKeyboardKey.keyC) {
+      session.writeInput('\x03');
+      return true;
+    }
+
+    // Don't interfere during command execution
     if (session != null && session.isCommandRunning) return false;
     if (promptState.isHistorySearchOpen) return false;
 
