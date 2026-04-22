@@ -238,6 +238,7 @@ class TerminalSession extends ChangeNotifier {
   bool _isTuiMode = false;
   bool get isTuiMode => _isTuiMode;
   Timer? _interactiveTimer;
+  Timer? _idleOutputTimer;
 
   /// Set by the listener when an entire command lifecycle (C marker,
   /// output, D marker) arrives in a single PTY chunk. Consumed by the
@@ -611,6 +612,7 @@ class TerminalSession extends ChangeNotifier {
     _disposed = true;
     _outputSub?.cancel();
     _interactiveTimer?.cancel();
+    _idleOutputTimer?.cancel();
     _liveOutputController.close();
     _pty.kill();
     _completionEngine?.dispose();
@@ -657,12 +659,25 @@ class TerminalSession extends ChangeNotifier {
         // (cursor movement), and charset switches so the inline
         // display only sees plain text + SGR color codes.
         _liveOutputController.add(_stripForLiveDisplay(decoded));
+        // Reset idle timer — if no output arrives for 3 seconds
+        // after the command has been producing output, assume it's
+        // a server/watcher that has settled and switch to TUI mode.
+        if (!_isTuiMode) {
+          _idleOutputTimer?.cancel();
+          _idleOutputTimer = Timer(const Duration(seconds: 2), () {
+            if (_commandRunning && !_isTuiMode && _outputCapture.isNotEmpty) {
+              _isTuiMode = true;
+              notifyListeners();
+            }
+          });
+        }
         // Detect alternate screen buffer usage (vim, less, top, etc.)
         if (!_usedAltBuffer && terminal.isUsingAltBuffer) {
           _usedAltBuffer = true;
           if (!_isTuiMode) {
             _isTuiMode = true;
             _interactiveTimer?.cancel();
+            _idleOutputTimer?.cancel();
             notifyListeners();
           }
         }
@@ -686,6 +701,7 @@ class TerminalSession extends ChangeNotifier {
           if (isTui) {
             _isTuiMode = true;
             _interactiveTimer?.cancel();
+            _idleOutputTimer?.cancel();
             notifyListeners();
           }
         }
