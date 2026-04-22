@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import '../../core/ai/history_sanitizer.dart';
 import '../../core/completion/completion_engine.dart';
 import '../../core/config/keybinding.dart';
 import '../../core/platform_shortcuts.dart';
+import '../../core/terminal/input_broadcast.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../ai/git_commit_panel.dart';
@@ -37,6 +39,13 @@ class PromptInput extends StatefulWidget {
   final String cursorStyle;
   final Map<KeyAction, KeyBinding> keybindingOverrides;
 
+  /// When set, called instead of `session.submitFromPrompt` to allow
+  /// broadcasting input to multiple panes.
+  final void Function(String data)? onSubmitOverride;
+
+  /// Whether this pane should publish keystrokes for broadcast.
+  final bool broadcastActive;
+
   const PromptInput({
     super.key,
     required this.session,
@@ -48,6 +57,8 @@ class PromptInput extends StatefulWidget {
     this.commandSuggestions = true,
     this.smartHistorySearch = true,
     this.shareHistory = false,
+    this.onSubmitOverride,
+    this.broadcastActive = false,
     this.cursorStyle = 'bar',
     this.keybindingOverrides = const {},
   });
@@ -129,6 +140,8 @@ class PromptInputState extends State<PromptInput> {
   }
 
   int _lastBlockCount = 0;
+  StreamSubscription<String>? _broadcastTextSub;
+  bool _receivingBroadcast = false;
 
   @override
   void initState() {
@@ -137,6 +150,31 @@ class PromptInputState extends State<PromptInput> {
     _controller.addListener(_onTextChanged);
     widget.session.addListener(_onSessionChanged);
     _lastBlockCount = widget.session.blocks.length;
+    _setupBroadcastListener();
+  }
+
+  void _setupBroadcastListener() {
+    _broadcastTextSub?.cancel();
+    if (widget.broadcastActive) {
+      _broadcastTextSub = InputBroadcast.onTextChanged.listen((text) {
+        // Only mirror if this pane is NOT the one publishing.
+        if (!_focusNode.hasFocus && mounted) {
+          _receivingBroadcast = true;
+          _controller.text = text;
+          _controller.selection =
+              TextSelection.collapsed(offset: text.length);
+          _receivingBroadcast = false;
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(PromptInput old) {
+    super.didUpdateWidget(old);
+    if (old.broadcastActive != widget.broadcastActive) {
+      _setupBroadcastListener();
+    }
   }
 
   void requestFocus() => _focusNode.requestFocus();
@@ -156,6 +194,7 @@ class PromptInputState extends State<PromptInput> {
 
   @override
   void dispose() {
+    _broadcastTextSub?.cancel();
     _removeCompletionOverlay();
     widget.session.removeListener(_onSessionChanged);
     _controller.removeListener(_onTextChanged);
@@ -321,10 +360,17 @@ class PromptInputState extends State<PromptInput> {
 
   void _onTextChanged() {
     if (_controller.text == _lastObservedText) {
-      // Ghost-only notification — nothing to do here.
       return;
     }
     _lastObservedText = _controller.text;
+
+    // Don't re-publish when we're receiving a broadcast update.
+    if (_receivingBroadcast) return;
+
+    // Publish text change for broadcast input.
+    if (widget.broadcastActive && _focusNode.hasFocus) {
+      InputBroadcast.publishText(_controller.text);
+    }
 
     final aiMode = widget.aiEnabled &&
         _controller.text.startsWith('#') &&
@@ -833,10 +879,11 @@ class PromptInputState extends State<PromptInput> {
       }
     }
 
+    final submit = widget.onSubmitOverride ?? widget.session.submitFromPrompt;
     if (command.isEmpty) {
-      widget.session.submitFromPrompt('\n');
+      submit('\n');
     } else {
-      widget.session.submitFromPrompt('$command\n');
+      submit('$command\n');
       widget.session.history.add(command);
     }
     _controller.clear();

@@ -399,9 +399,14 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
     final tab = state.activeTab;
     if (tab == null || !tab.isTerminal) return;
 
+    final inherit = ref.read(configLoaderProvider).config
+        .general.inheritWorkingDirectory;
+    final cwd = inherit ? tab.focusedSession?.cwd : null;
+
     final currentFocusId = tab.focusedPaneId!;
-    final (newRoot, newLeaf) =
-        PaneManager.split(tab.rootPane!, currentFocusId, axis, history);
+    final (newRoot, newLeaf) = PaneManager.split(
+        tab.rootPane!, currentFocusId, axis, history,
+        workingDirectory: cwd);
     _attachSessionListener(newLeaf.session);
 
     // Focus the newly created pane
@@ -586,3 +591,6 @@ final currentSessionNotifierProvider = Provider<SessionNotifier>((ref) {
   final id = ref.watch(workspaceRegistryProvider).activeId;
   return ref.read(sessionFamily(id).notifier);
 });
+
+/// Whether input is broadcast to all panes in the active tab.
+final broadcastInputProvider = StateProvider<bool>((ref) => false);

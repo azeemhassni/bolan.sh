@@ -38,6 +38,8 @@ class PromptArea extends StatefulWidget {
   final String cursorStyle;
   final Map<KeyAction, KeyBinding> keybindingOverrides;
   final PromptStyleConfig promptStyle;
+  final void Function(String data)? onSubmitOverride;
+  final bool broadcastActive;
 
   const PromptArea({
     super.key,
@@ -55,6 +57,8 @@ class PromptArea extends StatefulWidget {
     this.cursorStyle = 'bar',
     this.keybindingOverrides = const {},
     this.promptStyle = const PromptStyleConfig(),
+    this.onSubmitOverride,
+    this.broadcastActive = false,
   });
 
   @override
@@ -568,6 +572,8 @@ class _PromptAreaState extends State<PromptArea> {
             shareHistory: widget.aiEnabled && widget.shareHistory,
             cursorStyle: widget.cursorStyle,
             keybindingOverrides: widget.keybindingOverrides,
+            onSubmitOverride: widget.onSubmitOverride,
+            broadcastActive: widget.broadcastActive,
           ),
       ],
     );
@@ -639,6 +645,8 @@ class _PromptAreaState extends State<PromptArea> {
                     shareHistory: widget.aiEnabled && widget.shareHistory,
                     cursorStyle: widget.cursorStyle,
                     keybindingOverrides: widget.keybindingOverrides,
+                    onSubmitOverride: widget.onSubmitOverride,
+            broadcastActive: widget.broadcastActive,
                   ),
                 ),
             ],

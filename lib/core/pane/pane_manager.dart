@@ -17,11 +17,16 @@ class PaneManager {
     PaneNode root,
     String targetId,
     Axis axis,
-    CommandHistory history,
-  ) {
+    CommandHistory history, {
+    String? workingDirectory,
+  }) {
     final newLeaf = LeafPane(
       id: _uuid.v4(),
-      session: TerminalSession.start(id: _uuid.v4(), history: history),
+      session: TerminalSession.start(
+        id: _uuid.v4(),
+        history: history,
+        workingDirectory: workingDirectory,
+      ),
     );
 
     final newRoot = _replaceNode(root, targetId, (leaf) {

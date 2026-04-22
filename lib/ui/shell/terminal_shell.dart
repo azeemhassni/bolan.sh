@@ -292,6 +292,10 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       case KeyAction.resetZoom:
         ref.read(fontSizeProvider.notifier).reset();
         return true;
+      case KeyAction.broadcastInput:
+        final current = ref.read(broadcastInputProvider);
+        ref.read(broadcastInputProvider.notifier).state = !current;
+        return true;
       case KeyAction.workspace1:
         _switchWorkspace(0);
         return true;

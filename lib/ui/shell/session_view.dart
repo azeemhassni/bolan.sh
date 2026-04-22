@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xterm/xterm.dart';
 
+import '../../core/pane/pane_manager.dart';
 import '../../core/platform_shortcuts.dart';
 import '../../core/terminal/session.dart';
 import '../../core/terminal/url_detector.dart';
@@ -142,6 +143,20 @@ class SessionViewState extends ConsumerState<SessionView> {
   /// Returns [KeyEventResult.handled] for intercepted keys (which
   /// prevents xterm's default processing), [ignored] for everything
   /// else so xterm handles it normally.
+  /// Submits input to all panes in the active tab.
+  void _broadcastSubmit(String data) {
+    final sessionState = ref.read(currentSessionProvider);
+    final tab = sessionState.activeTab;
+    if (tab == null || tab.rootPane == null) {
+      widget.session.submitFromPrompt(data);
+      return;
+    }
+    final leaves = PaneManager.allLeaves(tab.rootPane!);
+    for (final leaf in leaves) {
+      leaf.session.submitFromPrompt(data);
+    }
+  }
+
   void _scrollToBottomIfPinned() {
     if (!_scrollController.hasClients) return;
     final pos = _scrollController.position;
@@ -555,6 +570,10 @@ class SessionViewState extends ConsumerState<SessionView> {
                         cursorStyle: cursorStyle,
                         keybindingOverrides: configLoader.config.keybindingOverrides,
                         promptStyle: configLoader.config.general.promptStyle,
+                        onSubmitOverride: ref.watch(broadcastInputProvider)
+                            ? (data) => _broadcastSubmit(data)
+                            : null,
+                        broadcastActive: ref.watch(broadcastInputProvider),
                       ),
               ),
             ),

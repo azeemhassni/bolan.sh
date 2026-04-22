@@ -127,6 +127,7 @@ enum KeyAction {
   navigatePaneDown,
   find,
   focusPrompt,
+  broadcastInput,
   // ── Workspace ──
   workspace1,
   workspace2,
@@ -173,6 +174,7 @@ extension KeyActionMeta on KeyAction {
         KeyAction.navigatePaneDown => 'Navigate pane down',
         KeyAction.find => 'Find',
         KeyAction.focusPrompt => 'Focus prompt',
+        KeyAction.broadcastInput => 'Toggle broadcast input',
         KeyAction.workspace1 => 'Switch to workspace 1',
         KeyAction.workspace2 => 'Switch to workspace 2',
         KeyAction.workspace3 => 'Switch to workspace 3',
@@ -215,7 +217,8 @@ extension KeyActionMeta on KeyAction {
         KeyAction.navigatePaneUp ||
         KeyAction.navigatePaneDown ||
         KeyAction.find ||
-        KeyAction.focusPrompt =>
+        KeyAction.focusPrompt ||
+        KeyAction.broadcastInput =>
           'Global',
         KeyAction.workspace1 ||
         KeyAction.workspace2 ||
@@ -278,6 +281,8 @@ final Map<KeyAction, KeyBinding> defaultKeyBindings = {
       _primary(LogicalKeyboardKey.arrowDown, alt: true),
   KeyAction.find: _primary(LogicalKeyboardKey.keyF),
   KeyAction.focusPrompt: _primary(LogicalKeyboardKey.keyL),
+  KeyAction.broadcastInput:
+      _primary(LogicalKeyboardKey.keyB, shift: true),
   // Workspace switching: Ctrl+1–9 on all platforms.
   KeyAction.workspace1:
       const KeyBinding(ctrl: true, key: LogicalKeyboardKey.digit1),
