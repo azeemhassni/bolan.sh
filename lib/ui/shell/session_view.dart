@@ -450,6 +450,11 @@ class SessionViewState extends ConsumerState<SessionView> {
         if (widget.paneId != null) {
           ref.read(currentSessionNotifierProvider).setFocusedPane(widget.paneId!);
         }
+        // Re-focus the invisible terminal during command execution
+        // so Ctrl+C reaches the PTY.
+        if (isRunning && !widget.session.isTuiMode) {
+          _terminalFocusNode.requestFocus();
+        }
       },
       child: Stack(
         children: [

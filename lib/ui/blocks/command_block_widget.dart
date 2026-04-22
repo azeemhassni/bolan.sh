@@ -83,7 +83,12 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
   Widget build(BuildContext context) {
     final theme = BolonTheme.of(context);
     final block = widget.block;
-    final isFailed = block.exitCode != null && block.exitCode! > 0;
+    // Non-zero exit = failed, but exclude signal kills (Ctrl+C = 130,
+    // SIGTERM = 143) — those are intentional, not errors to explain.
+    final isFailed = block.exitCode != null &&
+        block.exitCode! > 0 &&
+        block.exitCode != 130 &&
+        block.exitCode != 143;
 
     // Each block is a SliverMainAxisGroup containing three slivers:
     //   1. The prompt context line (scrolls away normally)
@@ -597,7 +602,10 @@ class _CommandBlockWidgetState extends State<CommandBlockWidget> {
 
   void _showMoreMenu() {
     final isFailed =
-        widget.block.exitCode != null && widget.block.exitCode! > 0;
+        widget.block.exitCode != null &&
+        widget.block.exitCode! > 0 &&
+        widget.block.exitCode != 130 &&
+        widget.block.exitCode != 143;
     final hasOutput = widget.block.hasOutput;
     final canExplain = widget.aiEnabled && isFailed && _explanation == null;
 
