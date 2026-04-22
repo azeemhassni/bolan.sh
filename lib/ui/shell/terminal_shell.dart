@@ -558,18 +558,16 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         // Manual check: show the full update dialog
         setState(() => _showUpdateDialog = true);
       } else {
-        // Auto check: download silently in the background.
-        // When done, the toast will appear prompting restart.
+        // Auto check: download in background with toast showing progress.
         notifier.download();
-        // Listen for completion to show restart prompt
+        setState(() => _showUpdateToast = true);
+        // Listen for completion or error to update toast state
         void listener() {
           if (!mounted) return;
           final s = notifier.state;
-          if (s.status == UpdateStatus.readyToRestart) {
-            setState(() => _showUpdateToast = true);
-            notifier.removeListener(listener);
-          } else if (s.status == UpdateStatus.error ||
+          if (s.status == UpdateStatus.error ||
               s.status == UpdateStatus.idle) {
+            setState(() => _showUpdateToast = false);
             notifier.removeListener(listener);
           }
         }
@@ -899,30 +897,42 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
             if (_showUpdateToast)
               Builder(builder: (context) {
                 final us = ref.watch(updateProvider).state;
-                if (us.status != UpdateStatus.downloading) {
+                // Auto-hide toast on error or idle.
+                if (us.status == UpdateStatus.error ||
+                    us.status == UpdateStatus.idle) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (mounted && _showUpdateToast) {
-                      if (us.status == UpdateStatus.readyToRestart ||
-                          us.status == UpdateStatus.error ||
-                          us.status == UpdateStatus.verifying ||
-                          us.status == UpdateStatus.installing) {
-                        setState(() {
-                          _showUpdateToast = false;
-                          _showUpdateDialog = true;
-                        });
-                      } else {
-                        setState(() => _showUpdateToast = false);
-                      }
+                      setState(() => _showUpdateToast = false);
+                    }
+                  });
+                }
+                // For verifying/installing, switch to dialog.
+                if (us.status == UpdateStatus.verifying ||
+                    us.status == UpdateStatus.installing) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && _showUpdateToast) {
+                      setState(() {
+                        _showUpdateToast = false;
+                        _showUpdateDialog = true;
+                      });
                     }
                   });
                 }
                 return UpdateToast(
                   received: us.received,
                   total: us.total,
+                  isReady:
+                      us.status == UpdateStatus.readyToRestart,
                   onTap: () => setState(() {
                     _showUpdateToast = false;
                     _showUpdateDialog = true;
                   }),
+                  onDismiss: () {
+                    ref.read(updateProvider).cancelDownload();
+                    setState(() => _showUpdateToast = false);
+                  },
+                  onRestart: () =>
+                      ref.read(updateProvider).restart(),
                 );
               }),
           ],

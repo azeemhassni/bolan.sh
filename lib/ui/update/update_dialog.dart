@@ -235,11 +235,21 @@ class _UpdateDialogState extends ConsumerState<UpdateDialog> {
         const SizedBox(height: 8),
         const BolanDialogText('Restart Bolan to use the new version.'),
         const SizedBox(height: 20),
-        BolanDialogButton(
-          label: 'Restart Now',
-          autofocus: true,
-          kind: BolanButtonKind.primary,
-          onTap: () => ref.read(updateProvider).restart(),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            BolanDialogButton(
+              label: 'Later',
+              onTap: widget.onDismiss,
+            ),
+            const SizedBox(width: 8),
+            BolanDialogButton(
+              label: 'Restart Now',
+              autofocus: true,
+              kind: BolanButtonKind.primary,
+              onTap: () => ref.read(updateProvider).restart(),
+            ),
+          ],
         ),
       ],
     );
