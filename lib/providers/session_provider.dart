@@ -284,7 +284,13 @@ class SessionNotifier extends FamilyNotifier<SessionState, String> {
   }
 
   void createTab({String? workingDirectory}) {
-    final tab = _createTab(workingDirectory: workingDirectory);
+    // Inherit working directory from the active pane if not specified
+    // and the setting is enabled.
+    final inherit = ref.read(configLoaderProvider).config
+        .general.inheritWorkingDirectory;
+    final effectiveDir = workingDirectory ??
+        (inherit ? state.activeSession?.cwd : null);
+    final tab = _createTab(workingDirectory: effectiveDir);
     _attachTabListeners(tab);
     final tabs = [...state.tabs, tab];
     state = SessionState(tabs: tabs, activeTabIndex: tabs.length - 1);

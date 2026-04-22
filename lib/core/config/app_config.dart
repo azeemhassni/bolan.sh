@@ -98,6 +98,9 @@ class GeneralConfig {
   /// Whether to show a confirmation dialog before quitting the app.
   final bool confirmOnQuit;
 
+  /// Whether new tabs inherit the active pane's working directory.
+  final bool inheritWorkingDirectory;
+
   /// Visual style for prompt bar chips (shape, spacing, separators).
   final PromptStyleConfig promptStyle;
 
@@ -110,6 +113,7 @@ class GeneralConfig {
     this.longRunningThresholdSeconds = 10,
     this.startupCommands = const [],
     this.confirmOnQuit = true,
+    this.inheritWorkingDirectory = true,
     this.promptStyle = const PromptStyleConfig(),
   });
 
@@ -122,6 +126,7 @@ class GeneralConfig {
     int? longRunningThresholdSeconds,
     List<String>? startupCommands,
     bool? confirmOnQuit,
+    bool? inheritWorkingDirectory,
     PromptStyleConfig? promptStyle,
   }) =>
       GeneralConfig(
@@ -134,6 +139,8 @@ class GeneralConfig {
             longRunningThresholdSeconds ?? this.longRunningThresholdSeconds,
         startupCommands: startupCommands ?? this.startupCommands,
         confirmOnQuit: confirmOnQuit ?? this.confirmOnQuit,
+        inheritWorkingDirectory:
+            inheritWorkingDirectory ?? this.inheritWorkingDirectory,
         promptStyle: promptStyle ?? this.promptStyle,
       );
 }

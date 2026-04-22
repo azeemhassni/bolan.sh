@@ -53,6 +53,8 @@ class ConfigValidator {
           raw['long_running_threshold_seconds'], 10, min: 1, max: 3600),
       startupCommands: _stringList(raw['startup_commands'], const []),
       confirmOnQuit: _bool(raw['confirm_on_quit'], true),
+      inheritWorkingDirectory:
+          _bool(raw['inherit_working_directory'], true),
       promptStyle: _validatePromptStyle(
           _toStringMap(raw['prompt_style'])),
     );

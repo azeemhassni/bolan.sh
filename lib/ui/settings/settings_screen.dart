@@ -935,6 +935,12 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
       ),
       BolanToggle(
+        label: 'Inherit working directory',
+        help: 'New tabs start in the same directory as the active tab',
+        value: _config.general.inheritWorkingDirectory,
+        onChanged: (v) => _updateGeneral(inheritWorkingDirectory: v),
+      ),
+      BolanToggle(
         label: 'Confirm on Quit',
         help: 'Ask before closing the app',
         value: _config.general.confirmOnQuit,
@@ -1262,22 +1268,17 @@ class _SettingsScreenState extends State<SettingsScreen>
     bool? confirmOnQuit,
     bool? restoreSessions,
     bool? notifyLongRunning,
+    bool? inheritWorkingDirectory,
   }) {
     setState(() {
       _config = _config.copyWith(
-        general: GeneralConfig(
-          shell: shell ?? _config.general.shell,
-          workingDirectory:
-              workingDirectory ?? _config.general.workingDirectory,
-          restoreSessions:
-              restoreSessions ?? _config.general.restoreSessions,
-          confirmOnQuit: confirmOnQuit ?? _config.general.confirmOnQuit,
-          notifyLongRunning:
-              notifyLongRunning ?? _config.general.notifyLongRunning,
-          longRunningThresholdSeconds:
-              _config.general.longRunningThresholdSeconds,
-          promptChips: _config.general.promptChips,
-          startupCommands: _config.general.startupCommands,
+        general: _config.general.copyWith(
+          shell: shell,
+          workingDirectory: workingDirectory,
+          restoreSessions: restoreSessions,
+          confirmOnQuit: confirmOnQuit,
+          notifyLongRunning: notifyLongRunning,
+          inheritWorkingDirectory: inheritWorkingDirectory,
         ),
       );
     });
