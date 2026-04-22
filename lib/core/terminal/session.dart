@@ -1535,9 +1535,30 @@ class TerminalSession extends ChangeNotifier {
       // the live tool chips that depend on shell-side state — AWS
       // profile, GCP project, Docker context, active Python venv.
       script = r"""
-PS1=''
+# Bolan prompt: shellname · cwd · branch ❯
+# Uses ANSI colors matching Bolan's theme defaults.
+__bolan_ps1() {
+  local branch=""
+  if command -v git >/dev/null 2>&1; then
+    branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+  fi
+  local dim=$'\e[90m'
+  local cyan=$'\e[36m'
+  local green=$'\e[32m'
+  local blue=$'\e[34m'
+  local reset=$'\e[0m'
+  local sep="${dim} · ${reset}"
+  local p="${green}zsh${reset}${sep}${cyan}%~${reset}"
+  if [[ -n "$branch" ]]; then
+    p="${p}${sep}${blue}${branch}${reset}"
+  fi
+  p="${p} ${dim}❯${reset} "
+  echo -n "$p"
+}
+setopt PROMPT_SUBST
+PS1='$(__bolan_ps1)'
 RPS1=''
-PROMPT=''
+PROMPT='$(__bolan_ps1)'
 __bolan_prompt_start() { printf '\e]133;A\a'; }
 __bolan_prompt_end()   { printf '\e]133;B\a'; }
 __bolan_cmd_start()    { printf '\e]133;C;%s\a' "$1"; }
@@ -1565,7 +1586,26 @@ add-zsh-hook preexec __bolan_cmd_start
 """;
     } else if (shellName == 'bash') {
       script = r"""
-PS1=''
+# Bolan prompt: shellname · cwd · branch ❯
+__bolan_ps1() {
+  local branch=""
+  if command -v git >/dev/null 2>&1; then
+    branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+  fi
+  local dim='\[\e[90m\]'
+  local cyan='\[\e[36m\]'
+  local green='\[\e[32m\]'
+  local blue='\[\e[34m\]'
+  local reset='\[\e[0m\]'
+  local sep="${dim} · ${reset}"
+  local p="${green}bash${reset}${sep}${cyan}\w${reset}"
+  if [[ -n "$branch" ]]; then
+    p="${p}${sep}${blue}${branch}${reset}"
+  fi
+  p="${p} ${dim}❯${reset} "
+  echo "$p"
+}
+PS1='$(__bolan_ps1)'
 __bolan_prompt_start() { printf '\e]133;A\a'; }
 __bolan_prompt_end()   { printf '\e]133;B\a'; }
 __bolan_cmd_start()    { printf '\e]133;C;%s\a' "$BASH_COMMAND"; }
