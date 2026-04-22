@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -64,6 +65,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   bool _showUpdateDialog = false;
   bool _showUpdateToast = false;
   bool _sidebarOpen = false;
+  Timer? _updateCheckTimer;
   final _downloadDialogKey = GlobalKey<ModelDownloadDialogState>();
 
   @override
@@ -93,6 +95,11 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
       ref.read(updateProvider).setConfigLoader(_configLoader);
       _checkLocalModelNeeded();
       _checkForUpdates();
+      // Re-check every hour for long-running sessions.
+      _updateCheckTimer = Timer.periodic(
+        const Duration(hours: 1),
+        (_) => _checkForUpdates(),
+      );
     });
   }
 
@@ -119,6 +126,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
 
   @override
   void dispose() {
+    _updateCheckTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(_globalKeyHandler);
     LocalLlmProvider.memoryConfirmCallback = null;

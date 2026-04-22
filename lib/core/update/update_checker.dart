@@ -41,11 +41,11 @@ class UpdateChecker {
     if (!force) {
       if (!config.update.autoCheck) return null;
 
-      // 24-hour throttle
+      // 1-hour throttle (covers long-running sessions)
       if (config.update.lastCheckTime.isNotEmpty) {
         final last = DateTime.tryParse(config.update.lastCheckTime);
         if (last != null &&
-            DateTime.now().difference(last) < const Duration(hours: 24)) {
+            DateTime.now().difference(last) < const Duration(hours: 1)) {
           return null;
         }
       }
