@@ -387,13 +387,18 @@ class SessionViewState extends ConsumerState<SessionView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
-      // Command just started or switched to TUI → focus the terminal
+      // Command just started → focus terminal, scroll to bottom so
+      // the live output block is visible.
       if (isRunning && !_wasRunning) {
         _terminalFocusNode.requestFocus();
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           final t = widget.session.terminal;
           widget.session.resize(t.viewHeight, t.viewWidth);
+          if (_scrollController.hasClients) {
+            _scrollController
+                .jumpTo(_scrollController.position.maxScrollExtent);
+          }
         });
       }
       // Mid-command TUI transition (e.g. git log → less): re-request
