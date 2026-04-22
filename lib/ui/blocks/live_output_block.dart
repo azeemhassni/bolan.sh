@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/terminal/session.dart';
 import '../../core/theme/bolan_theme.dart';
 import 'ansi_text_parser.dart';
+import 'linkified_text.dart';
 
 /// Renders streaming command output inline in the blocks layout while
 /// a command is running. Replaces the full-screen TerminalView for
@@ -222,9 +223,14 @@ class _LiveOutputBlockState extends State<LiveOutputBlock> {
     );
 
     final spans = parser.parse(text, baseStyle: baseStyle);
+    final linkedSpans = LinkifiedText.linkify(
+      spans,
+      linkColor: theme.ansiCyan,
+      cwd: widget.session.cwd,
+    );
 
     return SelectableText.rich(
-      TextSpan(children: spans),
+      TextSpan(children: linkedSpans),
       contextMenuBuilder: (_, __) => const SizedBox.shrink(),
     );
   }
