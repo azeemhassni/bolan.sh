@@ -624,6 +624,26 @@ class _CustomStyleControls extends StatelessWidget {
               onChanged: (v) =>
                   onChanged(style.copyWith(perSegmentColors: v)),
           ),
+
+          // ── Inline input ──
+          BolanToggle(
+            label: 'Inline input',
+            help: 'Place the input on the same line as the chips',
+            value: style.inlineInput,
+            onChanged: (v) =>
+                onChanged(style.copyWith(inlineInput: v)),
+          ),
+          if (style.inlineInput)
+            BolanField(
+              label: 'Prompt symbol',
+              help: 'Symbol shown before the input (e.g. ❯, λ, ▶)',
+              child: BolanTextField(
+                value: style.promptSymbol,
+                hint: '❯',
+                onChanged: (v) =>
+                    onChanged(style.copyWith(promptSymbol: v)),
+              ),
+            ),
         ],
       ),
     );

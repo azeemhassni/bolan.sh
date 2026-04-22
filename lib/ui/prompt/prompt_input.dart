@@ -193,6 +193,7 @@ class PromptInputState extends State<PromptInput> {
       controller: _controller,
       focusNode: _focusNode,
       autofocus: true,
+      textAlign: TextAlign.left,
       maxLines: null,
       minLines: 1,
       contextMenuBuilder: (_, __) => const SizedBox.shrink(),

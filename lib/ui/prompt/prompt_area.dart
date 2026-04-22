@@ -537,6 +537,117 @@ class _PromptAreaState extends State<PromptArea> {
     }
   }
 
+  /// Traditional stacked layout: chips above, input below.
+  Widget _buildStackedLayout(BolonTheme theme) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(
+            left: 12, right: 12, top: 10, bottom: 12,
+          ),
+          child: _buildChipsBar(theme),
+        ),
+        if (widget.session.isCommandRunning && !widget.session.isTuiMode)
+          _RunningCommandIndicator(
+            command: widget.session.activeBlock?.command ?? '',
+            fontSize: widget.fontSize,
+          )
+        else
+          PromptInput(
+            key: widget.promptInputKey,
+            session: widget.session,
+            fontSize: widget.fontSize,
+            aiEnabled: widget.aiEnabled,
+            aiProvider: widget.aiProvider,
+            geminiModel: widget.geminiModel,
+            anthropicMode: widget.anthropicMode,
+            commandSuggestions: widget.aiEnabled && widget.commandSuggestions,
+            smartHistorySearch: widget.aiEnabled && widget.smartHistorySearch,
+            shareHistory: widget.aiEnabled && widget.shareHistory,
+            cursorStyle: widget.cursorStyle,
+            keybindingOverrides: widget.keybindingOverrides,
+          ),
+      ],
+    );
+  }
+
+  /// Inline layout: chips + prompt symbol + input on the same line.
+  /// Continuation lines indent by 2 spaces from the left edge.
+  Widget _buildInlineLayout(BolonTheme theme) {
+    final symbol = widget.promptStyle.promptSymbol;
+    final isRunning =
+        widget.session.isCommandRunning && !widget.session.isTuiMode;
+
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: 12, right: 12, top: 10, bottom: 8,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Chips — pinned to top, don't stretch
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: _buildChipsBar(theme),
+              ),
+              // Prompt symbol
+              if (symbol.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    symbol,
+                    style: TextStyle(
+                      color: theme.cursor,
+                      fontFamily: theme.fontFamily,
+                      fontSize: widget.fontSize,
+                      fontWeight: FontWeight.w700,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 8),
+              // Input field
+              if (isRunning)
+                Expanded(
+                  child: _RunningCommandIndicator(
+                    command: widget.session.activeBlock?.command ?? '',
+                    fontSize: widget.fontSize,
+                  ),
+                )
+              else
+                Expanded(
+                  child: PromptInput(
+                    key: widget.promptInputKey,
+                    session: widget.session,
+                    fontSize: widget.fontSize,
+                    aiEnabled: widget.aiEnabled,
+                    aiProvider: widget.aiProvider,
+                    geminiModel: widget.geminiModel,
+                    anthropicMode: widget.anthropicMode,
+                    commandSuggestions:
+                        widget.aiEnabled && widget.commandSuggestions,
+                    smartHistorySearch:
+                        widget.aiEnabled && widget.smartHistorySearch,
+                    shareHistory: widget.aiEnabled && widget.shareHistory,
+                    cursorStyle: widget.cursorStyle,
+                    keybindingOverrides: widget.keybindingOverrides,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildChipsBar(BolonTheme theme) {
     final renderer = PromptChipRenderer.forStyle(widget.promptStyle);
     final fontSize = widget.fontSize;
@@ -619,42 +730,9 @@ class _PromptAreaState extends State<PromptArea> {
           top: BorderSide(color: theme.blockBorder, width: 1),
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Status chips row — built dynamically from config
-          Padding(
-            padding: const EdgeInsets.only(
-              left: 12, right: 12, top: 10, bottom: 12,
-            ),
-            child: _buildChipsBar(theme),
-          ),
-
-          // Text input or running command indicator
-          if (widget.session.isCommandRunning &&
-              !widget.session.isTuiMode)
-            _RunningCommandIndicator(
-              command: widget.session.activeBlock?.command ?? '',
-              fontSize: widget.fontSize,
-            )
-          else
-            PromptInput(
-              key: widget.promptInputKey,
-              session: widget.session,
-              fontSize: widget.fontSize,
-              aiEnabled: widget.aiEnabled,
-              aiProvider: widget.aiProvider,
-              geminiModel: widget.geminiModel,
-              anthropicMode: widget.anthropicMode,
-              commandSuggestions: widget.aiEnabled && widget.commandSuggestions,
-              smartHistorySearch: widget.aiEnabled && widget.smartHistorySearch,
-              shareHistory: widget.aiEnabled && widget.shareHistory,
-              cursorStyle: widget.cursorStyle,
-              keybindingOverrides: widget.keybindingOverrides,
-            ),
-        ],
-      ),
+      child: widget.promptStyle.inlineInput
+          ? _buildInlineLayout(theme)
+          : _buildStackedLayout(theme),
     );
   }
 }

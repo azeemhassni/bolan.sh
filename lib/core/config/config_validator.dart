@@ -85,6 +85,8 @@ class ConfigValidator {
       showIcons: _bool(raw['show_icons'], true),
       fontWeight: _oneOf(
           raw['font_weight'], ['normal', 'w500', 'bold'], 'bold'),
+      inlineInput: _bool(raw['inline_input'], false),
+      promptSymbol: _string(raw['prompt_symbol'], ''),
     );
   }
 

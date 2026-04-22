@@ -139,6 +139,10 @@ class ConfigLoader extends ChangeNotifier {
       sb.writeln('show_border = ${ps.showBorder}');
       sb.writeln('show_icons = ${ps.showIcons}');
       sb.writeln('font_weight = "${ps.fontWeight}"');
+      sb.writeln('inline_input = ${ps.inlineInput}');
+      if (ps.promptSymbol.isNotEmpty) {
+        sb.writeln('prompt_symbol = "${ps.promptSymbol}"');
+      }
     }
     sb.writeln();
 

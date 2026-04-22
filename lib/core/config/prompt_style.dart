@@ -27,6 +27,8 @@ class PromptStyleConfig {
   final bool showBorder;
   final bool showIcons;
   final String fontWeight;
+  final bool inlineInput;
+  final String promptSymbol;
 
   const PromptStyleConfig({
     this.preset = PromptPreset.bolan,
@@ -44,6 +46,8 @@ class PromptStyleConfig {
     this.showBorder = true,
     this.showIcons = true,
     this.fontWeight = 'bold',
+    this.inlineInput = false,
+    this.promptSymbol = '',
   });
 
   const PromptStyleConfig.powerline()
@@ -61,7 +65,9 @@ class PromptStyleConfig {
         perSegmentColors = true,
         showBorder = false,
         showIcons = true,
-        fontWeight = 'bold';
+        fontWeight = 'bold',
+        inlineInput = false,
+        promptSymbol = '';
 
   const PromptStyleConfig.starship()
       : preset = PromptPreset.starship,
@@ -78,7 +84,9 @@ class PromptStyleConfig {
         perSegmentColors = false,
         showBorder = true,
         showIcons = true,
-        fontWeight = 'w500';
+        fontWeight = 'w500',
+        inlineInput = false,
+        promptSymbol = '';
 
   const PromptStyleConfig.minimal()
       : preset = PromptPreset.minimal,
@@ -95,7 +103,9 @@ class PromptStyleConfig {
         perSegmentColors = false,
         showBorder = false,
         showIcons = false,
-        fontWeight = 'normal';
+        fontWeight = 'normal',
+        inlineInput = true,
+        promptSymbol = '❯';
 
   factory PromptStyleConfig.fromPreset(PromptPreset p) => switch (p) {
         PromptPreset.bolan => const PromptStyleConfig(),
@@ -122,6 +132,8 @@ class PromptStyleConfig {
     bool? showBorder,
     bool? showIcons,
     String? fontWeight,
+    bool? inlineInput,
+    String? promptSymbol,
   }) =>
       PromptStyleConfig(
         preset: preset ?? this.preset,
@@ -139,6 +151,8 @@ class PromptStyleConfig {
         showBorder: showBorder ?? this.showBorder,
         showIcons: showIcons ?? this.showIcons,
         fontWeight: fontWeight ?? this.fontWeight,
+        inlineInput: inlineInput ?? this.inlineInput,
+        promptSymbol: promptSymbol ?? this.promptSymbol,
       );
 
   /// Serialize to a TOML-friendly map.
@@ -161,6 +175,8 @@ class PromptStyleConfig {
     m['show_border'] = showBorder;
     m['show_icons'] = showIcons;
     m['font_weight'] = fontWeight;
+    m['inline_input'] = inlineInput;
+    if (promptSymbol.isNotEmpty) m['prompt_symbol'] = promptSymbol;
     return m;
   }
 
@@ -181,7 +197,9 @@ class PromptStyleConfig {
       perSegmentColors == other.perSegmentColors &&
       showBorder == other.showBorder &&
       showIcons == other.showIcons &&
-      fontWeight == other.fontWeight;
+      fontWeight == other.fontWeight &&
+      inlineInput == other.inlineInput &&
+      promptSymbol == other.promptSymbol;
 
   @override
   int get hashCode => Object.hash(
@@ -200,5 +218,7 @@ class PromptStyleConfig {
         showBorder,
         showIcons,
         fontWeight,
+        inlineInput,
+        promptSymbol,
       );
 }
