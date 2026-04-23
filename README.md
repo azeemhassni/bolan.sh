@@ -16,7 +16,7 @@
 
 <p align="center">
   <a href="https://github.com/azeemhassni/bolan.sh/releases/latest">
-    <img src="https://img.shields.io/badge/macOS-Download-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS">
+    <img src="https://img.shields.io/badge/macOS%20Apple%20Silicon-Download-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS Apple Silicon">
   </a>
   &nbsp;
   <a href="https://github.com/azeemhassni/bolan.sh/releases/latest">
@@ -54,7 +54,19 @@ Early and a bit rough. I use it every day.
 - 11 built-in themes, custom TOML themes, AI-generated themes
 - Auto-updates with signature verification and rollback
 
-## Getting started
+## Installation
+
+### For end users
+
+Download the latest build from the [releases page](https://github.com/AzeemHassni/bolan.sh/releases):
+
+- macOS: Apple Silicon build
+- Linux x64
+- Linux ARM64
+
+Launch the app, then open Settings to choose your AI provider if you want AI features. Local mode works without any API key.
+
+### For development
 
 macOS needs Xcode 15+ and CocoaPods. Linux needs clang, cmake, ninja-build, libgtk-3-dev, pkg-config.
 
@@ -73,8 +85,6 @@ Release builds:
 flutter build macos     # -> build/macos/Build/Products/Release/Bolan.app
 flutter build linux     # -> build/linux/x64/release/bundle/
 ```
-
-Or grab a DMG/tar.gz from the [releases page](https://github.com/AzeemHassni/bolan.sh/releases).
 
 ## AI providers
 
