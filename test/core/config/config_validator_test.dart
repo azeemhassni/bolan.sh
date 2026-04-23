@@ -7,7 +7,7 @@ void main() {
   group('ConfigValidator', () {
     test('returns defaults for empty map', () {
       final config = validator.validate({});
-      expect(config.activeTheme, 'default-dark');
+      expect(config.activeTheme, 'midnight-cove');
       expect(config.editor.fontSize, 15.0);
       expect(config.editor.fontFamily, 'JetBrains Mono');
       expect(config.editor.cursorStyle, 'block');

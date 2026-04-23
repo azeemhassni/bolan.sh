@@ -24,7 +24,7 @@ class GlobalConfig {
 
   const GlobalConfig({
     this.editor = const EditorConfig(),
-    this.activeTheme = 'default-dark',
+    this.activeTheme = 'midnight-cove',
     this.keybindingOverrides = const {},
     this.update = const UpdateConfig(),
     this.confirmOnQuit = true,
@@ -207,7 +207,7 @@ class GlobalConfigLoader extends ChangeNotifier {
               ligatures: _bool(editor['ligatures'], true),
             )
           : const EditorConfig(),
-      activeTheme: _str(raw['theme'], 'default-dark'),
+      activeTheme: _str(raw['theme'], 'midnight-cove'),
       keybindingOverrides: _parseKeybindings(keybindings),
       update: updates != null
           ? UpdateConfig(

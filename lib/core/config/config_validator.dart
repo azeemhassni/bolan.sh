@@ -14,7 +14,7 @@ class ConfigValidator {
       editor: _validateEditor(raw['editor'] as Map<String, dynamic>?),
       ai: _validateAi(raw['ai'] as Map<String, dynamic>?),
       update: _validateUpdate(raw['updates'] as Map<String, dynamic>?),
-      activeTheme: _string(raw['theme'], 'default-dark'),
+      activeTheme: _string(raw['theme'], 'midnight-cove'),
       keybindingOverrides:
           _validateKeybindings(raw['keybindings'] as Map<String, dynamic>?),
       overrides: _validateOverrides(

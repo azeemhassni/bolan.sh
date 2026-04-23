@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/bolan_theme.dart';
 import '../../../core/theme/theme_registry.dart';
+import '../../shared/bolan_components.dart';
 import '../theme_editor.dart';
 import '../theme_functions.dart';
 import '../widgets/action_button.dart';
@@ -31,6 +32,7 @@ class _AppearanceTabState extends State<AppearanceTab> {
   bool _generating = false;
   String? _error;
   BolonTheme? _preview;
+  bool _legacyExpanded = false;
 
   Future<void> _generate(String description) async {
     if (description.trim().isEmpty) return;
@@ -95,41 +97,52 @@ class _AppearanceTabState extends State<AppearanceTab> {
   Future<void> _delete(BolonTheme theme) async {
     await deleteTheme(widget.registry, theme);
     if (!mounted) return;
-    widget.onActiveThemeChanged('default-dark');
+    widget.onActiveThemeChanged('midnight-cove');
+  }
+
+  Widget _themeGrid(List<BolonTheme> themes, BolonTheme currentTheme) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final t in themes)
+          ThemeCard(
+            theme: t,
+            isActive: widget.config.activeTheme == t.name,
+            currentTheme: currentTheme,
+            onTap: () => widget.onActiveThemeChanged(t.name),
+          ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final themes = widget.registry.allThemes;
+    final primary = widget.registry.primaryBuiltIns;
+    final custom = widget.registry.customThemes;
+    final legacy = widget.registry.legacyBuiltIns;
     final activeTheme = widget.registry.getTheme(widget.config.activeTheme);
     final theme = widget.theme;
+    final activeIsLegacy = widget.registry.isLegacy(activeTheme);
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
       children: [
-        Text(
-          'Theme',
-          style: TextStyle(
-            color: theme.foreground,
-            fontFamily: theme.fontFamily,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            decoration: TextDecoration.none,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final t in themes)
-              ThemeCard(
-                theme: t,
-                isActive: widget.config.activeTheme == t.name,
-                currentTheme: theme,
-                onTap: () => widget.onActiveThemeChanged(t.name),
-              ),
-          ],
+        const BolanSectionHeader('BUILT-IN'),
+        _themeGrid(primary, theme),
+        const SizedBox(height: 20),
+        if (custom.isNotEmpty) ...[
+          const BolanSectionHeader('CUSTOM'),
+          _themeGrid(custom, theme),
+          const SizedBox(height: 20),
+        ],
+        _LegacyAccordion(
+          theme: theme,
+          expanded: _legacyExpanded || activeIsLegacy,
+          count: legacy.length,
+          onToggle: () =>
+              setState(() => _legacyExpanded = !_legacyExpanded),
+          child: _themeGrid(legacy, theme),
         ),
         const SizedBox(height: 20),
         Row(
@@ -194,6 +207,76 @@ class _AppearanceTabState extends State<AppearanceTab> {
             setState(() {});
           },
         ),
+      ],
+    );
+  }
+}
+
+class _LegacyAccordion extends StatelessWidget {
+  final BolonTheme theme;
+  final bool expanded;
+  final int count;
+  final VoidCallback onToggle;
+  final Widget child;
+
+  const _LegacyAccordion({
+    required this.theme,
+    required this.expanded,
+    required this.count,
+    required this.onToggle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: onToggle,
+          behavior: HitTestBehavior.opaque,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Icon(
+                    expanded ? Icons.expand_more : Icons.chevron_right,
+                    size: 16,
+                    color: theme.dimForeground,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Legacy themes',
+                    style: TextStyle(
+                      color: theme.dimForeground,
+                      fontFamily: theme.fontFamily,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '($count)',
+                    style: TextStyle(
+                      color: theme.dimForeground.withAlpha(160),
+                      fontFamily: theme.fontFamily,
+                      fontSize: 11,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (expanded)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: child,
+          ),
       ],
     );
   }

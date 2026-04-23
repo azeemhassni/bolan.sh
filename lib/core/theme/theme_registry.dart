@@ -6,15 +6,25 @@ import 'package:flutter/foundation.dart';
 import 'bolan_theme.dart';
 import 'default_dark.dart';
 import 'theme_serializer.dart';
+import 'themes/amethyst_dusk.dart';
+import 'themes/carbon.dart';
+import 'themes/coral_reef.dart';
 import 'themes/default_light.dart';
 import 'themes/dracula.dart';
+import 'themes/ember.dart';
+import 'themes/forest_dawn.dart';
 import 'themes/gruvbox_dark.dart';
+import 'themes/midnight_cove.dart';
 import 'themes/monokai.dart';
 import 'themes/nord.dart';
+import 'themes/nordic_frost.dart';
 import 'themes/one_dark.dart';
+import 'themes/parchment.dart';
 import 'themes/raskoh.dart';
+import 'themes/sakura_morning.dart';
 import 'themes/solarized_dark.dart';
 import 'themes/solarized_light.dart';
+import 'themes/terracotta.dart';
 import 'themes/tokyo_night.dart';
 
 /// Registry of all available themes (built-in + custom).
@@ -25,7 +35,36 @@ class ThemeRegistry extends ChangeNotifier {
   final Map<String, BolonTheme> _themes = {};
   Timer? _watchTimer;
 
+  /// Names of the legacy built-ins — prior default set, kept for users
+  /// who had them selected. Surfaced in a separate "Legacy" accordion
+  /// in the theme picker so the primary set is what new users see first.
+  static const _legacyNames = {
+    'default-dark',
+    'default-light',
+    'dracula',
+    'one-dark',
+    'nord',
+    'monokai',
+    'solarized-dark',
+    'solarized-light',
+    'gruvbox-dark',
+    'tokyo-night',
+    'raskoh',
+  };
+
   ThemeRegistry() {
+    // Primary built-ins (registered first — shown at the top of the picker).
+    _register(midnightCoveTheme);
+    _register(parchmentTheme);
+    _register(forestDawnTheme);
+    _register(coralReefTheme);
+    _register(amethystDuskTheme);
+    _register(carbonTheme);
+    _register(emberTheme);
+    _register(nordicFrostTheme);
+    _register(sakuraMorningTheme);
+    _register(terracottaTheme);
+    // Legacy built-ins.
     _register(bolonDefaultDark);
     _register(bolonDefaultLight);
     _register(draculaTheme);
@@ -39,14 +78,37 @@ class ThemeRegistry extends ChangeNotifier {
     _register(raskohTheme);
   }
 
-  /// All available themes sorted: built-ins first, then custom alphabetically.
-  List<BolonTheme> get allThemes {
-    final builtIns = _themes.values.where((t) => t.isBuiltIn).toList()
+  /// Whether a theme is one of the "legacy" built-ins (older set, kept
+  /// for backward compatibility, rendered in an accordion).
+  bool isLegacy(BolonTheme theme) =>
+      theme.isBuiltIn && _legacyNames.contains(theme.name);
+
+  /// Built-in themes that form the current default set (non-legacy),
+  /// sorted alphabetically.
+  List<BolonTheme> get primaryBuiltIns {
+    return _themes.values
+        .where((t) => t.isBuiltIn && !_legacyNames.contains(t.name))
+        .toList()
       ..sort((a, b) => a.displayName.compareTo(b.displayName));
-    final custom = _themes.values.where((t) => !t.isBuiltIn).toList()
-      ..sort((a, b) => a.displayName.compareTo(b.displayName));
-    return [...builtIns, ...custom];
   }
+
+  /// Legacy built-in themes, sorted alphabetically.
+  List<BolonTheme> get legacyBuiltIns {
+    return _themes.values
+        .where((t) => t.isBuiltIn && _legacyNames.contains(t.name))
+        .toList()
+      ..sort((a, b) => a.displayName.compareTo(b.displayName));
+  }
+
+  /// User-created themes loaded from disk.
+  List<BolonTheme> get customThemes {
+    return _themes.values.where((t) => !t.isBuiltIn).toList()
+      ..sort((a, b) => a.displayName.compareTo(b.displayName));
+  }
+
+  /// All available themes sorted: primary built-ins, custom, then legacy.
+  List<BolonTheme> get allThemes =>
+      [...primaryBuiltIns, ...customThemes, ...legacyBuiltIns];
 
   /// Gets a theme by name, falling back to default-dark.
   BolonTheme getTheme(String name) {

@@ -16,7 +16,7 @@ final themeRegistryProvider = Provider<ThemeRegistry>((ref) {
 });
 
 /// The currently active theme name — synced with config.
-final activeThemeNameProvider = StateProvider<String>((ref) => 'default-dark');
+final activeThemeNameProvider = StateProvider<String>((ref) => 'midnight-cove');
 
 /// The resolved active [BolonTheme] — derived from name + registry.
 final activeThemeProvider = Provider<BolonTheme>((ref) {

@@ -25,7 +25,7 @@ class AppConfig {
     this.editor = const EditorConfig(),
     this.ai = const AiConfig(),
     this.update = const UpdateConfig(),
-    this.activeTheme = 'default-dark',
+    this.activeTheme = 'midnight-cove',
     this.keybindingOverrides = const {},
     this.overrides = const WorkspaceOverrides(),
   });
@@ -228,7 +228,7 @@ class ResolvedConfig {
 
   const ResolvedConfig({
     this.editor = const EditorConfig(),
-    this.activeTheme = 'default-dark',
+    this.activeTheme = 'midnight-cove',
     this.keybindingOverrides = const {},
     this.update = const UpdateConfig(),
     this.confirmOnQuit = true,
