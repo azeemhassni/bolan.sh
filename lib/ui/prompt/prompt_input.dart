@@ -170,9 +170,9 @@ class PromptInputState extends State<PromptInput> {
   }
 
   @override
-  void didUpdateWidget(PromptInput old) {
-    super.didUpdateWidget(old);
-    if (old.broadcastActive != widget.broadcastActive) {
+  void didUpdateWidget(PromptInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.broadcastActive != widget.broadcastActive) {
       _setupBroadcastListener();
     }
   }

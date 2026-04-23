@@ -11,8 +11,8 @@ import 'package:xterm/xterm.dart';
 import '../completion/completion_engine.dart';
 import '../workspace/workspace_paths.dart';
 import 'command_block.dart';
-import 'command_parser.dart';
 import 'command_history.dart';
+import 'command_parser.dart';
 import 'shell_integration.dart';
 
 /// Tab status indicator.

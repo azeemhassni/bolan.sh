@@ -448,9 +448,10 @@ class SessionViewState extends ConsumerState<SessionView> {
     final fontSize = ref.watch(fontSizeProvider);
     ref.watch(configVersionProvider); // rebuild on config file changes
     final configLoader = ref.watch(configLoaderProvider);
-    final lineHeight = configLoader.config.editor.lineHeight;
-    final fontFamily = configLoader.config.editor.fontFamily;
-    final cursorStyle = configLoader.config.editor.cursorStyle;
+    final resolved = ref.watch(resolvedConfigProvider);
+    final lineHeight = resolved.editor.lineHeight;
+    final fontFamily = resolved.editor.fontFamily;
+    final cursorStyle = resolved.editor.cursorStyle;
     final cursorType = switch (cursorStyle) {
       'underline' => TerminalCursorType.underline,
       'bar' => TerminalCursorType.verticalBar,
@@ -524,14 +525,14 @@ class SessionViewState extends ConsumerState<SessionView> {
                       block: blocks[i],
                       fontSize: fontSize,
                       lineHeight: lineHeight,
-                      scrollable: configLoader.config.editor.scrollableBlocks,
+                      scrollable: resolved.editor.scrollableBlocks,
                       cwd: widget.session.cwd,
                       shellName: widget.session.shellName,
                       aiEnabled: configLoader.config.ai.enabled,
                       aiProvider: configLoader.config.ai.provider,
                       geminiModel: configLoader.config.ai.geminiModel,
                       anthropicMode: configLoader.config.ai.anthropicMode,
-                      ligatures: configLoader.config.editor.ligatures,
+                      ligatures: resolved.editor.ligatures,
                       searchHighlight: _buildSearchRegex(),
                       currentMatchIndex: _findCurrentMatch,
                       blockMatchStartIndex: _matchStartIndexForBlock(i),
@@ -547,7 +548,7 @@ class SessionViewState extends ConsumerState<SessionView> {
                         session: widget.session,
                         fontSize: fontSize,
                         lineHeight: lineHeight,
-                        ligatures: configLoader.config.editor.ligatures,
+                        ligatures: resolved.editor.ligatures,
                         onContentGrew: _scrollToBottomIfPinned,
                       ),
                     ),

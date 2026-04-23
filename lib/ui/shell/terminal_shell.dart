@@ -11,6 +11,7 @@ import '../../core/ai/ai_provider_helper.dart';
 import '../../core/ai/local_llm_provider.dart';
 import '../../core/ai/model_manager.dart';
 import '../../core/config/config_loader.dart';
+import '../../core/config/global_config.dart';
 import '../../core/config/keybinding.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../core/pane/pane_manager.dart';
@@ -58,6 +59,8 @@ class TerminalShell extends ConsumerStatefulWidget {
 class _TerminalShellState extends ConsumerState<TerminalShell>
     with WidgetsBindingObserver {
   ConfigLoader get _configLoader => ref.read(configLoaderProvider);
+  GlobalConfigLoader get _globalConfigLoader =>
+      ref.read(globalConfigLoaderProvider);
   final _notificationService = NotificationService();
   bool _showPalette = false;
   bool _showDownloadDialog = false;
@@ -73,6 +76,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _configLoader.addListener(_onConfigChanged);
+    _globalConfigLoader.addListener(_onConfigChanged);
     HardwareKeyboard.instance.addHandler(_globalKeyHandler);
     LocalLlmProvider.memoryConfirmCallback = _confirmHighMemoryLoad;
     // Sweep up any orphan llamafile server left from a previous Bolan
@@ -132,6 +136,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     LocalLlmProvider.memoryConfirmCallback = null;
     AiProviderHelper.dispose();
     _configLoader.removeListener(_onConfigChanged);
+    _globalConfigLoader.removeListener(_onConfigChanged);
     _configLoader.dispose();
     super.dispose();
   }
@@ -152,7 +157,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
   }
 
   void _onConfigChanged() {
-    final config = _configLoader.config;
+    final config = ref.read(resolvedConfigProvider);
     final currentFontSize = ref.read(fontSizeProvider);
     if (config.editor.fontSize != currentFontSize) {
       ref.read(fontSizeProvider.notifier).setSize(config.editor.fontSize);
@@ -783,7 +788,7 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
     final sessionState = ref.watch(currentSessionProvider);
 
     final configuredFont =
-        _configLoader.config.editor.fontFamily;
+        ref.watch(resolvedConfigProvider).editor.fontFamily;
     final theme = ref.watch(activeThemeProvider)
         .copyWith(fontFamily: configuredFont);
 
