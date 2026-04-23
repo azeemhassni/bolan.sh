@@ -669,6 +669,17 @@ class _TerminalShellState extends ConsumerState<TerminalShell>
         callback: () => _checkForUpdates(force: true),
       ),
       AppAction(
+        id: 'broadcast_input',
+        label: 'Toggle Broadcast Input',
+        shortcut: kb(KeyAction.broadcastInput),
+        icon: Icons.cell_tower,
+        keywords: const ['broadcast', 'input', 'multi', 'pane', 'all'],
+        callback: () {
+          final current = ref.read(broadcastInputProvider);
+          ref.read(broadcastInputProvider.notifier).state = !current;
+        },
+      ),
+      AppAction(
         id: 'focus_prompt',
         label: 'Focus Prompt',
         shortcut: kb(KeyAction.focusPrompt),
