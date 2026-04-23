@@ -7,6 +7,7 @@ import '../../core/workspace/workspace.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/workspace_provider.dart';
 import '../shared/bolan_button.dart';
+import 'workspace_icon.dart';
 
 /// Vertical rail listing workspaces. Click an item to switch; the
 /// active item is highlighted with its accent color. Two-finger
@@ -184,12 +185,23 @@ class _WorkspaceItemState extends State<_WorkspaceItem> {
           ),
           child: Row(
             children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: accent,
-                  shape: BoxShape.circle,
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: Center(
+                  child: WorkspaceIcon(
+                    workspace: widget.workspace,
+                    size: 14,
+                    tintColor: accent,
+                    fallback: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: accent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),

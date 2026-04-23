@@ -94,4 +94,10 @@ class WorkspacePaths {
       File('${rootPath()}/workspaces/$id/session_state.json');
   static File configFileFor(String id) =>
       File('${rootPath()}/workspaces/$id/config.toml');
+
+  /// Per-workspace custom SVG icon file. Present iff the user uploaded
+  /// a custom icon for that workspace (see the Workspace Editor's icon
+  /// picker). The Workspace.icon field stores `"svg"` to flag this.
+  static File iconSvgFileFor(String id) =>
+      File('${rootPath()}/workspaces/$id/icon.svg');
 }

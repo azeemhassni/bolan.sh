@@ -209,6 +209,7 @@ class WorkspaceRegistry extends ChangeNotifier {
             .map((k, v) => MapEntry(k, v.toString())),
         gitName: m['git_name'] as String?,
         gitEmail: m['git_email'] as String?,
+        icon: (m['icon'] as String?) ?? '',
       );
 
   Workspace _defaultWorkspace() => const Workspace(
@@ -229,6 +230,7 @@ class WorkspaceRegistry extends ChangeNotifier {
       if (!w.enabled) sb.writeln('enabled = false');
       if (w.gitName != null) sb.writeln('git_name = "${w.gitName}"');
       if (w.gitEmail != null) sb.writeln('git_email = "${w.gitEmail}"');
+      if (w.icon.isNotEmpty) sb.writeln('icon = "${w.icon}"');
       if (w.envVars.isNotEmpty) {
         sb.writeln('[workspaces.env]');
         for (final entry in w.envVars.entries) {

@@ -7,6 +7,8 @@ import '../../core/workspace/workspace.dart';
 import '../../core/workspace/workspace_secrets.dart';
 import '../../providers/workspace_provider.dart';
 import '../shared/bolan_button.dart';
+import '../workspace/workspace_icon.dart';
+import '../workspace/workspace_icon_picker.dart';
 
 /// CRUD UI for workspaces. Renders a list of workspaces, each row
 /// expandable into an inline editor. New workspaces seed their config
@@ -127,24 +129,7 @@ class _WorkspaceRow extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: workspace.accentColor,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Center(
-                      child: Text(
-                        workspace.initial,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
+                  _rowAvatar(workspace, theme),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -235,6 +220,37 @@ class _WorkspaceRow extends StatelessWidget {
       ),
     );
   }
+
+  /// 28×28 avatar tile. SVG icons render on a neutral background so
+  /// brand colors aren't muddied by the accent fill; everything else
+  /// (Material icon or initial-letter fallback) renders white-on-accent.
+  Widget _rowAvatar(Workspace workspace, BolonTheme theme) {
+    final isSvg = workspace.icon == 'svg';
+    final bg = isSvg ? theme.statusChipBg : workspace.accentColor;
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Center(
+        child: WorkspaceIcon(
+          workspace: workspace,
+          size: 18,
+          tintColor: Colors.white,
+          fallback: Text(
+            workspace.initial,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _WorkspaceEditor extends StatefulWidget {
@@ -261,12 +277,14 @@ class _WorkspaceEditor extends StatefulWidget {
 class _WorkspaceEditorState extends State<_WorkspaceEditor> {
   late TextEditingController _name;
   late TextEditingController _color;
+  late String _icon;
 
   @override
   void initState() {
     super.initState();
     _name = TextEditingController(text: widget.workspace.name);
     _color = TextEditingController(text: widget.workspace.color);
+    _icon = widget.workspace.icon;
   }
 
   @override
@@ -282,6 +300,7 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
       color: _color.text.trim().isEmpty
           ? widget.workspace.color
           : _color.text.trim(),
+      icon: _icon,
     ));
   }
 
@@ -327,7 +346,18 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
           _field('Name', _name, t),
           _field('Color (hex)', _color, t),
           Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            padding: const EdgeInsets.only(top: 4, bottom: 4),
+            child: Text('Icon', style: _labelStyle(t)),
+          ),
+          WorkspaceIconPicker(
+            currentIcon: _icon,
+            accentColor: widget.workspace.accentColor,
+            theme: t,
+            workspaceId: widget.workspace.id,
+            onChanged: (v) => setState(() => _icon = v),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 8),
             child: Text(
               'Git identity, environment variables, and secrets for this '
               'workspace live under Settings → Environment.',
@@ -518,6 +548,7 @@ class _NewWorkspaceForm extends StatefulWidget {
 class _NewWorkspaceFormState extends State<_NewWorkspaceForm> {
   final _name = TextEditingController();
   late String _color;
+  String _icon = '';
   String? _error;
 
   @override
@@ -530,6 +561,12 @@ class _NewWorkspaceFormState extends State<_NewWorkspaceForm> {
   void dispose() {
     _name.dispose();
     super.dispose();
+  }
+
+  Color _parseHex(String hex) {
+    final s = hex.replaceFirst('#', '');
+    final v = int.tryParse(s, radix: 16) ?? 0x888888;
+    return Color(0xFF000000 | v);
   }
 
   /// Derives a stable id from the name: lowercase, kebab-case, alnum
@@ -559,6 +596,7 @@ class _NewWorkspaceFormState extends State<_NewWorkspaceForm> {
       id: _deriveId(name),
       name: name,
       color: _color,
+      icon: _icon,
     ));
   }
 
@@ -618,6 +656,22 @@ class _NewWorkspaceFormState extends State<_NewWorkspaceForm> {
                   onTap: () => setState(() => _color = c),
                 ),
             ],
+          ),
+          const SizedBox(height: 10),
+          Text('Icon (SVG upload available after create)',
+              style: TextStyle(
+                color: t.dimForeground,
+                fontFamily: t.fontFamily,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              )),
+          const SizedBox(height: 6),
+          WorkspaceIconPicker(
+            currentIcon: _icon,
+            accentColor: _parseHex(_color),
+            theme: t,
+            supportSvg: false,
+            onChanged: (v) => setState(() => _icon = v),
           ),
           const SizedBox(height: 12),
           Row(children: [

@@ -39,6 +39,12 @@ class Workspace {
   final String? gitName;
   final String? gitEmail;
 
+  /// Icon identifier. Empty = no icon (fall back to accent dot /
+  /// initial letter). `material:<key>` refers to a built-in Material
+  /// icon from the icon catalog. `svg` means "use the SVG file at
+  /// `<workspace-dir>/icon.svg`" (uploaded by the user).
+  final String icon;
+
   const Workspace({
     required this.id,
     required this.name,
@@ -48,6 +54,7 @@ class Workspace {
     this.secrets = const {},
     this.gitName,
     this.gitEmail,
+    this.icon = '',
   });
 
   /// Initial letter for the sidebar icon. First code unit of [name];
@@ -73,6 +80,7 @@ class Workspace {
     Map<String, String>? secrets,
     String? gitName,
     String? gitEmail,
+    String? icon,
   }) =>
       Workspace(
         id: id ?? this.id,
@@ -83,5 +91,6 @@ class Workspace {
         secrets: secrets ?? this.secrets,
         gitName: gitName ?? this.gitName,
         gitEmail: gitEmail ?? this.gitEmail,
+        icon: icon ?? this.icon,
       );
 }
