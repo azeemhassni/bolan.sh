@@ -161,6 +161,8 @@ class BolanTextField extends StatefulWidget {
   final String value;
   final String? hint;
   final bool obscure;
+  final bool autofocus;
+  final FocusNode? focusNode;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
@@ -169,6 +171,8 @@ class BolanTextField extends StatefulWidget {
     required this.value,
     this.hint,
     this.obscure = false,
+    this.autofocus = false,
+    this.focusNode,
     this.onChanged,
     this.onSubmitted,
   });
@@ -208,6 +212,8 @@ class _BolanTextFieldState extends State<BolanTextField> {
       borderRadius: BorderRadius.circular(5),
       child: TextField(
         controller: _controller,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
         obscureText: widget.obscure,
         style: TextStyle(
           color: theme.foreground,
