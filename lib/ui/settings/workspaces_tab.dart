@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/bolan_theme.dart';
 import '../../core/workspace/workspace.dart';
-// ignore: unused_import
-import '../../core/workspace/workspace_secrets.dart';
 import '../../providers/workspace_provider.dart';
 import '../shared/bolan_button.dart';
 import '../workspace/workspace_icon.dart';
@@ -466,64 +464,6 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
     );
   }
 
-  // ignore: unused_element
-  Widget _envField(String value, String hint, BolonTheme t,
-      ValueChanged<String> onChanged) {
-    return TextFormField(
-      initialValue: value,
-      onChanged: onChanged,
-      style: TextStyle(
-        color: t.foreground,
-        fontFamily: t.fontFamily,
-        fontSize: 12,
-      ),
-      decoration: InputDecoration(
-        isDense: true,
-        hintText: hint,
-        hintStyle: TextStyle(color: t.dimForeground, fontSize: 11),
-        border: OutlineInputBorder(
-          borderSide: BorderSide(color: t.blockBorder),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: t.blockBorder),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      ),
-    );
-  }
-
-  // ignore: unused_element
-  Widget _secretField(String value, String hint, BolonTheme t,
-      ValueChanged<String> onChanged) {
-    return TextFormField(
-      initialValue: value,
-      onChanged: onChanged,
-      obscureText: true,
-      style: TextStyle(
-        color: t.foreground,
-        fontFamily: t.fontFamily,
-        fontSize: 12,
-      ),
-      decoration: InputDecoration(
-        isDense: true,
-        hintText: hint,
-        hintStyle: TextStyle(color: t.dimForeground, fontSize: 11),
-        border: OutlineInputBorder(
-          borderSide: BorderSide(color: t.blockBorder),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: t.blockBorder),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      ),
-    );
-  }
 }
 
 class _NewWorkspaceForm extends StatefulWidget {
