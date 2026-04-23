@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/bolan_theme.dart';
 import '../../core/workspace/workspace.dart';
+// ignore: unused_import
 import '../../core/workspace/workspace_secrets.dart';
 import '../../providers/workspace_provider.dart';
 import '../shared/bolan_button.dart';
@@ -260,67 +261,27 @@ class _WorkspaceEditor extends StatefulWidget {
 class _WorkspaceEditorState extends State<_WorkspaceEditor> {
   late TextEditingController _name;
   late TextEditingController _color;
-  late TextEditingController _gitName;
-  late TextEditingController _gitEmail;
-  late List<MapEntry<String, String>> _envEntries;
-  List<MapEntry<String, String>> _secretEntries = [];
-  bool _secretsLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _name = TextEditingController(text: widget.workspace.name);
     _color = TextEditingController(text: widget.workspace.color);
-    _gitName = TextEditingController(text: widget.workspace.gitName ?? '');
-    _gitEmail =
-        TextEditingController(text: widget.workspace.gitEmail ?? '');
-    _envEntries = widget.workspace.envVars.entries
-        .map((e) => MapEntry(e.key, e.value))
-        .toList();
-    _loadSecrets();
-  }
-
-  Future<void> _loadSecrets() async {
-    final secrets = await WorkspaceSecrets.load(widget.workspace.id);
-    if (!mounted) return;
-    setState(() {
-      _secretEntries = secrets.entries
-          .map((e) => MapEntry(e.key, e.value))
-          .toList();
-      _secretsLoaded = true;
-    });
   }
 
   @override
   void dispose() {
     _name.dispose();
     _color.dispose();
-    _gitName.dispose();
-    _gitEmail.dispose();
     super.dispose();
   }
 
   void _save() {
-    // Persist secrets to keychain (not TOML)
-    final secretsMap = {
-      for (final e in _secretEntries)
-        if (e.key.trim().isNotEmpty) e.key.trim(): e.value,
-    };
-    WorkspaceSecrets.save(widget.workspace.id, secretsMap);
-
     widget.onSave(widget.workspace.copyWith(
       name: _name.text.trim().isEmpty ? widget.workspace.name : _name.text.trim(),
       color: _color.text.trim().isEmpty
           ? widget.workspace.color
           : _color.text.trim(),
-      gitName: _gitName.text.trim().isEmpty ? null : _gitName.text.trim(),
-      gitEmail:
-          _gitEmail.text.trim().isEmpty ? null : _gitEmail.text.trim(),
-      envVars: {
-        for (final e in _envEntries)
-          if (e.key.trim().isNotEmpty) e.key.trim(): e.value,
-      },
-      secrets: secretsMap,
     ));
   }
 
@@ -366,119 +327,18 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
           _field('Name', _name, t),
           _field('Color (hex)', _color, t),
           Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 4),
-            child: Text('Git identity (optional, requires Git 2.31+)',
-                style: _labelStyle(t)),
-          ),
-          Row(children: [
-            Expanded(child: _field('Name', _gitName, t)),
-            const SizedBox(width: 8),
-            Expanded(child: _field('Email', _gitEmail, t)),
-          ]),
-          Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 4),
-            child: Text('Environment variables', style: _labelStyle(t)),
-          ),
-          for (var i = 0; i < _envEntries.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(children: [
-                Expanded(
-                  child: _envField(
-                    _envEntries[i].key,
-                    'KEY',
-                    t,
-                    (v) => setState(() => _envEntries[i] =
-                        MapEntry(v, _envEntries[i].value)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _envField(
-                    _envEntries[i].value,
-                    'value',
-                    t,
-                    (v) => setState(() => _envEntries[i] =
-                        MapEntry(_envEntries[i].key, v)),
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.close,
-                      size: 14, color: t.dimForeground),
-                  onPressed: () =>
-                      setState(() => _envEntries.removeAt(i)),
-                  splashRadius: 16,
-                ),
-              ]),
-            ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: BolanButton.ghost(
-              label: 'Add variable',
-              icon: Icons.add,
-              onTap: () => setState(
-                  () => _envEntries.add(const MapEntry('', ''))),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 4),
-            child: Text('Secrets (stored in OS keychain)', style: _labelStyle(t)),
-          ),
-          if (!_secretsLoaded)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                'Loading...',
-                style: TextStyle(
-                  color: t.dimForeground,
-                  fontFamily: t.fontFamily,
-                  fontSize: 11,
-                ),
-              ),
-            )
-          else ...[
-            for (var i = 0; i < _secretEntries.length; i++)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(children: [
-                  Expanded(
-                    child: _envField(
-                      _secretEntries[i].key,
-                      'KEY',
-                      t,
-                      (v) => setState(() => _secretEntries[i] =
-                          MapEntry(v, _secretEntries[i].value)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _secretField(
-                      _secretEntries[i].value,
-                      'secret value',
-                      t,
-                      (v) => setState(() => _secretEntries[i] =
-                          MapEntry(_secretEntries[i].key, v)),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close,
-                        size: 14, color: t.dimForeground),
-                    onPressed: () =>
-                        setState(() => _secretEntries.removeAt(i)),
-                    splashRadius: 16,
-                  ),
-                ]),
-              ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: BolanButton.ghost(
-                label: 'Add secret',
-                icon: Icons.add,
-                onTap: () => setState(
-                    () => _secretEntries.add(const MapEntry('', ''))),
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Text(
+              'Git identity, environment variables, and secrets for this '
+              'workspace live under Settings → Environment.',
+              style: TextStyle(
+                color: t.dimForeground,
+                fontFamily: t.fontFamily,
+                fontSize: 11,
+                decoration: TextDecoration.none,
               ),
             ),
-          ],
+          ),
           const SizedBox(height: 12),
           Row(children: [
             BolanButton.primary(
@@ -576,6 +436,7 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
     );
   }
 
+  // ignore: unused_element
   Widget _envField(String value, String hint, BolonTheme t,
       ValueChanged<String> onChanged) {
     return TextFormField(
@@ -604,6 +465,7 @@ class _WorkspaceEditorState extends State<_WorkspaceEditor> {
     );
   }
 
+  // ignore: unused_element
   Widget _secretField(String value, String hint, BolonTheme t,
       ValueChanged<String> onChanged) {
     return TextFormField(

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_version.dart';
 import '../../core/config/app_config.dart';
@@ -9,10 +10,12 @@ import '../../core/config/global_config.dart';
 import '../../core/theme/bolan_theme.dart';
 import '../../core/theme/theme_registry.dart';
 import '../../core/workspace/workspace_paths.dart';
+import '../../providers/workspace_provider.dart';
 import 'keybindings_tab.dart';
 import 'tabs/ai_tab.dart';
 import 'tabs/appearance_tab.dart';
 import 'tabs/editor_tab.dart';
+import 'tabs/environment_tab.dart';
 import 'tabs/general_tab.dart';
 import 'tabs/prompt_tab.dart';
 import 'tabs/updates_tab.dart';
@@ -58,12 +61,19 @@ class _SettingsScreenState extends State<SettingsScreen>
     Icons.system_update_outlined,
     Icons.workspaces_outlined,
   ];
-  static const _workspaceTabs = ['General', 'Appearance', 'Prompt', 'AI'];
+  static const _workspaceTabs = [
+    'General',
+    'Appearance',
+    'Prompt',
+    'AI',
+    'Environment',
+  ];
   static const _workspaceTabIcons = [
     Icons.settings_outlined,
     Icons.palette_outlined,
     Icons.terminal_outlined,
     Icons.auto_awesome_outlined,
+    Icons.key_outlined,
   ];
   static const _maxContentWidth = 860.0;
 
@@ -310,6 +320,16 @@ class _SettingsScreenState extends State<SettingsScreen>
           config: _config,
           theme: theme,
           onChanged: _updateAi,
+        ),
+      8 => Consumer(
+          builder: (context, ref, _) {
+            final workspace = ref.watch(currentWorkspaceProvider);
+            return EnvironmentTab(
+              key: ValueKey(workspace.id),
+              workspace: workspace,
+              theme: theme,
+            );
+          },
         ),
       _ => const SizedBox.shrink(),
     };
